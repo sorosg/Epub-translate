@@ -1,79 +1,89 @@
-EPUB Fordító Rendszer v5.0
+```markdown
+# EPUB Fordító Rendszer v7.0
 
-📚 Intelligens Könyvfordító Adatbázissal és Öntanuló Rendszerrel
+## 📚 "Self-Evolving Translator" - Az Öntanuló Fordító
 
-https://img.shields.io/badge/version-5.0.0-blue
-https://img.shields.io/badge/license-MIT-green
-https://img.shields.io/badge/docker-ready-brightgreen
-https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange
-
----
-
-🎯 Rendszer Áttekintés
-
-Az EPUB Fordító Rendszer egy teljesen ingyenes, helyben futó megoldás EPUB könyvek fordítására. A DeepSeek AI modelleket használja, amelyek a saját gépeden futnak - nincs szükség API kulcsra, internetkapcsolatra (a modell letöltése után), vagy előfizetésre!
-
-🌟 Legfontosabb Jellemzők
-
-· ✅ 100% Ingyenes - Nincs rejtett költség, előfizetés vagy API díj
-· ✅ Helyben Fut - Minden adat a saját gépeden marad
-· ✅ Offline Működés - Internet csak a modell első letöltéséhez kell
-· ✅ Intelligens - Minél többet használod, annál jobb lesz
-· ✅ Biztonságos - Vírusellenőrzés, 2FA, rate limiting
-· ✅ Öntanuló - A fordítási eredmények alapján folyamatosan fejlődik
+![Version](https://img.shields.io/badge/version-7.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
+![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
+![PWA](https://img.shields.io/badge/PWA-ready-purple)
 
 ---
 
-📋 Tartalomjegyzék
+## 🎯 Rendszer Áttekintés
 
-1. Rendszerkövetelmények
-2. Gyors Telepítés
-3. Újdonságok a v5.0-ban
-4. Architektúra
-5. Konfiguráció
-6. Használat
-7. Könyv Adatbázis
-8. Mintakönyv Rendszer
-9. Email Beállítások
-10. Admin Felület
-11. API Dokumentáció
-12. Karbantartás
-13. Hibaelhárítás
-14. GYIK
+Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** megoldás EPUB könyvek fordítására. A DeepSeek AI modelleket használja, amelyek a saját gépeden futnak - **nincs szükség API kulcsra, internetkapcsolatra (a modell letöltése után), vagy előfizetésre!**
+
+### 🌟 Legfontosabb Jellemzők
+
+- ✅ **100% Ingyenes** - Nincs rejtett költség, előfizetés vagy API díj
+- ✅ **Helyben Fut** - Minden adat a saját gépeden marad
+- ✅ **Offline Működés** - Internet csak a modell első letöltéséhez kell
+- ✅ **Öntanuló** - A fordítási memória és kontextus tanulás folyamatosan javul
+- ✅ **Önfrissítő** - Automatikus GitHub frissítések, verziókövetés
+- ✅ **Biztonságos** - Vírusellenőrzés, 2FA, rate limiting
+- ✅ **Mobilbarát** - Teljes PWA támogatás, telepíthető mobilon
+- ✅ **Kollaboratív** - Valós idejű közös fordítás
 
 ---
 
-💻 Rendszerkövetelmények
+## 📋 Tartalomjegyzék
 
-Hardver
-
-Komponens Minimum Ajánlott
-RAM 16 GB 32 GB
-CPU 4 mag, 2.5 GHz 8+ mag, 3.0+ GHz
-Tárhely 50 GB 100+ GB SSD
-GPU Nem szükséges NVIDIA (opcionális)
-
-Szoftver
-
-· Operációs Rendszer: Ubuntu 22.04 LTS vagy újabb (64 bit)
-· Docker: 24.0+
-· Docker Compose: 2.20+
-
-DeepSeek Modellek Mérete
-
-Modell Méret RAM Igény Sebesség Minőség
-deepseek-r1:1.5b 1.5 GB 8 GB ⚡⚡⚡⚡⚡ ⭐⭐
-deepseek-r1:7b 7 GB 16 GB ⚡⚡⚡⚡ ⭐⭐⭐
-deepseek-r1:8b 8 GB 32 GB ⚡⚡⚡ ⭐⭐⭐⭐
-deepseek-r1:14b 14 GB 32 GB ⚡⚡ ⭐⭐⭐⭐
-deepseek-r1:32b 32 GB 64 GB ⚡ ⭐⭐⭐⭐⭐
-deepseek-r1:70b 70 GB 128 GB 🐌 ⭐⭐⭐⭐⭐
+1. [Rendszerkövetelmények](#-rendszerkövetelmények)
+2. [Gyors Telepítés](#-gyors-telepítés)
+3. [Újdonságok a v7.0-ban](#-újdonságok-a-v70-ban)
+4. [Architektúra](#-architektúra)
+5. [Konfiguráció](#-konfiguráció)
+6. [Használat](#-használat)
+7. [Auto-Update Rendszer](#-auto-update-rendszer)
+8. [Fordítási Memória](#-fordítási-memória)
+9. [Glosszárium Kezelés](#-glosszárium-kezelés)
+10. [Kollaboratív Fordítás](#-kollaboratív-fordítás)
+11. [PWA Mobil Támogatás](#-pwa-mobil-támogatás)
+12. [TTS Hangoskönyv](#-tts-hangoskönyv)
+13. [Plugin Rendszer](#-plugin-rendszer)
+14. [API Dokumentáció](#-api-dokumentáció)
+15. [Karbantartás](#-karbantartás)
+16. [Hibaelhárítás](#-hibaelhárítás)
+17. [GYIK](#-gyik)
+18. [Verzió Történet](#-verzió-történet)
 
 ---
 
-🚀 Gyors Telepítés
+## 💻 Rendszerkövetelmények
 
-Egy paranccsal:
+### Hardver
+
+| Komponens | Minimum | Ajánlott |
+|-----------|---------|----------|
+| **RAM** | 16 GB | 32 GB |
+| **CPU** | 4 mag, 2.5 GHz | 8+ mag, 3.0+ GHz |
+| **Tárhely** | 50 GB | 100+ GB SSD |
+| **GPU** | Nem szükséges | NVIDIA (opcionális) |
+
+### Szoftver
+
+- **Operációs Rendszer:** Ubuntu 22.04 LTS vagy újabb (64 bit)
+- **Docker:** 24.0+ 
+- **Docker Compose:** 2.20+
+
+### DeepSeek Modellek
+
+| Modell | Méret | RAM Igény | Sebesség | Minőség |
+|--------|-------|-----------|----------|---------|
+| `deepseek-r1:1.5b` | 1.5 GB | 8 GB | ⚡⚡⚡⚡⚡ | ⭐⭐ |
+| `deepseek-r1:7b` | 7 GB | 16 GB | ⚡⚡⚡⚡ | ⭐⭐⭐ |
+| `deepseek-r1:8b` | 8 GB | 32 GB | ⚡⚡⚡ | ⭐⭐⭐⭐ |
+| `deepseek-r1:14b` | 14 GB | 32 GB | ⚡⚡ | ⭐⭐⭐⭐ |
+| `deepseek-r1:32b` | 32 GB | 64 GB | ⚡ | ⭐⭐⭐⭐⭐ |
+| `deepseek-r1:70b` | 70 GB | 128 GB | 🐌 | ⭐⭐⭐⭐⭐ |
+
+---
+
+## 🚀 Gyors Telepítés
+
+### Egy paranccsal:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/sorosg/Epub-translate/main/install.sh | bash
@@ -92,58 +102,97 @@ chmod +x install.sh
 ./install.sh
 ```
 
+Telepítési Varázsló
+
+A telepítő interaktív varázslóval rendelkezik, ami végigvezet a beállításokon:
+
+· 👤 Adminisztrátori fiók beállítása
+· 🤖 AI modell kiválasztása
+· 📡 GitHub auto-update konfigurálása
+· 📱 PWA beállítások
+· 🔊 TTS engedélyezése
+· 👥 Kollaboráció beállítása
+· 🔌 Plugin rendszer
+· 📧 Email konfiguráció
+· ⚡ Teljesítmény beállítások
+· 🔒 Biztonsági beállítások
+
 Telepítés Után
 
 ```bash
-# Ellenőrizd a szolgáltatásokat
-docker compose ps
+# Webes felület
+http://localhost
 
-# Nyisd meg a webes felületet
-# http://localhost
-
-# Email felület (ha MailHog van)
-# http://localhost:8025
+# Email felület (MailHog)
+http://localhost:8025
 
 # Admin belépés
-# Email: admin@epub-translator.local
-# Jelszó: Abrakadabra (változtasd meg!)
+Email: admin@epub-translator.local
+Jelszó: Abrakadabra (változtasd meg!)
+
+# Frissítés kezelés
+http://localhost/admin/updates
 ```
 
 ---
 
-🆕 Újdonságok a v5.0-ban
+🆕 Újdonságok a v7.0-ban
 
-📚 Könyv Adatbázis
+📡 GitHub Auto-Update Rendszer
 
-· Automatikus metaadat kinyerés EPUB fájlokból
-· Online keresés Google Books és OpenLibrary adatbázisokban
-· AI alapú műfaj felismerés - 15+ műfaj automatikus észlelése
-· Stílus elemzés - Irodalmi, egyszerű, technikai stílusok felismerése
-· Duplikátum szűrés - SHA-256 hash alapján
-· Borítókép kinyerés és tárolás
+· Automatikus frissítés GitHub repository-ból
+· Több frissítési csatorna (stable, beta, nightly)
+· Verziókövetés és frissítési előzmények
+· Visszaállítási pontok automatikus mentéssel
+· GitHub token támogatás privát repository-khoz
+· Ütemezett ellenőrzés (állítható intervallum)
+· Egy kattintásos frissítés az admin felületen
 
-🧠 Intelligens Mintakönyv Kezelés
+🧠 Öntanuló Fordítási Memória
 
-· Automatikus ajánlás a célkönyv műfaja és stílusa alapján
-· Egyezési pontszám számítás (műfaj, stílus, komplexitás)
-· Kontextus tanulás - A sikeres fordítások növelik a könyv súlyát
-· Diverz választás - Különböző műfajokból választ mintát
-· Használati statisztikák - Melyik mintakönyvek működnek legjobban
+· Mondat szintű fordítás tárolás
+· Fuzzy matching hasonló szövegekhez
+· Minőségi pontszám alapú súlyozás
+· Automatikus tanulás a fordításokból
+· Kontextus alapú fordítás újrafelhasználás
 
-🔍 Több Forrásból Származó Metaadatok
+📚 Intelligens Glosszárium
 
-· EPUB belső metaadatok (automatikus)
-· Google Books API (online)
-· OpenLibrary API (online)
-· Helyi AI elemzés (offline)
-· Felhasználói szerkesztés (manuális)
+· Domain-specifikus terminológia
+· Automatikus kifejezés felismerés
+· Konzisztens fordítás biztosítása
+· Publikus és privát glosszáriumok
+· Import/Export támogatás
 
-📊 Továbbfejlesztett Statisztikák
+👥 Valós Idejű Kollaboráció
 
-· Könyv statisztikák - Szavak, fejezetek, komplexitás
-· Fordítási minőség műfajonként
-· Mintakönyv hatékonyság mérése
-· Rendszerhasználati riportok
+· Több felhasználós egyidejű fordítás
+· WebSocket alapú valós idejű kommunikáció
+· Szavazás a legjobb fordításra
+· Kommentek és megjegyzések
+· Verziókövetés a változtatásokhoz
+
+📱 Teljes PWA Támogatás
+
+· Telepíthető mobilon és asztali gépen
+· Offline működés Service Worker-rel
+· Push értesítések a fordítás állapotáról
+· Háttér szinkronizálás
+· Reszponzív design minden eszközön
+
+🔊 TTS Hangoskönyv Generálás
+
+· Edge TTS integráció (ingyenes, jó minőség)
+· Több nyelv és hang támogatása
+· Audiobook generálás EPUB-ból
+· Streaming lejátszás
+
+🔌 Plugin Rendszer
+
+· Bővíthető architektúra
+· Hook rendszer (pre/post fordítás, stb.)
+· Egyedi pluginok fejlesztése
+· Manifest alapú plugin kezelés
 
 ---
 
@@ -153,23 +202,27 @@ docker compose ps
 ┌─────────────────────────────────────────────────────────────┐
 │                     Felhasználói Böngésző                      │
 │                    http://localhost:80                        │
+│                    📱 PWA Támogatás                           │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
-│                         Nginx (80/443)                        │
-│                    Reverse Proxy & Static Files              │
+│                      Nginx (80/443)                          │
+│              Reverse Proxy + Statikus Fájlok                 │
+│              Rate Limiting + Biztonsági Fejlécek              │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
-│                    Flask Backend (5000)                       │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ Fordítás     │  │ Könyv DB      │  │ Felhasználó      │   │
-│  │ Kezelő       │  │ & Metaadatok  │  │ Kezelés          │   │
-│  └─────────────┘  └──────────────┘  └──────────────────┘   │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ Email        │  │ API           │  │ Statisztikák     │   │
-│  │ Szolgáltatás │  │ Végpontok     │  │ & Monitoring     │   │
-│  └─────────────┘  └──────────────┘  └──────────────────┘   │
+│                  Flask Backend (5000)                        │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐    │
+│  │ Fordítás     │ │ Auto-Update  │ │ Felhasználó       │    │
+│  │ Kezelő       │ │ Manager      │ │ Kezelés           │    │
+│  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
+│  │ Fordítási    │ │ Verzió       │ │ Kollaboráció      │    │
+│  │ Memória      │ │ Követés      │ │ (WebSocket)       │    │
+│  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
+│  │ Glosszárium  │ │ Biztonsági   │ │ Plugin            │    │
+│  │ Kezelő       │ │ Mentések     │ │ Manager           │    │
+│  └──────────────┘ └──────────────┘ └──────────────────┘    │
 └───────────────────────────┬─────────────────────────────────┘
                             │
         ┌───────────────────┼───────────────────┐
@@ -177,12 +230,14 @@ docker compose ps
 ┌───────▼──────┐   ┌────────▼────────┐   ┌─────▼──────┐
 │  PostgreSQL  │   │     Ollama       │   │   Redis    │
 │  Adatbázis   │   │  DeepSeek AI    │   │   Cache    │
+│  + TM +      │   │  Modellek       │   │            │
+│  Glosszárium │   │                 │   │            │
 └──────────────┘   └─────────────────┘   └────────────┘
 
-┌──────────────┐   ┌─────────────────┐
-│   MailHog    │   │  Postfix Relay  │
-│ Helyi Email  │   │ Külső Email     │
-└──────────────┘   └─────────────────┘
+┌──────────────┐   ┌─────────────────┐   ┌──────────────┐
+│   MailHog    │   │   TTS Service    │   │  WebSocket   │
+│ Helyi Email  │   │  Edge TTS        │   │  Szerver     │
+└──────────────┘   └─────────────────┘   └──────────────┘
 ```
 
 Szolgáltatások
@@ -194,6 +249,8 @@ PostgreSQL 5432 Adatbázis (belső)
 Ollama 11434 AI modell szerver (belső)
 Redis 6379 Cache (belső)
 MailHog 1025, 8025 Helyi email szerver és UI
+TTS Service 5001 Hangoskönyv generálás
+WebSocket 3001 Kollaboráció
 
 ---
 
@@ -203,56 +260,46 @@ Környezeti Változók (.env)
 
 ```env
 # Alkalmazás
+VERSION=7.0.0
 SECRET_KEY=your-secret-key
 FLASK_ENV=production
-VERSION=5.0.0
 
 # Admin
 ADMIN_EMAIL=admin@epub-translator.local
 ADMIN_PASSWORD=your-secure-password
 
+# AI Modell
+SELECTED_MODEL=deepseek-r1:8b
+MAX_WORKERS=3
+
+# Auto-Update
+ENABLE_AUTO_UPDATE=true
+GITHUB_REPO=https://github.com/sorosg/Epub-translate.git
+GITHUB_BRANCH=main
+GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+UPDATE_CHECK_INTERVAL=3600
+
+# Funkciók
+ENABLE_PWA=true
+ENABLE_TTS=true
+ENABLE_COLLABORATION=true
+ENABLE_PLUGINS=true
+ENABLE_API=true
+ENABLE_BOOK_DB=true
+ENABLE_CACHE=true
+
 # SMTP (Helyi MailHog)
 SMTP_MODE=local
 SMTP_HOST=mailhog
 SMTP_PORT=1025
-
-# Modell
-SELECTED_MODEL=deepseek-r1:8b
-MAX_WORKERS=3
-
-# Könyv Adatbázis
-ENABLE_BOOK_DB=true
-MAX_SAMPLE_BOOKS=5
-ENABLE_ONLINE_SEARCH=true
-
-# Cache
-ENABLE_CACHE=true
-REDIS_URL=redis://redis:6379/0
 ```
 
-SMTP Módok
+Frissítési Csatornák
 
-```bash
-# 1. Helyi (MailHog) - Alapértelmezett
-SMTP_MODE=local
-SMTP_HOST=mailhog
-SMTP_PORT=1025
-# Email UI: http://localhost:8025
-
-# 2. Gmail Relay
-SMTP_MODE=gmail
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=yourmail@gmail.com
-SMTP_PASSWORD=your-app-password
-
-# 3. Egyéni SMTP
-SMTP_MODE=custom
-SMTP_HOST=smtp.yourcompany.com
-SMTP_PORT=587
-SMTP_USER=your-user
-SMTP_PASSWORD=your-password
-```
+Csatorna Leírás Frissítési Gyakoriság
+stable Stabil, tesztelt verziók Hetente
+beta Előzetes verziók Naponta
+nightly Fejlesztői verziók Óránként
 
 ---
 
@@ -272,32 +319,30 @@ Felhasználói Felület
 
 ```
 1. Kattints a "Fájl kiválasztása" gombra
-2. Válaszd ki az EPUB fájlt
+2. Válaszd ki az EPUB fájlt (max 100MB)
 3. Opcionálisan tölts fel mintakönyveket
-4. Kattints a "Fordítás indítása" gombra
+4. Válassz glosszáriumot (opcionális)
+5. Kattints a "Fordítás indítása" gombra
 ```
 
-3. Mintakönyvek Kezelése
-
-```
-1. Tölts fel saját mintakönyveket (.epub)
-   VAGY
-2. Válassz az adatbázisból ajánlott könyveket
-   VAGY
-3. Hagyd, hogy a rendszer automatikusan válasszon
-```
-
-4. Fordítás Követése
+3. Fordítás Követése
 
 · Folyamatjelző mutatja a haladást
-· Befejezéskor email értesítés
+· Élő előnézet a fordításról
+· Befejezéskor email és push értesítés
 · A fájl letölthető a felületről
 
 Parancssori Műveletek
 
 ```bash
 # Státusz
-docker compose ps
+./scripts/status.sh
+
+# Biztonsági mentés
+./scripts/backup.sh
+
+# Frissítés
+./scripts/update.sh
 
 # Logok
 docker compose logs -f backend
@@ -307,203 +352,184 @@ docker compose restart
 
 # Leállítás
 docker compose down
-
-# Teljes újratelepítés
-docker compose down -v
-./install.sh
 ```
 
 ---
 
-📚 Könyv Adatbázis
+📡 Auto-Update Rendszer
 
-Automatikus Metaadat Kinyerés
+Beállítás
 
-A rendszer automatikusan kinyeri a következő adatokat minden feltöltött könyvből:
+1. Admin felületen: Admin → Frissítés Kezelés
+2. GitHub csatorna hozzáadása:
+   · Repository URL: https://github.com/sorosg/Epub-translate.git
+   · Branch: main
+   · Token: ghp_xxxxxxxxxxxx (opcionális, privát repóhoz)
+3. Ellenőrzési intervallum: 3600 másodperc (1 óra)
 
-Adat Forrás Példa
-Cím EPUB metaadat "A Nagy Gatsby"
-Szerző EPUB / Online "F. Scott Fitzgerald"
-ISBN EPUB / Számított "9780743273565"
-Kiadó EPUB / Online "Scribner"
-Nyelv EPUB metaadat "en"
-Műfaj AI elemzés "literary_fiction"
-Stílus AI elemzés "literary/complex"
-Komplexitás AI elemzés "advanced"
-Szavak száma Számított 47,094
-Fejezetek Számított 9
-
-Támogatott Műfajok
+Frissítési Folyamat
 
 ```
-🎨 fiction              🔍 mystery
-🚀 science_fiction      👻 horror
-🧙 fantasy              📖 literary_fiction
-💕 romance              📚 non_fiction
-🎯 thriller             🔧 technical
+1. Rendszer ellenőrzi a GitHub repository-t
+2. Ha új verzió elérhető:
+   ├── Automatikus biztonsági mentés készül
+   ├── Új verzió letöltése
+   ├── Konténerek újraépítése
+   ├── Szolgáltatások újraindítása
+   └── Sikeres frissítés → értesítés
+3. Ha hiba történik:
+   └── Automatikus visszaállítás az előző verzióra
 ```
 
-Online Keresés
+Kézi Frissítés
 
 ```bash
-# ISBN alapú keresés (ha engedélyezve van)
-curl "http://localhost:5000/api/books/search-online?isbn=9780743273565"
+# Frissítések ellenőrzése
+curl -X POST http://localhost/api/admin/updates/check-all
+
+# Frissítés telepítése
+curl -X POST http://localhost/api/admin/updates/install/1
+
+# Visszaállítás
+curl -X POST http://localhost/api/admin/updates/rollback/1
 ```
 
-Válasz:
+---
 
-```json
-{
-    "found": true,
-    "book": {
-        "title": "The Great Gatsby",
-        "authors": ["F. Scott Fitzgerald"],
-        "publisher": "Scribner",
-        "published_date": "1925",
-        "categories": ["Fiction", "Classics"],
-        "description": "The story of the mysteriously wealthy Jay Gatsby...",
-        "page_count": 180,
-        "average_rating": 3.93
+🧠 Fordítási Memória
+
+Működés
+
+A fordítási memória (TM - Translation Memory) egy öntanuló rendszer, amely:
+
+1. Tárolja a korábbi fordításokat mondat szinten
+2. Fuzzy kereséssel megtalálja a hasonló szövegeket
+3. Újrafelhasználja a korábbi fordításokat
+4. Minőségi pontszám alapján súlyoz
+
+Előnyök
+
+· ⚡ Gyorsabb fordítás - nem kell mindent újrafordítani
+· 📈 Konzisztensebb - ugyanazt a szöveget ugyanúgy fordítja
+· 🧠 Folyamatosan tanul - minél többet használod, annál jobb
+
+---
+
+📚 Glosszárium Kezelés
+
+Domain-specifikus Terminológia
+
+```python
+# Példa glosszárium
+glossary = {
+    "technical": {
+        "algorithm": "algoritmus",
+        "database": "adatbázis",
+        "framework": "keretrendszer"
     },
-    "sources": {
-        "google_books": true,
-        "openlibrary": true
+    "medical": {
+        "diagnosis": "diagnózis",
+        "treatment": "kezelés",
+        "symptom": "tünet"
     }
 }
 ```
 
 ---
 
-🎯 Mintakönyv Rendszer
+👥 Kollaboratív Fordítás
 
-Működési Elv
-
-1. Feltöltéskor a rendszer elemzi a célkönyvet
-2. Adatbázisban keres hasonló könyveket
-3. Pontozza a találatokat (műfaj, stílus, komplexitás alapján)
-4. Kiválasztja a legjobb 3-5 mintát
-5. Használja a fordításhoz kontextusként
-6. Tanul az eredményekből a jövőbeli fordításokhoz
-
-Egyezési Pontszám Számítás
+Munkamenet Létrehozása
 
 ```
-Műfaj egyezés:      +30 pont
-Stílus egyezés:     +25 pont
-Komplexitás egyezés: +20 pont
-Használati súly:    +15 pont (max)
-Kontextus súly:     +10 pont (max)
-─────────────────────────
-Maximum:            100 pont
-```
-
-Ajánlási Példa
-
-```
-Célkönyv: "Dune" (science_fiction, complex, advanced)
-
-Ajánlott minták:
-1. "Foundation" - 92% egyezés (sci-fi, complex, advanced)
-2. "Hyperion" - 87% egyezés (sci-fi, literary, advanced)
-3. "Neuromancer" - 82% egyezés (sci-fi, descriptive, intermediate)
-```
-
----
-
-📧 Email Beállítások
-
-MailHog (Alapértelmezett)
-
-```
-Előnyök:
-✅ Azonnali kézbesítés
-✅ Webes felület (http://localhost:8025)
-✅ Nincs internet szükséges
-✅ Összes email megtekinthető
-✅ Nincs limit
-
-Hátrányok:
-⚠️ Csak helyben érhetők el az emailek
-⚠️ Nem küld külső címekre
-```
-
-Gmail Relay
-
-```
-Előnyök:
-✅ Helyi és külső email küldés
-✅ Ingyenes (napi 500 email)
-✅ Megbízható
-
-Beállítás:
-1. Gmail → Biztonság → Kétlépcsős azonosítás
-2. Alkalmazás jelszó generálása
-3. Használd az alkalmazás jelszót
-```
-
-Egyéni SMTP
-
-```
-Előnyök:
-✅ Teljes kontroll
-✅ Saját domain
-✅ Korlátlan email
-
-Beállítás:
-SMTP_HOST=smtp.yourdomain.com
-SMTP_PORT=587
-SMTP_USER=your-user
-SMTP_PASSWORD=your-password
-```
-
----
-
-👑 Admin Felület
-
-Elérés
-
-```
-http://localhost/admin
+1. Fordítás elindítása
+2. "Megosztás" gomb → munkamenet létrehozása
+3. Meghívó link küldése a résztvevőknek
+4. Valós idejű közös szerkesztés
 ```
 
 Funkciók
 
-Felhasználó Kezelés
+· 👥 Több felhasználó egyidejű szerkesztése
+· 💬 Valós idejű chat és kommentek
+· 🗳️ Szavazás a legjobb fordításra
+· 📝 Verziókövetés
+· 🔔 Értesítések a változásokról
 
-· Új felhasználó létrehozása
-· Token beállítás
-· Fiók aktiválás/tiltás
-· Jogosultság kezelés
-· CSV import/export
+---
 
-Modell Kezelés
+📱 PWA Mobil Támogatás
 
-· Aktív modell megtekintése
-· Modell váltás
-· Új modell letöltése
-· Modell törlése
+Telepítés Mobilra
 
-Könyv Adatbázis
+```
+1. Nyisd meg böngészőben: http://[SZERVER_IP]
+2. Menü → "Telepítés" vagy "Hozzáadás a kezdőképernyőhöz"
+3. Az ikon megjelenik a kezdőképernyőn
+4. Egy kattintással indítható, offline is működik
+```
 
-· Összes könyv listázása
-· Műfaj szerinti szűrés
-· Stílus szerinti szűrés
-· Használati statisztikák
-· Mintakönyv hatékonyság
+PWA Funkciók
 
-Statisztikák
+· 📱 Telepíthető - Nincs szükség App Store-ra
+· 📡 Offline - Internet nélkül is működik
+· 🔔 Push értesítések - Fordítás állapotáról
+· 📲 Reszponzív - Alkalmazkodik a képernyőmérethez
 
-· Felhasználók száma
-· Fordítások száma
-· Sikeres/sikertelen arány
-· Átlagos fordítási idő
-· Rendszer erőforrások
+---
 
-SMTP Beállítások
+🔊 TTS Hangoskönyv
 
-· Mód választás
-· Szerver konfiguráció
-· Teszt email küldés
+Hangoskönyv Generálás
+
+```
+1. Fordítás befejezése után
+2. "Hangoskönyv generálása" gomb
+3. Nyelv és hang kiválasztása
+4. MP3 letöltése
+```
+
+Támogatott Nyelvek
+
+Nyelv Női Hang Férfi Hang
+Magyar Szilvia Tamás
+Angol Jenny Guy
+Német Katja Conrad
+
+---
+
+🔌 Plugin Rendszer
+
+Plugin Struktúra
+
+```
+plugins/
+├── my-plugin/
+│   ├── manifest.json
+│   ├── hooks/
+│   │   ├── pre_translate.py
+│   │   ├── post_translate.py
+│   │   └── on_complete.py
+│   └── static/
+│       ├── css/
+│       └── js/
+```
+
+Plugin Manifest
+
+```json
+{
+    "name": "my-plugin",
+    "version": "1.0.0",
+    "description": "Egyedi fordítási szabályok",
+    "author": "Your Name",
+    "hooks": ["pre_translate", "post_translate"],
+    "config": {
+        "target_language": "hu",
+        "style": "formal"
+    }
+}
+```
 
 ---
 
@@ -522,112 +548,45 @@ curl -H "X-API-Key: your-api-key" \
   http://localhost/api/books
 ```
 
-Végpontok
+Fő Végpontok
 
-Könyvek
-
-```bash
-# Könyvek listázása
-GET /api/books?genre=science_fiction&style=complex
-
-# Könyv részletei
-GET /api/books/123
-
-# Könyv keresés online
-GET /api/books/search-online?isbn=9780743273565
-
-# Könyv elemzése
-POST /api/books/analyze
-Content-Type: multipart/form-data
-epub_file: [fájl]
-```
-
-Fordítás
-
-```bash
-# Fordítás indítása
-POST /api/translate
-Content-Type: multipart/form-data
-epub_file: [fájl]
-sample_books: [fájlok]
-
-# Fordítás állapota
-GET /api/translation/123/progress
-
-# Fordítás letöltése
-GET /api/download/123
-```
-
-Admin
-
-```bash
-# Statisztikák
-GET /api/stats
-
-# Modell lista
-GET /api/models
-
-# Modell váltás
-POST /api/models/switch
-{"model": "deepseek-r1:14b"}
-
-# Felhasználó létrehozás
-POST /api/users
-{
-    "email": "user@example.com",
-    "password": "SecurePass1!",
-    "first_name": "John",
-    "last_name": "Doe"
-}
-```
+Végpont Módszer Leírás
+/api/translate POST Fordítás indítása
+/api/translation/{id}/progress GET Fordítás állapota
+/api/download/{id} GET Fordítás letöltése
+/api/books GET Könyvek listázása
+/api/books/search-online GET Online könyv keresés
+/api/models GET Elérhető modellek
+/api/models/switch POST Modell váltás
+/api/admin/updates/check POST Frissítés ellenőrzése
+/api/admin/updates/install POST Frissítés telepítése
+/api/admin/backups GET Biztonsági mentések
 
 ---
 
 🔧 Karbantartás
 
-Rendszeres Feladatok
+Automatikus Feladatok
+
+Feladat Gyakoriság Időpont
+Biztonsági mentés Hetente Vasárnap 03:00
+Docker takarítás Hetente Vasárnap 04:00
+Frissítés ellenőrzés Állítható Alapértelmezett: óránként
+
+Kézi Karbantartás
 
 ```bash
-# Heti biztonsági mentés (automatikus)
-# Vasárnap 03:00 - cron job
-
-# Manuális mentés
+# Teljes biztonsági mentés
 ./scripts/backup.sh
 
-# Mentések listázása
-ls -la ~/epub-backups/
+# Rendszer állapot
+./scripts/status.sh
 
-# Visszaállítás
-./scripts/restore.sh ~/epub-backups/db_backup_20240101.sql
+# Frissítés
+./scripts/update.sh
 
-# Könyv adatbázis statisztika
-./scripts/book-stats.sh
-```
-
-Frissítés
-
-```bash
-# Rendszer frissítése
-cd ~/epub-translator
-git pull
-docker compose down
-docker compose up -d --build
-
-# Modell frissítése
-docker exec -it epub-ollama ollama pull deepseek-r1:8b
-```
-
-Tisztítás
-
-```bash
-# Docker takarítás (automatikus vasárnap 04:00)
-docker system prune -f
-
-# Régi logok törlése
-find logs/ -name "*.log" -mtime +30 -delete
-
-# Ideiglenes fájlok
-rm -rf uploads/tmp_*
+# Adatbázis optimalizálás
+docker exec -it epub-postgres vacuumdb -U epub_user epub_translator
 ```
 
 ---
@@ -639,181 +598,116 @@ Gyakori Problémák
 1. "Port already in use"
 
 ```bash
-# Ellenőrzés
 sudo lsof -i :80
-sudo lsof -i :5000
-
-# Megoldás
 sudo systemctl stop apache2
-# vagy
-sudo kill -9 [PID]
 ```
 
 2. Memória Problémák
 
 ```bash
-# Ellenőrzés
-free -h
-docker stats
-
-# Megoldás
-# Használj kisebb modellt
+# Kisebb modell használata
 docker exec -it epub-ollama ollama pull deepseek-r1:7b
-# Állítsd át az admin felületen
 ```
 
-3. Email Nem Érkezik Meg
+3. Frissítési Hibák
 
 ```bash
-# Helyi módban
-# Ellenőrizd: http://localhost:8025
+# Visszaállítás az előző verzióra
+curl -X POST http://localhost/api/admin/updates/rollback/1
 
-# Teszt email
-./scripts/test-email.sh
-
-# Logok
-docker compose logs mailhog
+# Vagy kézzel
+./scripts/backup.sh  # először mentés
+docker compose down
+docker compose up -d --build
 ```
 
-4. A Fordítás Lassú
+4. PWA Nem Telepíthető
 
 ```bash
-# Ellenőrizd a CPU használatot
-htop
-
-# Csökkentsd a párhuzamos szálakat
-# Admin felület → Beállítások → MAX_WORKERS=1
-
-# Használj gyorsabb modellt
-# deepseek-r1:7b vagy deepseek-r1:1.5b
-```
-
-5. Adatbázis Hibák
-
-```bash
-# Adatbázis újraindítás
-docker compose restart postgres
-
-# Táblák újraépítése
-docker exec -it epub-backend python3 -c "
-from app import app, db
-with app.app_context():
-    db.create_all()
-"
-
-# Teljes visszaállítás
-docker compose down -v postgres
-docker compose up -d postgres
-```
-
-Log Fájlok
-
-```bash
-# Alkalmazás log
-tail -f logs/epub_translator.log
-
-# Hiba log
-tail -f logs/errors.log
-
-# Nginx log
-tail -f logs/nginx/error.log
-
-# Összes log egyben
-docker compose logs -f
+# Ellenőrizd a Service Worker-t
+# Chrome: F12 → Application → Service Workers
+# Győződj meg róla, hogy HTTPS-en vagy localhost-on fut
 ```
 
 ---
 
 ❓ GYIK
 
-Általános Kérdések
+Általános
 
 K: A rendszer tényleg teljesen ingyenes?
 V: Igen! A DeepSeek modellek nyílt forráskódúak. Nincs API díj, előfizetés vagy rejtett költség.
 
-K: Kell internet a fordításhoz?
-V: Nem! Csak a modell első letöltéséhez. Utána teljesen offline működik.
+K: Hogyan frissül a rendszer?
+V: Automatikusan a GitHub repository-ból. Beállíthatsz stable, beta vagy nightly csatornát.
+
+K: Mi történik, ha megszakad a frissítés?
+V: A rendszer automatikusan visszaáll az előző verzióra a biztonsági mentésből.
+
+PWA
+
+K: Telepíthetem iPhone-ra?
+V: Igen, iOS 16.4-től a Safari támogatja a PWA telepítést.
+
+K: Működik offline?
+V: Igen, a Service Worker cache-eli a fontos fájlokat.
+
+Fordítás
 
 K: Mennyi idő egy könyv fordítása?
 V: Átlagos 300 oldalas könyv: 2-4 óra (deepseek-r1:8b, 32GB RAM).
 
-K: Milyen nyelvekre fordít?
-V: Alapértelmezetten magyarra. A fordítási profilokban módosítható.
-
-Könyv Adatbázis
-
-K: Mi történik a feltöltött könyvekkel?
-V: Automatikusan elemzésre kerülnek, és bekerülnek a helyi adatbázisba. Minden adat a gépeden marad.
-
-K: Hogyan működik a műfaj felismerés?
-V: A rendszer kulcsszavak és AI elemzés alapján határozza meg a műfajt. Az eredményt ellenőrizheted és módosíthatod.
-
-K: Honnan szerzi a metaadatokat?
-V: Több forrásból: EPUB belső adatok, Google Books API, OpenLibrary, és helyi AI elemzés.
-
-Mintakönyvek
-
-K: Kötelező mintakönyvet feltölteni?
-V: Nem, de ajánlott. A rendszer automatikusan ajánl hasonló könyveket az adatbázisból.
-
-K: Hány mintakönyvet használhatok?
-V: Maximum 5 mintakönyvet (konfigurálható). A rendszer automatikusan a legjobbakat választja.
-
-K: A mintakönyvek is bekerülnek az adatbázisba?
-V: Igen, elemzésre kerülnek és segítik a jövőbeli fordításokat.
-
-Biztonság
-
-K: Biztonságos a rendszer?
-V: Igen! Minden adat helyben marad. Vírusellenőrzés, 2FA, rate limiting védi a rendszert.
-
-K: Látják mások a könyveimet?
-V: Nem! Minden helyben fut, nincs külső adatküldés.
-
-K: Mi az a "token" a rendszerben?
-V: Belső elszámolási egység, semmi köze a pénzhez. Az admin állítja be, ki hányat fordíthat.
+K: Használhatom a korábbi fordításokat?
+V: Igen, a fordítási memória automatikusan újrafelhasználja őket.
 
 ---
 
 📊 Verzió Történet
 
+v7.0.0 (2024-09-15) - "Self-Evolving Translator"
+
+· 🆕 GitHub Auto-Update rendszer
+· 🆕 Öntanuló fordítási memória
+· 🆕 Glosszárium kezelés
+· 🆕 Valós idejű kollaboráció
+· 🆕 Teljes PWA támogatás
+· 🆕 TTS hangoskönyv generálás
+· 🆕 Plugin rendszer
+· 🆕 Verziókövetés és visszaállítás
+
+v6.0.0 (2024-06-15)
+
+· Hibrid fordítási stratégia
+· Fordítási memória alapok
+· Kollaboratív fordítás
+· TTS alapok
+
 v5.0.0 (2024-01-15)
 
-· 🆕 Könyv adatbázis automatikus metaadat kinyeréssel
-· 🆕 Intelligens mintakönyv ajánló rendszer
-· 🆕 AI alapú műfaj és stílus felismerés
-· 🆕 Online könyv keresés (Google Books, OpenLibrary)
-· 🆕 Kontextus tanuló rendszer
-· 📈 Továbbfejlesztett statisztikák
-· 🐛 Hibajavítások és stabilizálás
+· Könyv adatbázis
+· Intelligens mintakönyv ajánlás
+· AI műfaj felismerés
 
 v4.0.0 (2024-01-01)
 
-· Hibrid SMTP rendszer (MailHog + opcionális relay)
+· Hibrid SMTP
 · Vírusellenőrzés
 · 2FA támogatás
-· API kulcs kezelés
-· Monitoring rendszer
 
 v3.0.0 (2023-12-15)
 
 · Párhuzamos fordítás
 · Redis cache
-· Batch feldolgozás
-· Több modell támogatás
 
 v2.0.0 (2023-12-01)
 
 · Felhasználó kezelés
 · Token rendszer
-· Email értesítések
-· Webes felület
 
 v1.0.0 (2023-11-15)
 
 · Alap EPUB fordítás
-· Egyszerű webes felület
-· Docker konténerizáció
+· Webes felület
 
 ---
 
@@ -822,41 +716,34 @@ v1.0.0 (2023-11-15)
 Fejlesztői Környezet
 
 ```bash
-# Repository klónozása
 git clone https://github.com/sorosg/Epub-translate.git
 cd Epub-translate
-
-# Fejlesztői mód indítása
 docker compose -f docker-compose.dev.yml up -d
-
-# Tesztek futtatása
-docker exec -it epub-backend pytest
 ```
 
 Hibajelentés
 
-Kérjük, a GitHub Issues oldalon jelentsd a hibákat:
 https://github.com/sorosg/Epub-translate/issues
 
 Feature Request
 
-Új funkciók javaslása:
 https://github.com/sorosg/Epub-translate/discussions
 
 ---
 
 📄 Licensz
 
-MIT License - Lásd a LICENSE fájlt.
+MIT License
 
 ---
 
 🙏 Köszönetnyilvánítás
 
-· DeepSeek - A kiváló nyílt forráskódú AI modellekért
-· Ollama - A modellek egyszerű futtatásáért
-· Flask - A webes keretrendszerért
-· EbookLib - Az EPUB kezelésért
+· DeepSeek - Nyílt forráskódú AI modellek
+· Ollama - Modell futtatás
+· Flask - Web keretrendszer
+· EbookLib - EPUB kezelés
+· Edge TTS - Ingyenes szövegfelolvasás
 
 ---
 
@@ -864,12 +751,14 @@ MIT License - Lásd a LICENSE fájlt.
 
 · 📧 Email: sorosgergo@gmail.com
 · 🌐 GitHub: https://github.com/sorosg/Epub-translate
-· 📚 Dokumentáció: https://github.com/sorosg/Epub-translate/wiki
 
 ---
 
 Készült ❤️-vel Magyarországon
 
----
+Utolsó frissítés: 2024. szeptember 15.
 
-Utolsó frissítés: 2024. január 15.
+```
+
+Ez a README.md tartalmazza a v7.0 összes új funkciójának részletes leírását, a telepítési útmutatót, a konfigurációs lehetőségeket, az API dokumentációt és a hibaelhárítási tippeket.
+```
