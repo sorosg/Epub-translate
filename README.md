@@ -1,13 +1,15 @@
-# EPUB Fordító Rendszer v8.0
+```markdown
+# EPUB Fordító Rendszer v9.0
 
-## 📚 "Library Manager" - Könyvtárkezelő és Belső Email Rendszer
+## 📚 "User Portal" - Felhasználói Portál és Regisztrációs Rendszer
 
-![Version](https://img.shields.io/badge/version-8.0.0-blue)
+![Version](https://img.shields.io/badge/version-9.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
 ![PWA](https://img.shields.io/badge/PWA-ready-purple)
 ![Update](https://img.shields.io/badge/auto--update-ready-success)
+![Registration](https://img.shields.io/badge/registration-open-brightgreen)
 
 ---
 
@@ -21,7 +23,8 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 - ✅ **Helyben Fut** - Minden adat a saját gépeden marad
 - ✅ **Offline Működés** - Internet csak a modell első letöltéséhez kell
 - ✅ **Öntanuló** - A fordítási memória és kontextus tanulás folyamatosan javul
-- ✅ **Önfrissítő** - Automatikus GitHub frissítések, verziókövetés
+- ✅ **Önfrissítő** - Automatikus GitHub frissítések, egykattintásos frissítés
+- ✅ **Felhasználói Regisztráció** - Önálló regisztráció, belső email cím
 - ✅ **Könyvtárkezelő** - Drag & drop könyvfeltöltés fordítás nélkül is
 - ✅ **Belső Email** - Saját email rendszer a felhasználók között
 - ✅ **Biztonságos** - Vírusellenőrzés, 2FA, rate limiting
@@ -35,21 +38,20 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 1. [Rendszerkövetelmények](#-rendszerkövetelmények)
 2. [Gyors Telepítés](#-gyors-telepítés)
 3. [Frissítés Meglévő Telepítésről](#-frissítés-meglévő-telepítésről)
-4. [Újdonságok a v8.0-ban](#-újdonságok-a-v80-ban)
-5. [Architektúra](#-architektúra)
-6. [Konfiguráció](#-konfiguráció)
-7. [Használat](#-használat)
-8. [Könyvtár Kezelés](#-könyvtár-kezelés)
-9. [Belső Email Rendszer](#-belső-email-rendszer)
-10. [Drag & Drop Feltöltés](#-drag--drop-feltöltés)
+4. [Újdonságok a v9.0-ban](#-újdonságok-a-v90-ban)
+5. [Felhasználói Regisztráció](#-felhasználói-regisztráció)
+6. [Belső Email Rendszer](#-belső-email-rendszer)
+7. [Architektúra](#-architektúra)
+8. [Konfiguráció](#-konfiguráció)
+9. [Használat](#-használat)
+10. [Könyvtár Kezelés](#-könyvtár-kezelés)
 11. [Auto-Update Rendszer](#-auto-update-rendszer)
-12. [Felhasználó Regisztráció](#-felhasználó-regisztráció)
-13. [PWA Mobil Támogatás](#-pwa-mobil-támogatás)
-14. [API Dokumentáció](#-api-dokumentáció)
-15. [Karbantartás](#-karbantartás)
-16. [Hibaelhárítás](#-hibaelhárítás)
-17. [GYIK](#-gyik)
-18. [Verzió Történet](#-verzió-történet)
+12. [PWA Mobil Támogatás](#-pwa-mobil-támogatás)
+13. [API Dokumentáció](#-api-dokumentáció)
+14. [Karbantartás](#-karbantartás)
+15. [Hibaelhárítás](#-hibaelhárítás)
+16. [GYIK](#-gyik)
+17. [Verzió Történet](#-verzió-történet)
 
 ---
 
@@ -110,11 +112,11 @@ Telepítés Után
 # Webes felület
 http://localhost
 
+# Regisztráció
+http://localhost/register
+
 # Email felület (MailHog)
 http://localhost:8025
-
-# Könyvtár kezelés
-http://localhost/admin/library
 
 # Admin belépés
 Email: admin@epub-translator.local
@@ -135,22 +137,33 @@ Automatikus Frissítés (Webes Felületről)
 Frissítés Parancssorból
 
 ```bash
-# Frissítés a telepítő script-tel
+# 1. lehetőség: Telepítő script
 ./install.sh
-# A script automatikusan észleli a meglévő telepítést
 # Válaszd: 1) Frissítés meglévő telepítésről
 
-# VAGY a gyorsfrissítő script-tel
+# 2. lehetőség: Gyorsfrissítő
 ./scripts/update.sh
+
+# 3. lehetőség: Csak konfiguráció frissítése
+./install.sh
+# Válaszd: 3) Csak konfiguráció frissítése
 ```
+
+Frissítési Lehetőségek
+
+Opció Leírás Adatmegőrzés
+1) Frissítés Teljes frissítés, adatok megőrzése ✅ Igen
+2) Újratelepítés Minden törlése, friss telepítés ❌ Nem
+3) Konfig frissítés Csak konfigurációs fájlok frissítése ✅ Igen
 
 Frissítési Folyamat
 
 ```
-1. Meglévő verzió észlelése (v7.x → v8.0)
+1. Meglévő verzió észlelése
 2. Frissítés előtti biztonsági mentés
    ├── Adatbázis mentése
    ├── Konfiguráció mentése
+   ├── Könyvtár mentése
    └── Fordítási memória mentése
 3. Konténerek leállítása
 4. Új fájlok telepítése
@@ -160,66 +173,130 @@ Frissítési Folyamat
 8. Verzió frissítése
 ```
 
-Visszaállítás Előző Verzióra
+---
 
-```bash
-# Ha probléma lenne a frissítéssel:
-cd ~/epub-translator
+🆕 Újdonságok a v9.0-ban
 
-# Visszaállítás a mentésből
-cp backups/updates/pre_update_7.0.0_*/database.sql backups/restore.sql
-docker exec -i epub-postgres psql -U epub_user epub_translator < backups/restore.sql
+👤 Felhasználói Regisztráció
 
-# Konfiguráció visszaállítása
-cp backups/updates/pre_update_7.0.0_*/.env .env
+· Önálló regisztrációs oldal (/register)
+· Regisztrációs űrlap validációval
+· Jelszó erősség ellenőrzés
+· Automatikus belső email generálás
+· Kezdő tokenek (alapértelmezett: 5)
+· Üdvözlő üzenet regisztráció után
+· Rate limiting (5 regisztráció/óra)
 
-# Újraindítás
-docker compose restart
-```
+📧 Belső Email Cím
+
+· Automatikus generálás: keresztnev.vezeteknev@epub.local
+· Egyedi cím minden felhasználónak
+· Ütközéskezelés (számozás azonos neveknél)
+
+🎨 Továbbfejlesztett Felhasználói Felület
+
+· Regisztrációs gomb a bejelentkezés oldalon
+· Modern, letisztult design
+· Reszponzív mobil nézet
+· Font Awesome ikonok
+
+🔄 Továbbfejlesztett Frissítés
+
+· Három frissítési mód (teljes, újratelepítés, konfig)
+· Részletes frissítési napló
+· Automatikus mentés frissítés előtt
 
 ---
 
-🆕 Újdonságok a v8.0-ban
+👤 Felhasználói Regisztráció
 
-📚 Drag & Drop Könyvtárfeltöltés
+Regisztráció Menete
 
-· Több EPUB fájl egyidejű feltöltése
-· Fordítás nélkül is bővíthető a könyvtár
-· Automatikus elemzés feltöltés után
-· Duplikátum szűrés SHA-256 hash alapján
-· Kötegelt feldolgozás progress jelzővel
-· Húzd és dobd (drag & drop) támogatás
+```
+1. Nyisd meg: http://localhost/register
+2. Töltsd ki az űrlapot:
+   ├── Vezetéknév (kötelező)
+   ├── Keresztnév (kötelező)
+   ├── Email cím (kötelező)
+   ├── Jelszó (minimum 8 karakter)
+   └── Jelszó megerősítése
+3. Kattints a "Regisztráció" gombra
+4. Azonnal megkapod:
+   ├── Belső email címed (@epub.local)
+   ├── 5 kezdő token
+   └── Üdvözlő üzenet
+5. Jelentkezz be az email címeddel
+```
+
+Regisztrációs Adatok
+
+Mező Kötelező Megjegyzés
+Vezetéknév ✅ -
+Keresztnév ✅ -
+Email ✅ Egyedi kell legyen
+Jelszó ✅ Minimum 8 karakter
+Jelszó újra ✅ Egyeznie kell
+
+Kezdő Jogosultságok
+
+Jogosultság Érték
+Tokenek 5 fordítás
+Belső email nev@epub.local
+Könyvtár hozzáférés Olvasás
+Mintakönyv feltöltés ✅
+Kollaboráció ✅
+
+Regisztráció Letiltása
+
+Az adminisztrátor letilthatja a regisztrációt:
+
+```env
+# .env fájlban
+ENABLE_REGISTRATION=false
+```
+
+Vagy az admin felületen: Beállítások → Regisztráció
+
+---
 
 📧 Belső Email Rendszer
 
-· Saját email cím minden felhasználónak (@epub.local)
-· Belső üzenetküldés a felhasználók között
-· Rendszerértesítések automatikus küldése
-· Bejövő/Kimenő üzenetek kezelése
-· Olvasatlan üzenetek számlálója
-· Csillagozás fontos üzenetekhez
+Email Cím Generálás
 
-📨 MailHog Integráció
+Minden felhasználó automatikusan kap egy belső email címet:
 
-· Közvetlen átjárás a MailHog felületre
-· Beágyazott email nézet a programon belül
-· Valós idejű email frissítés
-· Külső hivatkozás a teljes MailHog felületre
+```
+Formátum: keresztnev.vezeteknev@epub.local
+Példa: gabor.kiss@epub.local
+       anna.nagy@epub.local
+```
 
-🤖 Automatikus Regisztrációs Email
+Ha már létezik azonos cím:
 
-· Belső email cím automatikus generálása
-· Üdvözlő üzenet új felhasználóknak
-· Kezdő tokenek automatikus kiosztása
-· Felhasználói adatok azonnali megküldése
+```
+gabor.kiss@epub.local
+gabor.kiss1@epub.local  ← automatikus számozás
+gabor.kiss2@epub.local
+```
 
-🔄 Továbbfejlesztett Frissítési Rendszer
+Belső Email Funkciók
 
-· Egykattintásos frissítés a webes felületről
-· Frissítési előzmények részletes naplózással
-· Automatikus mentés frissítés előtt
-· Visszaállítási pontok biztonságos frissítéshez
-· Több csatorna (stable, beta, nightly)
+· 📨 Üzenetküldés felhasználók között
+· 📬 Bejövő üzenetek (/api/internal-mail/inbox)
+· 📤 Elküldött üzenetek (/api/internal-mail/sent)
+· ⭐ Csillagozás fontos üzenetekhez
+· ✅ Olvasott/Olvasatlan állapot
+· 🔔 Értesítések új üzenetről
+
+Rendszerüzenetek
+
+Automatikus üzenetek:
+
+· 🎉 Regisztrációkor üdvözlő üzenet
+· 📚 Könyv feltöltésekor
+· ✅ Fordítás befejezésekor
+· ❌ Fordítási hiba esetén
+· 🔄 Rendszerfrissítéskor
 
 ---
 
@@ -230,7 +307,7 @@ docker compose restart
 │                     Felhasználói Böngésző                      │
 │                    http://localhost:80                        │
 │                    📱 PWA Támogatás                           │
-│                    📚 Drag & Drop Feltöltés                   │
+│                    👤 Regisztráció                            │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
@@ -242,14 +319,14 @@ docker compose restart
 ┌───────────────────────────▼─────────────────────────────────┐
 │                  Flask Backend (5000)                        │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐    │
-│  │ Könyvtár     │ │ Belső Email  │ │ Felhasználó       │    │
+│  │ Regisztráció │ │ Belső Email  │ │ Felhasználó       │    │
 │  │ Kezelő       │ │ Rendszer     │ │ Kezelés           │    │
 │  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
-│  │ Drag & Drop  │ │ MailHog      │ │ Regisztráció      │    │
-│  │ Feltöltés    │ │ Integráció   │ │ + Tokenek         │    │
+│  │ Könyvtár     │ │ Fordítás     │ │ Auto-Update       │    │
+│  │ Kezelő       │ │ Kezelő       │ │ Manager           │    │
 │  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
-│  │ Auto-Update  │ │ Fordítási    │ │ Kollaboráció      │    │
-│  │ Manager      │ │ Memória      │ │ (WebSocket)       │    │
+│  │ Token        │ │ Kollaboráció │ │ Statisztikák      │    │
+│  │ Rendszer     │ │ (WebSocket)  │ │                   │    │
 │  └──────────────┘ └──────────────┘ └──────────────────┘    │
 └───────────────────────────┬─────────────────────────────────┘
                             │
@@ -257,33 +334,35 @@ docker compose restart
         │                   │                   │
 ┌───────▼──────┐   ┌────────▼────────┐   ┌─────▼──────┐
 │  PostgreSQL  │   │     Ollama       │   │   Redis    │
-│  + Könyvtár  │   │  DeepSeek AI    │   │   Cache    │
-│  + Email DB  │   │  Modellek       │   │            │
+│  + Users     │   │  DeepSeek AI    │   │   Cache    │
+│  + Books     │   │  Modellek       │   │            │
+│  + Email     │   │                 │   │            │
 └──────────────┘   └─────────────────┘   └────────────┘
 
-┌──────────────┐   ┌─────────────────┐   ┌──────────────┐
-│   MailHog    │   │   TTS Service    │   │  WebSocket   │
-│ Helyi Email  │   │  Edge TTS        │   │  Szerver     │
-│ + Web UI     │   │                 │   │              │
-└──────────────┘   └─────────────────┘   └──────────────┘
+┌──────────────┐   ┌─────────────────┐
+│   MailHog    │   │   TTS Service    │
+│ Helyi Email  │   │  (opcionális)    │
+└──────────────┘   └─────────────────┘
 ```
 
 ---
 
 ⚙️ Konfiguráció
 
-Környezeti Változók (.env)
+.env Fájl
 
 ```env
-# Alkalmazás
-VERSION=8.0.0
-CODENAME="Library Manager"
-SECRET_KEY=your-secret-key
-FLASK_ENV=production
+# Verzió
+VERSION=9.0.0
+CODENAME="User Portal"
 
 # Admin
 ADMIN_EMAIL=admin@epub-translator.local
 ADMIN_PASSWORD=your-secure-password
+
+# Regisztráció
+ENABLE_REGISTRATION=true      # true/false - regisztráció engedélyezése
+DEFAULT_TOKENS=5               # Kezdő tokenek száma
 
 # AI Modell
 SELECTED_MODEL=deepseek-r1:8b
@@ -292,71 +371,220 @@ MAX_WORKERS=3
 # Auto-Update
 ENABLE_AUTO_UPDATE=true
 GITHUB_REPO=https://github.com/sorosg/Epub-translate.git
-GITHUB_BRANCH=main
 GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 UPDATE_CHECK_INTERVAL=3600
+
+# SMTP
+SMTP_MODE=local
+SMTP_HOST=mailhog
+SMTP_PORT=1025
 
 # Funkciók
 ENABLE_PWA=true
 ENABLE_TTS=true
 ENABLE_COLLABORATION=true
-ENABLE_PLUGINS=true
-ENABLE_API=true
 ENABLE_BOOK_DB=true
 ENABLE_CACHE=true
+```
 
-# SMTP (Helyi MailHog)
-SMTP_MODE=local
-SMTP_HOST=mailhog
-SMTP_PORT=1025
+Regisztráció Testreszabása
+
+```env
+# Regisztráció teljes letiltása
+ENABLE_REGISTRATION=false
+
+# Kezdő tokenek módosítása
+DEFAULT_TOKENS=10
+
+# Regisztráció limitálása
+# (a Flask-Limiter kezeli: 5 regisztráció/óra)
 ```
 
 ---
 
 📖 Használat
 
-Felhasználói Felület
-
-1. Bejelentkezés
+Új Felhasználó Regisztrációja
 
 ```
 1. Nyisd meg: http://localhost
-2. Email: a regisztrált email címed
-3. Jelszó: a kapott jelszó
+2. Kattints a "Regisztráció" gombra
+3. Töltsd ki az adatokat
+4. Kattints a "Regisztráció" gombra
+5. Jelentkezz be az email címeddel
 ```
 
-2. Regisztráció
+Bejelentkezés
 
 ```
-1. Kattints a "Regisztráció" gombra
-2. Töltsd ki az adataidat
-3. Kattints a "Regisztráció" gombra
-4. Kapsz egy belső email címet: keresztnev.vezeteknev@epub.local
-5. Kezdő tokenek: 5 fordítás
+1. Nyisd meg: http://localhost/login
+2. Add meg az email címed
+3. Add meg a jelszavad
+4. Kattints a "Bejelentkezés" gombra
 ```
 
-3. Könyv Feltöltése (Drag & Drop)
+Dashboard
+
+Bejelentkezés után a dashboard-on láthatod:
+
+· 👤 Neved
+· 💰 Token egyenleged
+· 📧 Belső email címed
+· 📚 Fordítási előzményeid
+· 🔔 Értesítéseid
+
+Token Kérés
+
+Ha elfogytak a tokenjeid:
+
+1. Kattints a "Tokenek kérése" gombra
+2. Az adminisztrátor értesítést kap
+3. Az admin jóváhagyja és beállítja az új tokeneket
+
+---
+
+📚 Könyvtár Kezelés
+
+Drag & Drop Feltöltés (Admin)
 
 ```
-1. Húzd az EPUB fájlokat a kijelölt zónába
-   VAGY
-   Kattints a zónára és válaszd ki a fájlokat
-2. Állítsd be az elemzési opciókat
-3. Kattints a "Feltöltés Indítása" gombra
-4. Kövesd a folyamatjelzőt
+1. Admin → Könyvtár Kezelés
+2. Húzd az EPUB fájlokat a drop zónába
+3. VAGY kattints a zónára
+4. Több fájl is kiválasztható (Ctrl+A)
+5. Kattints a "Feltöltés Indítása" gombra
 ```
 
-4. Fordítás Indítása
+Könyvtár Statisztikák
+
+Statisztika Leírás
+Összes könyv Adatbázisban lévő könyvek
+Szerzők Egyedi szerzők száma
+Feltöltések Összes feltöltés száma
+Műfajok Különböző műfajok száma
+
+---
+
+🔄 Auto-Update Rendszer
+
+Frissítési Módok
+
+Mód Leírás
+Teljes frissítés Új fájlok + adatbázis migráció
+Konfig frissítés Csak .env és konfig fájlok
+Újratelepítés Minden törlése, friss telepítés
+
+Frissítés a Webes Felületről
 
 ```
-1. Válaszd ki a fordítandó EPUB fájlt
-2. Opcionálisan válassz mintakönyveket
-3. Kattints a "Fordítás indítása" gombra
-4. Kövesd a folyamatot a dashboard-on
-5. Befejezéskor email és push értesítés
+1. Admin → Frissítés Kezelés
+2. "Frissítések ellenőrzése"
+3. Ha elérhető: "Telepítés"
 ```
 
-Parancssori Műveletek
+Frissítés Parancssorból
+
+```bash
+# Ellenőrzés
+curl http://localhost/api/admin/updates/check
+
+# Telepítés
+./scripts/update.sh
+
+# Visszaállítás
+cp backups/updates/pre_update_*/database.sql .
+docker exec -i epub-postgres psql -U epub_user epub_translator < database.sql
+docker compose restart
+```
+
+---
+
+📱 PWA Mobil Támogatás
+
+Telepítés Mobilra
+
+```
+1. Nyisd meg böngészőben: http://[IP]
+2. Menü → "Telepítés"
+3. Ikon a kezdőképernyőn
+4. Offline is működik
+```
+
+---
+
+🔌 API Dokumentáció
+
+Regisztráció
+
+```bash
+# Regisztráció
+curl -X POST http://localhost/api/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Gábor",
+    "last_name": "Kiss",
+    "email": "gabor.kiss@example.com",
+    "password": "SecurePass1!"
+  }'
+
+# Válasz
+{
+    "success": true,
+    "user_id": 2,
+    "internal_email": "gabor.kiss@epub.local",
+    "tokens": 5
+}
+```
+
+Bejelentkezés
+
+```bash
+curl -X POST http://localhost/login \
+  -d "email=gabor.kiss@example.com" \
+  -d "password=SecurePass1!"
+```
+
+Belső Email
+
+```bash
+# Bejövő üzenetek
+curl http://localhost/api/internal-mail/inbox \
+  -H "Cookie: session=..."
+
+# Üzenet küldése
+curl -X POST http://localhost/api/internal-mail/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient": "admin@epub.local",
+    "subject": "Token kérés",
+    "body": "Szeretnék több tokent kérni."
+  }'
+```
+
+Fő API Végpontok
+
+Végpont Módszer Leírás
+/api/register POST Felhasználó regisztráció
+/api/internal-mail/inbox GET Bejövő üzenetek
+/api/internal-mail/send POST Belső email küldése
+/api/internal-mail/unread-count GET Olvasatlanok száma
+/api/library/batch-upload POST Kötegelt feltöltés
+/api/library/stats GET Könyvtár statisztikák
+/api/admin/updates/check POST Frissítés ellenőrzése
+/api/admin/updates/install POST Frissítés telepítése
+
+---
+
+🔧 Karbantartás
+
+Automatikus Feladatok
+
+Feladat Gyakoriság Időpont
+Biztonsági mentés Hetente Vasárnap 03:00
+Docker takarítás Hetente Vasárnap 04:00
+Frissítés ellenőrzés Állítható Óránként
+
+Kézi Parancsok
 
 ```bash
 # Státusz
@@ -370,385 +598,103 @@ Parancssori Műveletek
 
 # Logok
 docker compose logs -f backend
-
-# Újraindítás
-docker compose restart
-
-# Leállítás
-docker compose down
-```
-
----
-
-📚 Könyvtár Kezelés
-
-Drag & Drop Feltöltés
-
-A könyvtárba fordítás nélkül is tölthetsz fel könyveket:
-
-```
-1. Admin → Könyvtár Kezelés
-2. Húzd az EPUB fájlokat a drop zónába
-3. VAGY kattints a "Fájlok Kiválasztása" gombra
-4. Több fájl is kiválasztható egyszerre (Ctrl+A)
-5. Állítsd be:
-   ✅ Automatikus elemzés
-   ✅ Nyilvános (mintakönyvként használható)
-6. Kattints a "Feltöltés Indítása" gombra
-```
-
-Támogatott Fájlok
-
-Formátum Max Méret Elemzés
-.epub 100 MB ✅ Automatikus
-.epub (több) 100 MB/fájl ✅ Kötegelt
-
-Feltöltési Statisztikák
-
-A feltöltés után azonnal látható:
-
-· 📊 Összes könyv száma
-· 👤 Szerzők száma
-· 📁 Feltöltések száma
-· 🏷️ Műfajok megoszlása
-
----
-
-📧 Belső Email Rendszer
-
-Email Cím Generálás
-
-Minden felhasználó automatikusan kap egy belső email címet:
-
-```
-Formátum: keresztnev.vezeteknev@epub.local
-Példa: gabor.kiss@epub.local
-```
-
-Ha már létezik azonos cím, a rendszer automatikusan számoz:
-
-```
-gabor.kiss@epub.local
-gabor.kiss1@epub.local
-gabor.kiss2@epub.local
-```
-
-Belső Email Funkciók
-
-· 📨 Üzenetküldés felhasználók között
-· 📬 Bejövő üzenetek listázása
-· 📤 Elküldött üzenetek megtekintése
-· ⭐ Csillagozás fontos üzenetekhez
-· ✅ Olvasott/Olvasatlan állapot
-· 🗑️ Törlés
-· 🔔 Értesítések új üzenetről
-
-MailHog Integráció
-
-A MailHog felület közvetlenül elérhető:
-
-```
-1. A navigációs menüben: Üzenetek → MailHog Felület
-2. VAGY közvetlenül: http://localhost:8025
-3. A programon belül beágyazott nézetben is
-```
-
-Rendszerüzenetek
-
-Automatikus üzenetek a következő eseményekről:
-
-· 🎉 Új felhasználó regisztráció
-· 📚 Könyv feltöltése a könyvtárba
-· ✅ Fordítás befejezése
-· ❌ Fordítási hiba
-· 🔄 Rendszerfrissítés
-
----
-
-🔄 Auto-Update Rendsszer
-
-Frissítési Csatornák
-
-Csatorna Leírás Frissítési Gyakoriság
-stable Stabil, tesztelt verziók Hetente
-beta Előzetes verziók Naponta
-nightly Fejlesztői verziók Óránként
-
-Frissítés a Webes Felületről
-
-```
-1. Admin → Frissítés Kezelés
-2. "Frissítések ellenőrzése"
-3. Ha elérhető: "Telepítés"
-4. Automatikus mentés → Letöltés → Telepítés → Újraindítás
-```
-
-Frissítés Parancssorból
-
-```bash
-# Ellenőrzés
-curl -X POST http://localhost/api/admin/updates/check-all
-
-# Telepítés
-curl -X POST http://localhost/api/admin/updates/install/1
-
-# Visszaállítás
-curl -X POST http://localhost/api/admin/updates/rollback/1
-```
-
----
-
-👤 Felhasználó Regisztráció
-
-Regisztrációs Folyamat
-
-```
-1. Felhasználó kitölti a regisztrációs űrlapot
-2. A rendszer ellenőrzi az email címet
-3. Jelszó validálás (minimum 8 karakter, kis-nagybetű, szám, speciális karakter)
-4. Felhasználó létrehozása
-5. Belső email cím generálása: keresztnev.vezeteknev@epub.local
-6. Kezdő tokenek kiosztása (5 token)
-7. Üdvözlő email küldése a belső címre
-```
-
-Regisztrációs Adatok
-
-Mező Kötelező Leírás
-Email ✅ Külső email cím
-Jelszó ✅ Minimum 8 karakter
-Vezetéknév ✅ -
-Keresztnév ✅ -
-
-Kezdő Jogosultságok
-
-· 📚 5 token fordításra
-· 📧 Belső email cím
-· 📖 Hozzáférés a könyvtárhoz
-· 👥 Kollaboráció lehetősége
-
----
-
-📱 PWA Mobil Támogatás
-
-Telepítés Mobilra
-
-```
-1. Nyisd meg böngészőben: http://[SZERVER_IP]
-2. Menü → "Telepítés" vagy "Hozzáadás a kezdőképernyőhöz"
-3. Az ikon megjelenik a kezdőképernyőn
-4. Egy kattintással indítható, offline is működik
-```
-
-PWA Funkciók
-
-· 📱 Telepíthető - Nincs szükség App Store-ra
-· 📡 Offline - Internet nélkül is működik
-· 🔔 Push értesítések - Fordítás állapotáról
-· 📲 Reszponzív - Alkalmazkodik a képernyőmérethez
-· 🔄 Háttér szinkronizálás
-
----
-
-🔌 API Dokumentáció
-
-Hitelesítés
-
-```bash
-# Bejelentkezés
-curl -X POST http://localhost/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "password"}'
-
-# API kulcs használata
-curl -H "X-API-Key: your-api-key" \
-  http://localhost/api/books
-```
-
-Új v8.0 Végpontok
-
-Végpont Módszer Leírás
-/api/library/upload POST Könyv feltöltése könyvtárba
-/api/library/batch-upload POST Kötegelt feltöltés (drag & drop)
-/api/library/stats GET Könyvtár statisztikák
-/api/library/recent GET Legutóbbi feltöltések
-/api/internal-mail/inbox GET Bejövő üzenetek
-/api/internal-mail/sent GET Elküldött üzenetek
-/api/internal-mail/send POST Belső email küldése
-/api/internal-mail/{id}/read POST Olvasottnak jelölés
-/api/internal-mail/{id}/star POST Csillagozás váltás
-/api/internal-mail/{id} DELETE Email törlése
-/api/internal-mail/unread-count GET Olvasatlanok száma
-/api/register POST Felhasználó regisztráció
-/api/admin/updates/check-all POST Összes csatorna ellenőrzése
-/api/admin/updates/install/{id} POST Frissítés telepítése
-/api/admin/updates/rollback/{id} POST Frissítés visszaállítása
-
----
-
-🔧 Karbantartás
-
-Automatikus Feladatok
-
-Feladat Gyakoriság Időpont
-Biztonsági mentés Hetente Vasárnap 03:00
-Docker takarítás Hetente Vasárnap 04:00
-Frissítés ellenőrzés Állítható Alapértelmezett: óránként
-
-Kézi Karbantartás
-
-```bash
-# Teljes biztonsági mentés
-./scripts/backup.sh
-
-# Rendszer állapot
-./scripts/status.sh
-
-# Frissítés
-./scripts/update.sh
-
-# Adatbázis optimalizálás
-docker exec -it epub-postgres vacuumdb -U epub_user epub_translator
-
-# Könyvtár tisztítás
-docker exec -it epub-backend python3 -c "
-from app import app, db
-from models import BookUpload
-with app.app_context():
-    # Duplikátumok törlése
-    duplicates = db.session.query(BookUpload.file_hash, db.func.count(BookUpload.id)).group_by(BookUpload.file_hash).having(db.func.count(BookUpload.id) > 1).all()
-    for hash, count in duplicates:
-        uploads = BookUpload.query.filter_by(file_hash=hash).order_by(BookUpload.uploaded_at).all()
-        for upload in uploads[1:]:
-            db.session.delete(upload)
-    db.session.commit()
-    print('Könyvtár tisztítva')
-"
 ```
 
 ---
 
 🔍 Hibaelhárítás
 
-Gyakori Problémák
-
-1. "Port already in use"
+Regisztrációs Problémák
 
 ```bash
-sudo lsof -i :80
-sudo lsof -i :5000
-sudo systemctl stop apache2
+# Regisztráció le van tiltva?
+grep ENABLE_REGISTRATION .env
+
+# Rate limit elérve?
+# Várj 1 órát, vagy állítsd át a limitet
+
+# Email már létezik?
+curl http://localhost/api/register \
+  -d '{"email": "existing@email.com", ...}'
 ```
 
-2. Memória Problémák
+Frissítési Hibák
 
 ```bash
-# Kisebb modell használata
-docker exec -it epub-ollama ollama pull deepseek-r1:7b
+# Visszaállítás mentésből
+ls backups/updates/
+# Használd a legfrissebb mentést
 
-# Admin felületen: Modell váltás
+# Konténerek újraindítása
+docker compose restart
 ```
 
-3. Frissítési Hibák
-
-```bash
-# Visszaállítás az előző verzióra
-./scripts/restore.sh
-
-# VAGY webes felületről:
-# Admin → Frissítés Kezelés → Visszaállítás
-```
-
-4. Email Nem Érkezik Meg
+Email Nem Érkezik
 
 ```bash
 # MailHog ellenőrzése
 curl http://localhost:8025
 
-# Belső email ellenőrzése
+# API ellenőrzése
 curl http://localhost/api/internal-mail/inbox \
   -H "Cookie: session=..."
-
-# Email újraküldés
-docker compose restart mailhog
-```
-
-5. Drag & Drop Nem Működik
-
-```bash
-# JavaScript console ellenőrzése (F12)
-# Győződj meg róla, hogy a fájlok .epub kiterjesztésűek
-# Max fájlméret: 100MB
 ```
 
 ---
 
 ❓ GYIK
 
-Általános
-
-K: A rendszer tényleg teljesen ingyenes?
-V: Igen! A DeepSeek modellek nyílt forráskódúak. Nincs API díj, előfizetés vagy rejtett költség.
-
-K: Hogyan frissül a rendszer?
-V: Automatikusan a GitHub repository-ból, vagy egy kattintással a webes felületről.
-
-K: Mi történik a feltöltött könyvekkel?
-V: Minden adat a saját gépeden marad. A könyvek bekerülnek a helyi könyvtárba.
-
-Könyvtár
-
-K: Feltölthetek könyveket fordítás nélkül?
-V: Igen! A Könyvtár Kezelés menüpontban drag & drop módszerrel.
-
-K: Hány könyvet tölthetek fel egyszerre?
-V: Nincs korlátozás. Több fájl is kiválasztható egyszerre.
-
-Email
-
-K: Mi az a belső email cím?
-V: Minden felhasználó kap egy @epub.local végű email címet a rendszeren belüli kommunikációhoz.
-
-K: Láthatom a MailHog felületet a programon belül?
-V: Igen! A felső menüben: Üzenetek → MailHog Felület.
-
 Regisztráció
+
+K: Ingyenes a regisztráció?
+V: Igen! A rendszer teljesen ingyenes, a tokenek belső elszámolási egységek.
 
 K: Mennyi token jár regisztrációnál?
 V: Alapértelmezetten 5 token (5 fordítás).
 
+K: Mi az a belső email cím?
+V: Egy @epub.local végű cím a rendszeren belüli kommunikációhoz.
+
 K: Hogyan kaphatok több tokent?
 V: A dashboard-on kattints a "Tokenek kérése" gombra.
+
+Frissítés
+
+K: Hogyan frissíthetek v8-ról v9-re?
+V: Futtasd az install.sh-t és válaszd az "1) Frissítés" lehetőséget.
+
+K: Elvesznek az adataim frissítéskor?
+V: Nem, a frissítés megőrzi az adatbázist és a konfigurációt.
 
 ---
 
 📊 Verzió Történet
 
+v9.0.0 (2025-01-15) - "User Portal"
+
+· 🆕 Felhasználói regisztrációs oldal
+· 🆕 Belső email automatikus generálás
+· 🆕 Kezdő tokenek új felhasználóknak
+· 🆕 Regisztrációs gomb a bejelentkezésnél
+· 🆕 Továbbfejlesztett frissítési rendszer
+· 🎨 Modernizált felhasználói felület
+
 v8.0.0 (2024-12-01) - "Library Manager"
 
-· 🆕 Drag & Drop könyvtárfeltöltés
-· 🆕 Belső email rendszer
-· 🆕 MailHog integráció a felületen
-· 🆕 Automatikus regisztrációs email
-· 🆕 Belső email cím generálás
-· 🆕 Könyvtár statisztikák
-· 🆕 Egykattintásos frissítés
-· 🆕 Továbbfejlesztett frissítési rendszer
+· Drag & Drop könyvtárfeltöltés
+· Belső email rendszer alapok
+· MailHog integráció
 
 v7.0.0 (2024-09-15) - "Self-Evolving Translator"
 
-· GitHub Auto-Update rendszer
+· GitHub Auto-Update
 · Öntanuló fordítási memória
 · Glosszárium kezelés
 · Valós idejű kollaboráció
-· Teljes PWA támogatás
-· TTS hangoskönyv generálás
-· Plugin rendszer
 
 v6.0.0 (2024-06-15)
 
 · Hibrid fordítási stratégia
-· Fordítási memória alapok
 · Kollaboratív fordítás
 
 v5.0.0 (2024-01-15)
@@ -782,21 +728,14 @@ v1.0.0 (2023-11-15)
 
 🤝 Közreműködés
 
-Fejlesztői Környezet
-
 ```bash
 git clone https://github.com/sorosg/Epub-translate.git
 cd Epub-translate
 docker compose up -d
 ```
 
-Hibajelentés
-
-https://github.com/sorosg/Epub-translate/issues
-
-Feature Request
-
-https://github.com/sorosg/Epub-translate/discussions
+· Hibajelentés: https://github.com/sorosg/Epub-translate/issues
+· Feature Request: https://github.com/sorosg/Epub-translate/discussions
 
 ---
 
@@ -813,7 +752,6 @@ MIT License
 · Flask - Web keretrendszer
 · EbookLib - EPUB kezelés
 · MailHog - Helyi email szerver
-· Edge TTS - Ingyenes szövegfelolvasás
 
 ---
 
@@ -830,6 +768,4 @@ Készült ❤️-vel Magyarországon
 Utolsó frissítés: 2026. július 12.
 
 ```
-
-Ez a README.md tartalmazza a v8.0 összes új funkciójának részletes leírását, a telepítési és frissítési útmutatót, a könyvtárkezelést, a belső email rendszert, az API dokumentációt és a hibaelhárítási tippeket.
 ```
