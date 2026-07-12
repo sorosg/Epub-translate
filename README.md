@@ -1,15 +1,16 @@
 ```markdown
-# EPUB Fordító Rendszer v9.0
+# EPUB Fordító Rendszer v9.1
 
-## 📚 "User Portal" - Felhasználói Portál és Regisztrációs Rendszer
+## 📚 "Enhanced Studio" - Továbbfejlesztett Stúdió
 
-![Version](https://img.shields.io/badge/version-9.0.0-blue)
+![Version](https://img.shields.io/badge/version-9.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
 ![PWA](https://img.shields.io/badge/PWA-ready-purple)
 ![Update](https://img.shields.io/badge/auto--update-ready-success)
-![Registration](https://img.shields.io/badge/registration-open-brightgreen)
+![Dark Mode](https://img.shields.io/badge/dark%20mode-supported-black)
+![i18n](https://img.shields.io/badge/i18n-5%20languages-blue)
 
 ---
 
@@ -24,12 +25,11 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 - ✅ **Offline Működés** - Internet csak a modell első letöltéséhez kell
 - ✅ **Öntanuló** - A fordítási memória és kontextus tanulás folyamatosan javul
 - ✅ **Önfrissítő** - Automatikus GitHub frissítések, egykattintásos frissítés
-- ✅ **Felhasználói Regisztráció** - Önálló regisztráció, belső email cím
-- ✅ **Könyvtárkezelő** - Drag & drop könyvfeltöltés fordítás nélkül is
-- ✅ **Belső Email** - Saját email rendszer a felhasználók között
-- ✅ **Biztonságos** - Vírusellenőrzés, 2FA, rate limiting
-- ✅ **Mobilbarát** - Teljes PWA támogatás, telepíthető mobilon
-- ✅ **Kollaboratív** - Valós idejű közös fordítás
+- ✅ **Dark Mode** - Sötét és világos téma támogatás
+- ✅ **Többnyelvű** - Magyar, Angol, Német, Francia, Spanyol felület
+- ✅ **Billentyűparancsok** - 8 gyorsbillentyű a hatékony munkához
+- ✅ **Dashboard 2.0** - Interaktív grafikonok és statisztikák
+- ✅ **Integrációk** - Calibre, Kindle, WordPress, Chrome bővítmény
 
 ---
 
@@ -38,20 +38,19 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 1. [Rendszerkövetelmények](#-rendszerkövetelmények)
 2. [Gyors Telepítés](#-gyors-telepítés)
 3. [Frissítés Meglévő Telepítésről](#-frissítés-meglévő-telepítésről)
-4. [Újdonságok a v9.0-ban](#-újdonságok-a-v90-ban)
-5. [Felhasználói Regisztráció](#-felhasználói-regisztráció)
-6. [Belső Email Rendszer](#-belső-email-rendszer)
-7. [Architektúra](#-architektúra)
-8. [Konfiguráció](#-konfiguráció)
-9. [Használat](#-használat)
-10. [Könyvtár Kezelés](#-könyvtár-kezelés)
-11. [Auto-Update Rendszer](#-auto-update-rendszer)
-12. [PWA Mobil Támogatás](#-pwa-mobil-támogatás)
-13. [API Dokumentáció](#-api-dokumentáció)
-14. [Karbantartás](#-karbantartás)
-15. [Hibaelhárítás](#-hibaelhárítás)
-16. [GYIK](#-gyik)
-17. [Verzió Történet](#-verzió-történet)
+4. [Újdonságok a v9.1-ben](#-újdonságok-a-v91-ben)
+5. [Dark Mode](#-dark-mode)
+6. [Billentyűparancsok](#-billentyűparancsok)
+7. [Dashboard 2.0](#-dashboard-20)
+8. [Többnyelvű Felület](#-többnyelvű-felület)
+9. [Integrációk](#-integrációk)
+10. [Architektúra](#-architektúra)
+11. [Konfiguráció](#-konfiguráció)
+12. [API Dokumentáció](#-api-dokumentáció)
+13. [Karbantartás](#-karbantartás)
+14. [Hibaelhárítás](#-hibaelhárítás)
+15. [GYIK](#-gyik)
+16. [Verzió Történet](#-verzió-történet)
 
 ---
 
@@ -72,16 +71,14 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 - **Docker:** 24.0+ 
 - **Docker Compose:** 2.20+
 
-### DeepSeek Modellek
+### Böngésző Támogatás
 
-| Modell | Méret | RAM Igény | Sebesség | Minőség |
-|--------|-------|-----------|----------|---------|
-| `deepseek-r1:1.5b` | 1.5 GB | 8 GB | ⚡⚡⚡⚡⚡ | ⭐⭐ |
-| `deepseek-r1:7b` | 7 GB | 16 GB | ⚡⚡⚡⚡ | ⭐⭐⭐ |
-| `deepseek-r1:8b` | 8 GB | 32 GB | ⚡⚡⚡ | ⭐⭐⭐⭐ |
-| `deepseek-r1:14b` | 14 GB | 32 GB | ⚡⚡ | ⭐⭐⭐⭐ |
-| `deepseek-r1:32b` | 32 GB | 64 GB | ⚡ | ⭐⭐⭐⭐⭐ |
-| `deepseek-r1:70b` | 70 GB | 128 GB | 🐌 | ⭐⭐⭐⭐⭐ |
+| Böngésző | Dark Mode | PWA | Billentyűparancsok |
+|----------|-----------|-----|-------------------|
+| Chrome 90+ | ✅ | ✅ | ✅ |
+| Firefox 88+ | ✅ | ✅ | ✅ |
+| Safari 14+ | ✅ | ✅ | ⚠️ Részleges |
+| Edge 90+ | ✅ | ✅ | ✅ |
 
 ---
 
@@ -102,7 +99,7 @@ wget https://raw.githubusercontent.com/sorosg/Epub-translate/main/install.sh
 # 2. Tedd futtathatóvá
 chmod +x install.sh
 
-# 3. Indítsd el (friss telepítés)
+# 3. Indítsd el
 ./install.sh
 ```
 
@@ -127,176 +124,275 @@ Jelszó: Abrakadabra (változtasd meg!)
 
 🔄 Frissítés Meglévő Telepítésről
 
-Automatikus Frissítés (Webes Felületről)
+Frissítés a Programból (Webes Felület)
 
-1. Jelentkezz be adminisztrátorként
-2. Navigálj: Admin → Frissítés Kezelés
-3. Kattints: "Frissítések ellenőrzése"
-4. Ha elérhető új verzió: "Telepítés"
+```
+1. Admin → Frissítés Kezelés
+2. "Frissítések ellenőrzése"
+3. Ha van új verzió → "Telepítés"
+4. Automatikus mentés → Letöltés → Telepítés
+```
 
 Frissítés Parancssorból
 
 ```bash
-# 1. lehetőség: Telepítő script
+# 1. lehetőség: Telepítő script (automatikus észlelés)
 ./install.sh
-# Válaszd: 1) Frissítés meglévő telepítésről
+# Válaszd: 1) Frissítés
 
 # 2. lehetőség: Gyorsfrissítő
 ./scripts/update.sh
 
-# 3. lehetőség: Csak konfiguráció frissítése
-./install.sh
-# Válaszd: 3) Csak konfiguráció frissítése
+# 3. lehetőség: API-n keresztül
+curl -X POST http://localhost/api/admin/updates/install/1
 ```
 
-Frissítési Lehetőségek
+Frissítési Csatornák
 
-Opció Leírás Adatmegőrzés
-1) Frissítés Teljes frissítés, adatok megőrzése ✅ Igen
-2) Újratelepítés Minden törlése, friss telepítés ❌ Nem
-3) Konfig frissítés Csak konfigurációs fájlok frissítése ✅ Igen
+Csatorna Leírás Frissítési Gyakoriság
+stable Stabil, tesztelt verziók Havonta
+beta Előzetes verziók Hetente
+nightly Fejlesztői verziók Naponta
 
-Frissítési Folyamat
+---
+
+🆕 Újdonságok a v9.1-ben
+
+🌙 Dark Mode
+
+· Sötét és világos téma támogatása
+· Automatikus váltás a rendszer beállításai alapján
+· Egyéni beállítás felhasználónként
+· CSS változók a könnyű testreszabhatóságért
+· Gyorsbillentyű: Ctrl+Shift+D
+
+⌨️ Billentyűparancsok
+
+· 8 gyorsbillentyű a hatékony munkához
+· Súgó ablak (? billentyű)
+· Testreszabható parancsok
+· Kontextus függő műveletek
+
+📊 Dashboard 2.0
+
+· Interaktív grafikonok (Chart.js)
+· Havi fordítási statisztikák
+· Minőségi mutatók
+· Token felhasználás követése
+· Valós idejű frissítés
+
+🌍 Többnyelvű Felület
+
+· 5 nyelv támogatása:
+  · 🇭🇺 Magyar
+  · 🇬🇧 Angol
+  · 🇩🇪 Német
+  · 🇫🇷 Francia
+  · 🇪🇸 Spanyol
+· Automatikus nyelvfelismerés
+· Flask-Babel integráció
+· Könnyen bővíthető új nyelvekkel
+
+🔗 Integrációk
+
+📚 Calibre Plugin
+
+· Könyvek küldése közvetlenül Calibre-ból
+· Automatikus formátum felismerés
+· Könyvtár szinkronizálás
+
+📱 Kindle Send
+
+· Fordított könyvek küldése Kindle eszközre
+· Email alapú kézbesítés
+· Több Kindle eszköz támogatása
+
+🔌 WordPress Plugin
+
+· Shortcode: [epub_translator]
+· REST API végpontok
+· Beágyazható iframe
+
+🧩 Chrome Bővítmény
+
+· Egy kattintásos fordítás
+· Jobb klikk menü integráció
+· Értesítések a fordítás állapotáról
+
+---
+
+🌙 Dark Mode
+
+Használat
 
 ```
-1. Meglévő verzió észlelése
-2. Frissítés előtti biztonsági mentés
-   ├── Adatbázis mentése
-   ├── Konfiguráció mentése
-   ├── Könyvtár mentése
-   └── Fordítási memória mentése
-3. Konténerek leállítása
-4. Új fájlok telepítése
-5. Konténerek újraépítése
-6. Adatbázis migráció
-7. Szolgáltatások újraindítása
-8. Verzió frissítése
+1. Kattints a 🌙 gombra a navigációs sávban
+   VAGY
+2. Használd a Ctrl+Shift+D billentyűkombinációt
+   VAGY
+3. Állítsd be a Felhasználói beállításokban
+```
+
+Színséma
+
+Elem Világos Téma Sötét Téma
+Háttér #ffffff #1a1a2e
+Kártya #ffffff #1e1e3a
+Szöveg #212529 #e0e0e0
+Fejléc #f8f9fa #16213e
+
+API Vezérlés
+
+```bash
+# Dark mode beállítása
+curl -X PUT http://localhost/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{"dark_mode": true}'
 ```
 
 ---
 
-🆕 Újdonságok a v9.0-ban
+⌨️ Billentyűparancsok
 
-👤 Felhasználói Regisztráció
-
-· Önálló regisztrációs oldal (/register)
-· Regisztrációs űrlap validációval
-· Jelszó erősség ellenőrzés
-· Automatikus belső email generálás
-· Kezdő tokenek (alapértelmezett: 5)
-· Üdvözlő üzenet regisztráció után
-· Rate limiting (5 regisztráció/óra)
-
-📧 Belső Email Cím
-
-· Automatikus generálás: keresztnev.vezeteknev@epub.local
-· Egyedi cím minden felhasználónak
-· Ütközéskezelés (számozás azonos neveknél)
-
-🎨 Továbbfejlesztett Felhasználói Felület
-
-· Regisztrációs gomb a bejelentkezés oldalon
-· Modern, letisztult design
-· Reszponzív mobil nézet
-· Font Awesome ikonok
-
-🔄 Továbbfejlesztett Frissítés
-
-· Három frissítési mód (teljes, újratelepítés, konfig)
-· Részletes frissítési napló
-· Automatikus mentés frissítés előtt
+Billentyű Művelet Leírás
+Ctrl+Enter Fordítás indítása Elindítja a kiválasztott könyv fordítását
+Ctrl+D Letöltés Legutóbbi fordítás letöltése
+Ctrl+N Új fordítás Új fordítási oldal megnyitása
+Ctrl+H Vezérlőpult Vissza a dashboard-ra
+Ctrl+L Könyvtár Könyvtár kezelő megnyitása
+Ctrl+Shift+D Dark Mode Sötét/világos téma váltás
+Esc Bezárás Modális ablakok bezárása
+? Súgó Billentyűparancsok listája
 
 ---
 
-👤 Felhasználói Regisztráció
+📊 Dashboard 2.0
 
-Regisztráció Menete
+Grafikonok
 
-```
-1. Nyisd meg: http://localhost/register
-2. Töltsd ki az űrlapot:
-   ├── Vezetéknév (kötelező)
-   ├── Keresztnév (kötelező)
-   ├── Email cím (kötelező)
-   ├── Jelszó (minimum 8 karakter)
-   └── Jelszó megerősítése
-3. Kattints a "Regisztráció" gombra
-4. Azonnal megkapod:
-   ├── Belső email címed (@epub.local)
-   ├── 5 kezdő token
-   └── Üdvözlő üzenet
-5. Jelentkezz be az email címeddel
-```
+```javascript
+// Havi fordítások vonaldiagram
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ['Jan', 'Feb', 'Már', ...],
+        datasets: [{
+            label: 'Fordítások',
+            data: [5, 12, 8, ...],
+            borderColor: '#0d6efd'
+        }]
+    }
+});
 
-Regisztrációs Adatok
-
-Mező Kötelező Megjegyzés
-Vezetéknév ✅ -
-Keresztnév ✅ -
-Email ✅ Egyedi kell legyen
-Jelszó ✅ Minimum 8 karakter
-Jelszó újra ✅ Egyeznie kell
-
-Kezdő Jogosultságok
-
-Jogosultság Érték
-Tokenek 5 fordítás
-Belső email nev@epub.local
-Könyvtár hozzáférés Olvasás
-Mintakönyv feltöltés ✅
-Kollaboráció ✅
-
-Regisztráció Letiltása
-
-Az adminisztrátor letilthatja a regisztrációt:
-
-```env
-# .env fájlban
-ENABLE_REGISTRATION=false
+// Státusz eloszlás fánkdiagram
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Kész', 'Sikertelen', 'Folyamatban'],
+        datasets: [{
+            data: [15, 3, 2],
+            backgroundColor: ['#198754', '#dc3545', '#ffc107']
+        }]
+    }
+});
 ```
 
-Vagy az admin felületen: Beállítások → Regisztráció
+Statisztikai Kártyák
+
+Kártya Adat Forrás
+Tokenek Felhasználható tokenek száma /api/stats/dashboard
+Fordítások Összes fordítás száma /api/stats/dashboard
+Átlag Minőség Fordítások átlagos minősége (%) /api/stats/dashboard
+Belső Email Felhasználó belső email címe Felhasználói adatok
 
 ---
 
-📧 Belső Email Rendszer
+🌍 Többnyelvű Felület
 
-Email Cím Generálás
+Támogatott Nyelvek
 
-Minden felhasználó automatikusan kap egy belső email címet:
+Kód Nyelv Teljesség
+hu Magyar 100%
+en English 100%
+de Deutsch 80%
+fr Français 80%
+es Español 80%
+
+Nyelv Váltás
 
 ```
-Formátum: keresztnev.vezeteknev@epub.local
-Példa: gabor.kiss@epub.local
-       anna.nagy@epub.local
+1. Felhasználói beállítások → Nyelv
+2. Böngésző automatikus felismerés
+3. URL paraméter: ?lang=en
 ```
 
-Ha már létezik azonos cím:
+Új Nyelv Hozzáadása
+
+```bash
+# 1. Fordítási fájl létrehozása
+cp backend/translations/en/LC_MESSAGES/messages.po \
+   backend/translations/XX/LC_MESSAGES/messages.po
+
+# 2. Fordítások szerkesztése
+nano backend/translations/XX/LC_MESSAGES/messages.po
+
+# 3. Fordítások fordítása
+msgfmt backend/translations/XX/LC_MESSAGES/messages.po \
+      -o backend/translations/XX/LC_MESSAGES/messages.mo
+
+# 4. Újraindítás
+docker compose restart backend
+```
+
+---
+
+🔗 Integrációk
+
+📚 Calibre Plugin
+
+```bash
+# Telepítés
+cp integrations/calibre/calibre_plugin.py ~/.config/calibre/plugins/
+
+# Használat
+python3 calibre_plugin.py --send book.epub --target hu
+```
+
+📱 Kindle Send
+
+```python
+from integrations.kindle.kindle_send import KindleSender
+
+sender = KindleSender(
+    email="your@gmail.com",
+    password="app-password",
+    kindle_email="your@kindle.com"
+)
+
+sender.send_book("translated_book.epub", "A Nagy Gatsby")
+```
+
+🔌 WordPress Plugin
+
+```php
+// Shortcode használata
+[epub_translator url="http://localhost"]
+
+// PHP kódban
+echo do_shortcode('[epub_translator]');
+
+// REST API
+GET /wp-json/epub-translator/v1/books
+```
+
+🧩 Chrome Bővítmény
 
 ```
-gabor.kiss@epub.local
-gabor.kiss1@epub.local  ← automatikus számozás
-gabor.kiss2@epub.local
+1. Chrome → bővítmények → Fejlesztői mód
+2. "Csomagolatlan bővítmény betöltése"
+3. Válaszd: integrations/chrome/ mappát
+4. Használat: jobb klikk EPUB linkre → Fordítás
 ```
-
-Belső Email Funkciók
-
-· 📨 Üzenetküldés felhasználók között
-· 📬 Bejövő üzenetek (/api/internal-mail/inbox)
-· 📤 Elküldött üzenetek (/api/internal-mail/sent)
-· ⭐ Csillagozás fontos üzenetekhez
-· ✅ Olvasott/Olvasatlan állapot
-· 🔔 Értesítések új üzenetről
-
-Rendszerüzenetek
-
-Automatikus üzenetek:
-
-· 🎉 Regisztrációkor üdvözlő üzenet
-· 📚 Könyv feltöltésekor
-· ✅ Fordítás befejezésekor
-· ❌ Fordítási hiba esetén
-· 🔄 Rendszerfrissítéskor
 
 ---
 
@@ -306,27 +402,26 @@ Automatikus üzenetek:
 ┌─────────────────────────────────────────────────────────────┐
 │                     Felhasználói Böngésző                      │
 │                    http://localhost:80                        │
-│                    📱 PWA Támogatás                           │
-│                    👤 Regisztráció                            │
+│                    🌙 Dark Mode | 🌍 i18n                     │
+│                    ⌨️ Shortcuts | 📊 Charts                   │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
 │                      Nginx (80/443)                          │
 │              Reverse Proxy + Statikus Fájlok                 │
-│              Rate Limiting + Biztonsági Fejlécek              │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
 │                  Flask Backend (5000)                        │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐    │
-│  │ Regisztráció │ │ Belső Email  │ │ Felhasználó       │    │
-│  │ Kezelő       │ │ Rendszer     │ │ Kezelés           │    │
+│  │ Felhasználó  │ │ Dashboard    │ │ Integrációk       │    │
+│  │ Beállítások  │ │ 2.0          │ │ - Calibre         │    │
+│  ├──────────────┤ ├──────────────┤ │ - Kindle          │    │
+│  │ Dark Mode    │ │ Chart.js     │ │ - WordPress       │    │
+│  │ Toggle       │ │ Grafikonok   │ │ - Chrome          │    │
 │  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
-│  │ Könyvtár     │ │ Fordítás     │ │ Auto-Update       │    │
-│  │ Kezelő       │ │ Kezelő       │ │ Manager           │    │
-│  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
-│  │ Token        │ │ Kollaboráció │ │ Statisztikák      │    │
-│  │ Rendszer     │ │ (WebSocket)  │ │                   │    │
+│  │ Nyelv Váltás │ │ Statisztikák │ │ Auto-Update       │    │
+│  │ (i18n)       │ │              │ │ Manager           │    │
 │  └──────────────┘ └──────────────┘ └──────────────────┘    │
 └───────────────────────────┬─────────────────────────────────┘
                             │
@@ -335,259 +430,114 @@ Automatikus üzenetek:
 ┌───────▼──────┐   ┌────────▼────────┐   ┌─────▼──────┐
 │  PostgreSQL  │   │     Ollama       │   │   Redis    │
 │  + Users     │   │  DeepSeek AI    │   │   Cache    │
-│  + Books     │   │  Modellek       │   │            │
-│  + Email     │   │                 │   │            │
+│  + Settings  │   │  Modellek       │   │            │
 └──────────────┘   └─────────────────┘   └────────────┘
-
-┌──────────────┐   ┌─────────────────┐
-│   MailHog    │   │   TTS Service    │
-│ Helyi Email  │   │  (opcionális)    │
-└──────────────┘   └─────────────────┘
 ```
 
 ---
 
 ⚙️ Konfiguráció
 
-.env Fájl
+.env Fájl (v9.1)
 
 ```env
 # Verzió
-VERSION=9.0.0
-CODENAME="User Portal"
+VERSION=9.1.0
+CODENAME="Enhanced Studio"
+RELEASE_DATE=2025-03-15
 
 # Admin
 ADMIN_EMAIL=admin@epub-translator.local
 ADMIN_PASSWORD=your-secure-password
 
-# Regisztráció
-ENABLE_REGISTRATION=true      # true/false - regisztráció engedélyezése
-DEFAULT_TOKENS=5               # Kezdő tokenek száma
+# Felhasználói beállítások
+ENABLE_REGISTRATION=true
+DEFAULT_TOKENS=5
+DEFAULT_LANGUAGE=hu
+
+# Megjelenés
+ENABLE_DARK_MODE=true
+ENABLE_SHORTCUTS=true
+ENABLE_I18N=true
 
 # AI Modell
 SELECTED_MODEL=deepseek-r1:8b
 MAX_WORKERS=3
 
+# Integrációk
+ENABLE_CALIBRE=true
+ENABLE_KINDLE=true
+ENABLE_WP_PLUGIN=true
+ENABLE_CHROME_EXT=true
+
 # Auto-Update
 ENABLE_AUTO_UPDATE=true
 GITHUB_REPO=https://github.com/sorosg/Epub-translate.git
 GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-UPDATE_CHECK_INTERVAL=3600
 
 # SMTP
 SMTP_MODE=local
 SMTP_HOST=mailhog
 SMTP_PORT=1025
-
-# Funkciók
-ENABLE_PWA=true
-ENABLE_TTS=true
-ENABLE_COLLABORATION=true
-ENABLE_BOOK_DB=true
-ENABLE_CACHE=true
 ```
 
-Regisztráció Testreszabása
-
-```env
-# Regisztráció teljes letiltása
-ENABLE_REGISTRATION=false
-
-# Kezdő tokenek módosítása
-DEFAULT_TOKENS=10
-
-# Regisztráció limitálása
-# (a Flask-Limiter kezeli: 5 regisztráció/óra)
-```
-
----
-
-📖 Használat
-
-Új Felhasználó Regisztrációja
-
-```
-1. Nyisd meg: http://localhost
-2. Kattints a "Regisztráció" gombra
-3. Töltsd ki az adatokat
-4. Kattints a "Regisztráció" gombra
-5. Jelentkezz be az email címeddel
-```
-
-Bejelentkezés
-
-```
-1. Nyisd meg: http://localhost/login
-2. Add meg az email címed
-3. Add meg a jelszavad
-4. Kattints a "Bejelentkezés" gombra
-```
-
-Dashboard
-
-Bejelentkezés után a dashboard-on láthatod:
-
-· 👤 Neved
-· 💰 Token egyenleged
-· 📧 Belső email címed
-· 📚 Fordítási előzményeid
-· 🔔 Értesítéseid
-
-Token Kérés
-
-Ha elfogytak a tokenjeid:
-
-1. Kattints a "Tokenek kérése" gombra
-2. Az adminisztrátor értesítést kap
-3. Az admin jóváhagyja és beállítja az új tokeneket
-
----
-
-📚 Könyvtár Kezelés
-
-Drag & Drop Feltöltés (Admin)
-
-```
-1. Admin → Könyvtár Kezelés
-2. Húzd az EPUB fájlokat a drop zónába
-3. VAGY kattints a zónára
-4. Több fájl is kiválasztható (Ctrl+A)
-5. Kattints a "Feltöltés Indítása" gombra
-```
-
-Könyvtár Statisztikák
-
-Statisztika Leírás
-Összes könyv Adatbázisban lévő könyvek
-Szerzők Egyedi szerzők száma
-Feltöltések Összes feltöltés száma
-Műfajok Különböző műfajok száma
-
----
-
-🔄 Auto-Update Rendszer
-
-Frissítési Módok
-
-Mód Leírás
-Teljes frissítés Új fájlok + adatbázis migráció
-Konfig frissítés Csak .env és konfig fájlok
-Újratelepítés Minden törlése, friss telepítés
-
-Frissítés a Webes Felületről
-
-```
-1. Admin → Frissítés Kezelés
-2. "Frissítések ellenőrzése"
-3. Ha elérhető: "Telepítés"
-```
-
-Frissítés Parancssorból
+Felhasználói Beállítások API
 
 ```bash
-# Ellenőrzés
-curl http://localhost/api/admin/updates/check
+# Beállítások lekérése
+GET /api/settings
 
-# Telepítés
-./scripts/update.sh
-
-# Visszaállítás
-cp backups/updates/pre_update_*/database.sql .
-docker exec -i epub-postgres psql -U epub_user epub_translator < database.sql
-docker compose restart
-```
-
----
-
-📱 PWA Mobil Támogatás
-
-Telepítés Mobilra
-
-```
-1. Nyisd meg böngészőben: http://[IP]
-2. Menü → "Telepítés"
-3. Ikon a kezdőképernyőn
-4. Offline is működik
+# Beállítások módosítása
+PUT /api/settings
+{
+    "dark_mode": true,
+    "language": "en",
+    "shortcuts_enabled": true
+}
 ```
 
 ---
 
 🔌 API Dokumentáció
 
-Regisztráció
-
-```bash
-# Regisztráció
-curl -X POST http://localhost/api/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "first_name": "Gábor",
-    "last_name": "Kiss",
-    "email": "gabor.kiss@example.com",
-    "password": "SecurePass1!"
-  }'
-
-# Válasz
-{
-    "success": true,
-    "user_id": 2,
-    "internal_email": "gabor.kiss@epub.local",
-    "tokens": 5
-}
-```
-
-Bejelentkezés
-
-```bash
-curl -X POST http://localhost/login \
-  -d "email=gabor.kiss@example.com" \
-  -d "password=SecurePass1!"
-```
-
-Belső Email
-
-```bash
-# Bejövő üzenetek
-curl http://localhost/api/internal-mail/inbox \
-  -H "Cookie: session=..."
-
-# Üzenet küldése
-curl -X POST http://localhost/api/internal-mail/send \
-  -H "Content-Type: application/json" \
-  -d '{
-    "recipient": "admin@epub.local",
-    "subject": "Token kérés",
-    "body": "Szeretnék több tokent kérni."
-  }'
-```
-
-Fő API Végpontok
+Új v9.1 Végpontok
 
 Végpont Módszer Leírás
-/api/register POST Felhasználó regisztráció
-/api/internal-mail/inbox GET Bejövő üzenetek
-/api/internal-mail/send POST Belső email küldése
-/api/internal-mail/unread-count GET Olvasatlanok száma
-/api/library/batch-upload POST Kötegelt feltöltés
-/api/library/stats GET Könyvtár statisztikák
-/api/admin/updates/check POST Frissítés ellenőrzése
-/api/admin/updates/install POST Frissítés telepítése
+/api/settings GET/PUT Felhasználói beállítások
+/api/stats/dashboard GET Dashboard statisztikák
+/api/i18n/languages GET Elérhető nyelvek
+/api/i18n/switch POST Nyelv váltás
+/api/integrations/calibre/send POST Küldés Calibre-ba
+/api/integrations/kindle/send POST Küldés Kindle-re
+
+Dashboard API
+
+```bash
+curl http://localhost/api/stats/dashboard \
+  -H "Cookie: session=..."
+
+# Válasz:
+{
+    "total_translations": 25,
+    "completed": 20,
+    "avg_quality": 85,
+    "monthly": {
+        "2025-01": 5,
+        "2025-02": 8,
+        "2025-03": 12
+    },
+    "tokens_left": 3
+}
+```
 
 ---
 
 🔧 Karbantartás
 
-Automatikus Feladatok
-
-Feladat Gyakoriság Időpont
-Biztonsági mentés Hetente Vasárnap 03:00
-Docker takarítás Hetente Vasárnap 04:00
-Frissítés ellenőrzés Állítható Óránként
-
-Kézi Parancsok
+Rendszeres Feladatok
 
 ```bash
-# Státusz
+# Státusz ellenőrzése
 ./scripts/status.sh
 
 # Biztonsági mentés
@@ -600,96 +550,124 @@ Kézi Parancsok
 docker compose logs -f backend
 ```
 
+Dark Mode Testreszabása
+
+```css
+/* Saját dark mode színek */
+:root {
+    --bg-primary: #1a1a2e;    /* Sötét háttér */
+    --card-bg: #1e1e3a;       /* Kártya háttér */
+    --text-primary: #e0e0e0;  /* Szöveg szín */
+}
+```
+
+Nyelvi Fájlok Frissítése
+
+```bash
+# Új fordítások fordítása
+pybabel compile -d backend/translations
+
+# Fordítások frissítése a kódból
+pybabel extract -F babel.cfg -o messages.pot .
+pybabel update -i messages.pot -d backend/translations
+```
+
 ---
 
 🔍 Hibaelhárítás
 
-Regisztrációs Problémák
+Dark Mode Problémák
 
 ```bash
-# Regisztráció le van tiltva?
-grep ENABLE_REGISTRATION .env
+# Dark mode nem működik?
+# Ellenőrizd a localStorage-t:
+localStorage.getItem('theme')
 
-# Rate limit elérve?
-# Várj 1 órát, vagy állítsd át a limitet
-
-# Email már létezik?
-curl http://localhost/api/register \
-  -d '{"email": "existing@email.com", ...}'
+# Töröld a cache-t:
+localStorage.removeItem('theme')
+location.reload()
 ```
 
-Frissítési Hibák
+Nyelvi Problémák
 
 ```bash
-# Visszaállítás mentésből
-ls backups/updates/
-# Használd a legfrissebb mentést
+# Fordítások újratöltése
+docker exec -it epub-backend pybabel compile -d translations
 
-# Konténerek újraindítása
-docker compose restart
+# Nyelv visszaállítása
+curl -X PUT http://localhost/api/settings \
+  -d '{"language": "hu"}'
 ```
 
-Email Nem Érkezik
+Integrációs Hibák
 
 ```bash
-# MailHog ellenőrzése
-curl http://localhost:8025
+# Calibre plugin
+python3 -c "from calibre_plugin import EPUBTranslatorPlugin; print('OK')"
 
-# API ellenőrzése
-curl http://localhost/api/internal-mail/inbox \
-  -H "Cookie: session=..."
+# Kindle send teszt
+python3 -c "from kindle_send import KindleSender; print('OK')"
 ```
 
 ---
 
 ❓ GYIK
 
-Regisztráció
+Dark Mode
 
-K: Ingyenes a regisztráció?
-V: Igen! A rendszer teljesen ingyenes, a tokenek belső elszámolási egységek.
+K: Hogyan kapcsolhatom be a dark mode-ot?
+V: Kattints a 🌙 gombra, használd a Ctrl+Shift+D billentyűt, vagy állítsd be a felhasználói beállításokban.
 
-K: Mennyi token jár regisztrációnál?
-V: Alapértelmezetten 5 token (5 fordítás).
+K: Megjegyzi a rendszer a beállításomat?
+V: Igen! A beállítás tárolódik a localStorage-ban és a szerveren is.
 
-K: Mi az a belső email cím?
-V: Egy @epub.local végű cím a rendszeren belüli kommunikációhoz.
+Nyelvek
 
-K: Hogyan kaphatok több tokent?
-V: A dashboard-on kattints a "Tokenek kérése" gombra.
+K: Hogyan válthatok nyelvet?
+V: A felhasználói beállításokban válaszd ki a kívánt nyelvet.
 
-Frissítés
+K: Hozzáadhatok új nyelvet?
+V: Igen! Másold le valamelyik meglévő fordítási fájlt és fordítsd le.
 
-K: Hogyan frissíthetek v8-ról v9-re?
-V: Futtasd az install.sh-t és válaszd az "1) Frissítés" lehetőséget.
+Integrációk
 
-K: Elvesznek az adataim frissítéskor?
-V: Nem, a frissítés megőrzi az adatbázist és a konfigurációt.
+K: Hogyan használhatom a Calibre plugin-t?
+V: Másold a calibre_plugin.py fájlt a Calibre plugins mappájába.
+
+K: Működik a Kindle send Gmail nélkül?
+V: Igen, bármilyen SMTP szerver használható.
 
 ---
 
 📊 Verzió Történet
 
+v9.1.0 (2025-03-15) - "Enhanced Studio"
+
+· 🆕 Dark Mode támogatás
+· 🆕 Billentyűparancsok (8 gyorsbillentyű)
+· 🆕 Dashboard 2.0 (Chart.js grafikonok)
+· 🆕 Többnyelvű felület (5 nyelv)
+· 🆕 Calibre integráció
+· 🆕 Kindle Send támogatás
+· 🆕 WordPress plugin
+· 🆕 Chrome bővítmény
+· 🎨 Továbbfejlesztett felhasználói élmény
+
 v9.0.0 (2025-01-15) - "User Portal"
 
-· 🆕 Felhasználói regisztrációs oldal
-· 🆕 Belső email automatikus generálás
-· 🆕 Kezdő tokenek új felhasználóknak
-· 🆕 Regisztrációs gomb a bejelentkezésnél
-· 🆕 Továbbfejlesztett frissítési rendszer
-· 🎨 Modernizált felhasználói felület
+· Felhasználói regisztráció
+· Belső email rendszer
+· Kezdő tokenek
 
 v8.0.0 (2024-12-01) - "Library Manager"
 
 · Drag & Drop könyvtárfeltöltés
-· Belső email rendszer alapok
 · MailHog integráció
 
 v7.0.0 (2024-09-15) - "Self-Evolving Translator"
 
 · GitHub Auto-Update
 · Öntanuló fordítási memória
-· Glosszárium kezelés
 · Valós idejű kollaboráció
 
 v6.0.0 (2024-06-15)
@@ -700,14 +678,12 @@ v6.0.0 (2024-06-15)
 v5.0.0 (2024-01-15)
 
 · Könyv adatbázis
-· Intelligens mintakönyv ajánlás
 · AI műfaj felismerés
 
 v4.0.0 (2024-01-01)
 
 · Hibrid SMTP
 · Vírusellenőrzés
-· 2FA támogatás
 
 v3.0.0 (2023-12-15)
 
@@ -750,6 +726,8 @@ MIT License
 · DeepSeek - Nyílt forráskódú AI modellek
 · Ollama - Modell futtatás
 · Flask - Web keretrendszer
+· Chart.js - Interaktív grafikonok
+· Flask-Babel - Többnyelvűség
 · EbookLib - EPUB kezelés
 · MailHog - Helyi email szerver
 
@@ -765,7 +743,7 @@ MIT License
 
 Készült ❤️-vel Magyarországon
 
-Utolsó frissítés: 2026. július 12.
+Utolsó frissítés: 2026. július 2.
 
 ```
 ```
