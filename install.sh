@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# EPUB Fordító Rendszer - Telepítő/Frissítő Script v10.0
-# Verzió: 10.0.0
-# Kódnév: "AI Studio"
-# Dátum: 2025-06-20
-# Leírás: AI Asszisztens, OAuth/SSO, Offline Queue, OCR, Hangalapú fordítás,
-#          Gamification, Közösségi könyvtár, Fine-tuning, Auto-Complete
+# EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
+# Verzió: 11.0.0
+# Kódnév: "Smart Optimizer"
+# Dátum: 2025-07-17
+# Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
+#          intelligens modellváltás, valós idejű rendszerfigyelés
 
 set -e
 
@@ -20,54 +20,57 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="10.0.0"
-CODENAME="AI Studio"
-RELEASE_DATE="2025-06-20"
-MIN_VERSION_FOR_UPDATE="8.0.0"
+VERSION="11.0.0"
+CODENAME="Smart Optimizer"
+RELEASE_DATE="2025-07-17"
+MIN_VERSION_FOR_UPDATE="9.0.0"
 
 # Alapértelmezések
-DEFAULT_MODEL="deepseek-r1:8b"
+DEFAULT_MODEL="deepseek-r1:14b"
 ADMIN_EMAIL="admin@epub-translator.local"
 ADMIN_PASSWORD="Abrakadabra"
 MAX_WORKERS=3
 DEFAULT_LANGUAGE="hu"
 
-# Funkciók
-ENABLE_REGISTRATION="i"
-ENABLE_DARK_MODE="i"
-ENABLE_SHORTCUTS="i"
-ENABLE_I18N="i"
-ENABLE_PWA="i"
-ENABLE_TTS="i"
-ENABLE_CACHE="i"
-ENABLE_API="i"
-ENABLE_BOOK_DB="i"
-ENABLE_AUTO_UPDATE="i"
+# Rendszer erőforrások automatikus észlelése
+TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
+CPU_CORES=$(nproc)
+FREE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 
-# v10.0 Új funkciók
+# Automatikus modell ajánlás
+if [ "$TOTAL_RAM" -ge 64 ]; then
+    RECOMMENDED_MODEL="deepseek-r1:32b"
+    MAX_WORKERS=4
+elif [ "$TOTAL_RAM" -ge 32 ]; then
+    RECOMMENDED_MODEL="deepseek-r1:14b"
+    MAX_WORKERS=3
+elif [ "$TOTAL_RAM" -ge 16 ]; then
+    RECOMMENDED_MODEL="deepseek-r1:8b"
+    MAX_WORKERS=2
+else
+    RECOMMENDED_MODEL="deepseek-r1:7b"
+    MAX_WORKERS=1
+fi
+
+# Funkciók (mind alapértelmezetten engedélyezve)
 ENABLE_AI_ASSISTANT="i"
 ENABLE_OAUTH="i"
-ENABLE_OFFLINE_QUEUE="i"
 ENABLE_OCR="i"
 ENABLE_VOICE_INPUT="i"
 ENABLE_GAMIFICATION="i"
 ENABLE_COMMUNITY="i"
 ENABLE_FINE_TUNING="i"
 ENABLE_AUTO_COMPLETE="i"
-ENABLE_COLLABORATION="i"
-
-# OAuth beállítások
-OAUTH_GOOGLE_CLIENT_ID=""
-OAUTH_GOOGLE_CLIENT_SECRET=""
-OAUTH_GITHUB_CLIENT_ID=""
-OAUTH_GITHUB_CLIENT_SECRET=""
-OAUTH_MICROSOFT_CLIENT_ID=""
-OAUTH_MICROSOFT_CLIENT_SECRET=""
-
-# Gamification
-ENABLE_ACHIEVEMENTS="i"
-ENABLE_LEADERBOARD="i"
-ENABLE_CHALLENGES="i"
+ENABLE_DARK_MODE="i"
+ENABLE_SHORTCUTS="i"
+ENABLE_I18N="i"
+ENABLE_PWA="i"
+ENABLE_CACHE="i"
+ENABLE_AUTO_UPDATE="i"
+ENABLE_REGISTRATION="i"
+ENABLE_AUTO_OPTIMIZE="i"  # ÚJ: Automatikus optimalizálás
+ENABLE_RESOURCE_MONITOR="i"  # ÚJ: Erőforrás figyelés
+ENABLE_SMART_SWITCH="i"  # ÚJ: Intelligens modellváltás
 
 # GitHub
 GITHUB_REPO="https://github.com/sorosg/Epub-translate.git"
@@ -88,6 +91,7 @@ log_success() { echo -e "${CYAN}[SIKER]${NC} $1"; }
 log_config() { echo -e "${PURPLE}[KONFIG]${NC} $1"; }
 log_header() { echo -e "${WHITE}$1${NC}"; }
 log_update() { echo -e "${YELLOW}[FRISSÍTÉS]${NC} $1"; }
+log_perf() { echo -e "${CYAN}[TELJESÍTMÉNY]${NC} $1"; }
 
 if [ "$EUID" -eq 0 ]; then 
     log_warn "Ne futtasd root-ként!"
@@ -117,7 +121,8 @@ detect_installation_mode() {
         echo "Válassz:"
         echo "  1) Frissítés (adatok megőrzése) ⭐ Ajánlott"
         echo "  2) Újratelepítés (minden törlődik)"
-        echo "  3) Kilépés"
+        echo "  3) Csak optimalizálás (megtart mindent, csak hangol)"
+        echo "  4) Kilépés"
         read -p "Választás [1]: " mode
         mode=${mode:-1}
         
@@ -129,7 +134,8 @@ detect_installation_mode() {
                BACKUP_DIR="$HOME/epub-translator-backup-$(date +%Y%m%d_%H%M%S)"
                cp -r "$PROJECT_DIR" "$BACKUP_DIR" 2>/dev/null || true
                rm -rf "$PROJECT_DIR";;
-            3) exit 0;;
+            3) IS_UPDATE=true; OPTIMIZE_ONLY=true; load_existing_config;;
+            4) exit 0;;
             *) IS_UPDATE=true; load_existing_config;;
         esac
     else
@@ -143,7 +149,7 @@ load_existing_config() {
     [ -f "$PROJECT_DIR/.env" ] && cp "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.backup.$(date +%Y%m%d_%H%M%S)"
     ADMIN_EMAIL="${ADMIN_EMAIL:-admin@epub-translator.local}"
     ADMIN_PASSWORD="${ADMIN_PASSWORD:-Abrakadabra}"
-    SELECTED_MODEL="${SELECTED_MODEL:-$DEFAULT_MODEL}"
+    SELECTED_MODEL="${SELECTED_MODEL:-$RECOMMENDED_MODEL}"
     DEFAULT_LANGUAGE="${DEFAULT_LANGUAGE:-hu}"
     GITHUB_REPO="${GITHUB_REPO:-https://github.com/sorosg/Epub-translate.git}"
     GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -151,16 +157,105 @@ load_existing_config() {
 }
 
 # ============================================================
-# RENDSZER ERŐFORRÁSOK
+# RENDSZER ANALÍZIS ÉS OPTIMALIZÁLÁS
 # ============================================================
-check_system_resources() {
-    log_step "Erőforrások ellenőrzése"
-    TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
-    log_info "RAM: ${TOTAL_RAM}GB"
-    [ "$TOTAL_RAM" -lt 16 ] && { log_error "Minimum 16GB RAM kell!"; exit 1; }
-    [ "$TOTAL_RAM" -lt 32 ] && { RECOMMENDED_MODEL="deepseek-r1:7b"; MAX_WORKERS=2; } || { RECOMMENDED_MODEL="deepseek-r1:8b"; MAX_WORKERS=3; }
-    log_info "Szabad hely: $(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')GB"
-    log_info "CPU: $(nproc) mag"
+analyze_and_optimize() {
+    log_step "Rendszer analízis és automatikus optimalizálás"
+    
+    log_perf "Hardver információ:"
+    log_info "  RAM: ${TOTAL_RAM} GB"
+    log_info "  CPU: ${CPU_CORES} mag"
+    log_info "  Szabad hely: ${FREE_SPACE} GB"
+    
+    # CPU optimalizálás
+    if [ "$CPU_CORES" -ge 8 ]; then
+        OPTIMAL_WORKERS=4
+        OPTIMAL_OLLAMA_PARALLEL=3
+    elif [ "$CPU_CORES" -ge 4 ]; then
+        OPTIMAL_WORKERS=3
+        OPTIMAL_OLLAMA_PARALLEL=2
+    else
+        OPTIMAL_WORKERS=1
+        OPTIMAL_OLLAMA_PARALLEL=1
+    fi
+    
+    # RAM optimalizálás
+    if [ "$TOTAL_RAM" -ge 64 ]; then
+        OPTIMAL_MEMORY_LIMIT="48G"
+        OPTIMAL_REDIS="1024mb"
+        OPTIMAL_PG_BUFFERS="1GB"
+    elif [ "$TOTAL_RAM" -ge 32 ]; then
+        OPTIMAL_MEMORY_LIMIT="24G"
+        OPTIMAL_REDIS="512mb"
+        OPTIMAL_PG_BUFFERS="512MB"
+    elif [ "$TOTAL_RAM" -ge 16 ]; then
+        OPTIMAL_MEMORY_LIMIT="12G"
+        OPTIMAL_REDIS="256mb"
+        OPTIMAL_PG_BUFFERS="256MB"
+    else
+        OPTIMAL_MEMORY_LIMIT="8G"
+        OPTIMAL_REDIS="128mb"
+        OPTIMAL_PG_BUFFERS="128MB"
+    fi
+    
+    # Lemez optimalizálás
+    if [ "$FREE_SPACE" -lt 20 ]; then
+        log_warn "Kevesebb mint 20 GB szabad hely - nagytakarítás javasolt"
+        ENABLE_CLEANUP="i"
+    fi
+    
+    # Modell ajánlás
+    log_perf "Optimális beállítások:"
+    log_info "  Ajánlott modell: ${RECOMMENDED_MODEL}"
+    log_info "  Optimális szálak: ${OPTIMAL_WORKERS}"
+    log_info "  Memória limit: ${OPTIMAL_MEMORY_LIMIT}"
+    log_info "  Redis cache: ${OPTIMAL_REDIS}"
+    log_info "  PostgreSQL buffer: ${OPTIMAL_PG_BUFFERS}"
+    
+    # Automatikus optimalizálási profil mentése
+    cat > .optimization_profile << EOF
+OPTIMAL_WORKERS=${OPTIMAL_WORKERS}
+OPTIMAL_OLLAMA_PARALLEL=${OPTIMAL_OLLAMA_PARALLEL}
+OPTIMAL_MEMORY_LIMIT="${OPTIMAL_MEMORY_LIMIT}"
+OPTIMAL_REDIS="${OPTIMAL_REDIS}"
+OPTIMAL_PG_BUFFERS="${OPTIMAL_PG_BUFFERS}"
+RECOMMENDED_MODEL="${RECOMMENDED_MODEL}"
+CPU_CORES=${CPU_CORES}
+TOTAL_RAM=${TOTAL_RAM}
+EOF
+    
+    log_success "Optimalizálási profil létrehozva"
+}
+
+# ============================================================
+# CSAK OPTIMALIZÁLÁS (meglévő telepítéshez)
+# ============================================================
+perform_optimization_only() {
+    log_step "Rendszer optimalizálás (meglévő telepítés)"
+    
+    cd "$PROJECT_DIR"
+    analyze_and_optimize
+    
+    log_info "Beállítások alkalmazása..."
+    
+    # .env frissítése
+    sed -i "s/MAX_WORKERS=.*/MAX_WORKERS=${OPTIMAL_WORKERS}/" .env
+    sed -i "s/SELECTED_MODEL=.*/SELECTED_MODEL=${RECOMMENDED_MODEL}/" .env
+    
+    # docker-compose.yml frissítése
+    sed -i "s/memory: [0-9]*G/memory: ${OPTIMAL_MEMORY_LIMIT}/" docker-compose.yml
+    
+    # Redis optimalizálás
+    docker exec epub-redis redis-cli CONFIG SET maxmemory "${OPTIMAL_REDIS}" 2>/dev/null || true
+    
+    # PostgreSQL optimalizálás
+    docker exec epub-postgres psql -U epub_user -c "ALTER SYSTEM SET shared_buffers = '${OPTIMAL_PG_BUFFERS}';" 2>/dev/null || true
+    docker exec epub-postgres psql -U epub_user -c "SELECT pg_reload_conf();" 2>/dev/null || true
+    
+    # Konténerek újraindítása az új beállításokkal
+    docker compose restart ollama backend
+    
+    log_success "Optimalizálás befejezve!"
 }
 
 # ============================================================
@@ -168,6 +263,7 @@ check_system_resources() {
 # ============================================================
 configure_system() {
     [ "$IS_UPDATE" = true ] && { log_info "Meglévő konfiguráció megtartása"; return; }
+    [ "${OPTIMIZE_ONLY:-false}" = true ] && return
     
     log_step "Konfigurációs varázsló"
     echo ""
@@ -175,52 +271,44 @@ configure_system() {
     log_header "║     EPUB Fordító v${VERSION} - \"${CODENAME}\"    ║"
     log_header "╚══════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "   🆕 v10.0 Újdonságok:"
-    echo "   🤖 AI Fordítási Asszisztens"
-    echo "   🔐 OAuth/SSO (Google, GitHub, Microsoft)"
-    echo "   📡 Offline Fordítási Queue"
-    echo "   📷 OCR és Képfordítás"
-    echo "   🎤 Hangalapú Fordítás"
-    echo "   🎮 Gamification (Achievement-ek, Ranglisták)"
-    echo "   📚 Közösségi Könyvtár"
-    echo "   🎯 Fine-tuning Támogatás"
-    echo "   ✨ Auto-Complete Fordítás"
+    echo "   🆕 v11.0 Újdonságok:"
+    echo "   🧠 Automatikus modell optimalizálás"
+    echo "   📊 Valós idejű erőforrás figyelés"
+    echo "   🔄 Intelligens modellváltás (auto-optimize)"
+    echo "   💾 Dinamikus memória kezelés"
+    echo "   ⚡ Teljesítmény profilok"
+    echo "   🎯 Hardver alapú auto-konfiguráció"
     echo ""
     
-    read -p "Testreszabás? (i/n) [i]: " c
+    # Rendszer analízis
+    analyze_and_optimize
+    
+    echo ""
+    log_perf "A rendszered alapján az optimális beállítások:"
+    echo "   🤖 Modell: ${RECOMMENDED_MODEL}"
+    echo "   🧵 Szálak: ${OPTIMAL_WORKERS}"
+    echo "   💾 RAM limit: ${OPTIMAL_MEMORY_LIMIT}"
+    echo ""
+    
+    read -p "Elfogadod az automatikus beállításokat? (i/n) [i]: " c
     c=${c:-"i"}
     
-    if [[ $c =~ ^[Ii]$ ]]; then
+    if [[ ! $c =~ ^[Ii]$ ]]; then
         echo ""; log_config "👤 Admin:"; read -p "Email [${ADMIN_EMAIL}]: " i; ADMIN_EMAIL=${i:-$ADMIN_EMAIL}; read -sp "Jelszó [${ADMIN_PASSWORD}]: " i; echo ""; ADMIN_PASSWORD=${i:-$ADMIN_PASSWORD}
-        echo ""; log_config "🤖 AI Modell:"; select_model
-        echo ""; log_config "🌍 Nyelv:"; read -p "Nyelv [${DEFAULT_LANGUAGE}]: " i; DEFAULT_LANGUAGE=${i:-$DEFAULT_LANGUAGE}
-        
-        echo ""; log_config "🆕 v10.0 Funkciók:"
-        read -p "  AI Asszisztens? (i/n) [i]: " i; ENABLE_AI_ASSISTANT=${i:-"i"}
-        read -p "  OAuth/SSO? (i/n) [i]: " i; ENABLE_OAUTH=${i:-"i"}
-        if [[ $ENABLE_OAUTH =~ ^[Ii]$ ]]; then
-            echo "    OAuth beállítások (opcionális):"
-            read -p "    Google Client ID: " OAUTH_GOOGLE_CLIENT_ID
-            read -sp "    Google Client Secret: " OAUTH_GOOGLE_CLIENT_SECRET; echo ""
-            read -p "    GitHub Client ID: " OAUTH_GITHUB_CLIENT_ID
-            read -sp "    GitHub Client Secret: " OAUTH_GITHUB_CLIENT_SECRET; echo ""
-        fi
-        read -p "  Offline Queue? (i/n) [i]: " i; ENABLE_OFFLINE_QUEUE=${i:-"i"}
-        read -p "  OCR? (i/n) [i]: " i; ENABLE_OCR=${i:-"i"}
-        read -p "  Hangalapú fordítás? (i/n) [i]: " i; ENABLE_VOICE_INPUT=${i:-"i"}
-        read -p "  Gamification? (i/n) [i]: " i; ENABLE_GAMIFICATION=${i:-"i"}
-        if [[ $ENABLE_GAMIFICATION =~ ^[Ii]$ ]]; then
-            read -p "    Achievement-ek? (i/n) [i]: " i; ENABLE_ACHIEVEMENTS=${i:-"i"}
-            read -p "    Ranglisták? (i/n) [i]: " i; ENABLE_LEADERBOARD=${i:-"i"}
-            read -p "    Kihívások? (i/n) [i]: " i; ENABLE_CHALLENGES=${i:-"i"}
-        fi
-        read -p "  Közösségi könyvtár? (i/n) [i]: " i; ENABLE_COMMUNITY=${i:-"i"}
-        read -p "  Fine-tuning? (i/n) [i]: " i; ENABLE_FINE_TUNING=${i:-"i"}
-        read -p "  Auto-Complete? (i/n) [i]: " i; ENABLE_AUTO_COMPLETE=${i:-"i"}
-        
-        echo ""; log_config "📡 Auto-Update:"; read -p "Engedélyezés? (i/n) [i]: " i; ENABLE_AUTO_UPDATE=${i:-"i"}
-        [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && { read -p "GitHub repo [${GITHUB_REPO}]: " i; GITHUB_REPO=${i:-$GITHUB_REPO}; read -p "Token (opc.): " i; GITHUB_TOKEN=${i:-""}; }
+        echo ""; log_config "🤖 Modell:"; select_model
+        echo ""; log_config "⚡ Teljesítmény:"
+        read -p "  Szálak [${OPTIMAL_WORKERS}]: " i; MAX_WORKERS=${i:-$OPTIMAL_WORKERS}
+        read -p "  RAM limit [${OPTIMAL_MEMORY_LIMIT}]: " i; OPTIMAL_MEMORY_LIMIT=${i:-$OPTIMAL_MEMORY_LIMIT}
+    else
+        SELECTED_MODEL="${RECOMMENDED_MODEL}"
+        MAX_WORKERS="${OPTIMAL_WORKERS}"
     fi
+    
+    echo ""; log_config "🆕 Funkciók:"
+    read -p "  Auto-optimalizálás? (i/n) [i]: " i; ENABLE_AUTO_OPTIMIZE=${i:-"i"}
+    read -p "  Erőforrás monitor? (i/n) [i]: " i; ENABLE_RESOURCE_MONITOR=${i:-"i"}
+    read -p "  Intelligens modellváltás? (i/n) [i]: " i; ENABLE_SMART_SWITCH=${i:-"i"}
+    read -p "  AI Asszisztens? (i/n) [i]: " i; ENABLE_AI_ASSISTANT=${i:-"i"}
     
     cat > .install_config << EOF
 VERSION="${VERSION}"
@@ -230,23 +318,23 @@ ADMIN_EMAIL="${ADMIN_EMAIL}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD}"
 MAX_WORKERS=${MAX_WORKERS}
 SELECTED_MODEL="${SELECTED_MODEL}"
+RECOMMENDED_MODEL="${RECOMMENDED_MODEL}"
+OPTIMAL_WORKERS=${OPTIMAL_WORKERS}
+OPTIMAL_MEMORY_LIMIT="${OPTIMAL_MEMORY_LIMIT}"
+OPTIMAL_REDIS="${OPTIMAL_REDIS}"
+OPTIMAL_PG_BUFFERS="${OPTIMAL_PG_BUFFERS}"
 DEFAULT_LANGUAGE="${DEFAULT_LANGUAGE}"
+ENABLE_AUTO_OPTIMIZE="${ENABLE_AUTO_OPTIMIZE}"
+ENABLE_RESOURCE_MONITOR="${ENABLE_RESOURCE_MONITOR}"
+ENABLE_SMART_SWITCH="${ENABLE_SMART_SWITCH}"
 ENABLE_AI_ASSISTANT="${ENABLE_AI_ASSISTANT}"
 ENABLE_OAUTH="${ENABLE_OAUTH}"
-ENABLE_OFFLINE_QUEUE="${ENABLE_OFFLINE_QUEUE}"
 ENABLE_OCR="${ENABLE_OCR}"
 ENABLE_VOICE_INPUT="${ENABLE_VOICE_INPUT}"
 ENABLE_GAMIFICATION="${ENABLE_GAMIFICATION}"
-ENABLE_ACHIEVEMENTS="${ENABLE_ACHIEVEMENTS}"
-ENABLE_LEADERBOARD="${ENABLE_LEADERBOARD}"
-ENABLE_CHALLENGES="${ENABLE_CHALLENGES}"
 ENABLE_COMMUNITY="${ENABLE_COMMUNITY}"
 ENABLE_FINE_TUNING="${ENABLE_FINE_TUNING}"
 ENABLE_AUTO_COMPLETE="${ENABLE_AUTO_COMPLETE}"
-OAUTH_GOOGLE_CLIENT_ID="${OAUTH_GOOGLE_CLIENT_ID}"
-OAUTH_GOOGLE_CLIENT_SECRET="${OAUTH_GOOGLE_CLIENT_SECRET}"
-OAUTH_GITHUB_CLIENT_ID="${OAUTH_GITHUB_CLIENT_ID}"
-OAUTH_GITHUB_CLIENT_SECRET="${OAUTH_GITHUB_CLIENT_SECRET}"
 ENABLE_AUTO_UPDATE="${ENABLE_AUTO_UPDATE}"
 GITHUB_REPO="${GITHUB_REPO}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -255,9 +343,23 @@ EOF
 }
 
 select_model() {
-    echo "1) deepseek-r1:1.5b  2) deepseek-r1:7b  3) deepseek-r1:8b ★  4) deepseek-r1:14b  5) deepseek-r1:32b"
-    read -p "Választás [3]: " c; c=${c:-3}
-    case $c in 1) SELECTED_MODEL="deepseek-r1:1.5b";; 2) SELECTED_MODEL="deepseek-r1:7b";; 3) SELECTED_MODEL="deepseek-r1:8b";; 4) SELECTED_MODEL="deepseek-r1:14b";; 5) SELECTED_MODEL="deepseek-r1:32b";; *) SELECTED_MODEL="deepseek-r1:8b";; esac
+    echo "   Válassz modellt (ajánlott: ${RECOMMENDED_MODEL}):"
+    echo "   1) deepseek-r1:1.5b (1.5GB)"
+    echo "   2) deepseek-r1:7b (7GB)"
+    echo "   3) deepseek-r1:8b (8GB)"
+    echo "   4) deepseek-r1:14b (14GB) ★"
+    echo "   5) deepseek-r1:32b (32GB)"
+    echo "   6) deepseek-r1:70b (70GB)"
+    read -p "   Választás [4]: " c; c=${c:-4}
+    case $c in
+        1) SELECTED_MODEL="deepseek-r1:1.5b";;
+        2) SELECTED_MODEL="deepseek-r1:7b";;
+        3) SELECTED_MODEL="deepseek-r1:8b";;
+        4) SELECTED_MODEL="deepseek-r1:14b";;
+        5) SELECTED_MODEL="deepseek-r1:32b";;
+        6) SELECTED_MODEL="deepseek-r1:70b";;
+        *) SELECTED_MODEL="${RECOMMENDED_MODEL}";;
+    esac
 }
 
 # ============================================================
@@ -273,7 +375,6 @@ perform_update() {
     cp .env "$BACK/.env" 2>/dev/null || true
     [ -d book_database ] && tar -czf "$BACK/book_database.tar.gz" book_database/ 2>/dev/null || true
     [ -d translation_memory ] && tar -czf "$BACK/translation_memory.tar.gz" translation_memory/ 2>/dev/null || true
-    [ -d community_library ] && tar -czf "$BACK/community_library.tar.gz" community_library/ 2>/dev/null || true
     log_success "Mentés: $BACK"
     
     docker compose down 2>/dev/null || true
@@ -285,6 +386,10 @@ perform_update() {
     sleep 15
     
     docker exec -it epub-backend python3 -c "from app import app, db; app.app_context().push(); db.create_all(); print('OK')" 2>/dev/null || log_warn "Migráció figyelmeztetés"
+    
+    # Optimalizálás alkalmazása
+    apply_optimization
+    
     echo "v${VERSION} - $(date +%Y-%m-%d)" > VERSION.txt
     echo "$(date): Frissítve ${EXISTING_VERSION} → ${VERSION}" >> updates.log
     log_success "Frissítés kész!"
@@ -301,12 +406,11 @@ perform_fresh_install() {
     
     create_directory_structure
     create_all_files
+    apply_optimization
     
     sudo apt update -qq && sudo apt upgrade -y -qq
     sudo apt install -y -qq curl wget git ca-certificates gnupg nano htop net-tools ufw build-essential python3-pip python3-venv libxml2-dev libxslt-dev redis-tools postgresql-client clamav postfix mailutils poppler-utils ffmpeg nginx openssl tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng espeak mpg321 2>/dev/null || true
-    
-    # Python csomagok
-    pip3 install pytesseract SpeechRecognition pyaudio pyttsx3 2>/dev/null || true
+    pip3 install pytesseract SpeechRecognition pyaudio pyttsx3 psutil 2>/dev/null || true
     
     if ! command -v docker &> /dev/null; then
         sudo mkdir -p /etc/apt/keyrings
@@ -329,15 +433,53 @@ perform_fresh_install() {
     
     (crontab -l 2>/dev/null; echo "0 3 * * 0 $PROJECT_DIR/scripts/backup.sh") | crontab -
     (crontab -l 2>/dev/null; echo "0 4 * * 0 docker system prune -f") | crontab -
+    (crontab -l 2>/dev/null; echo "*/30 * * * * $PROJECT_DIR/scripts/monitor.sh") | crontab -
     
     echo "v${VERSION} - $(date +%Y-%m-%d)" > VERSION.txt
+}
+
+# ============================================================
+# OPTIMALIZÁLÁS ALKALMAZÁSA
+# ============================================================
+apply_optimization() {
+    log_step "Optimalizálás alkalmazása"
+    
+    # Modell-specifikus beállítások
+    case "$SELECTED_MODEL" in
+        "deepseek-r1:1.5b")
+            OLLAMA_MEMORY="4G"; OLLAMA_PARALLEL=4; BATCH_SIZE=8;;
+        "deepseek-r1:7b")
+            OLLAMA_MEMORY="12G"; OLLAMA_PARALLEL=3; BATCH_SIZE=6;;
+        "deepseek-r1:8b")
+            OLLAMA_MEMORY="16G"; OLLAMA_PARALLEL=2; BATCH_SIZE=5;;
+        "deepseek-r1:14b")
+            OLLAMA_MEMORY="24G"; OLLAMA_PARALLEL=2; BATCH_SIZE=5;;
+        "deepseek-r1:32b")
+            OLLAMA_MEMORY="30G"; OLLAMA_PARALLEL=1; BATCH_SIZE=2;;
+        "deepseek-r1:70b")
+            OLLAMA_MEMORY="60G"; OLLAMA_PARALLEL=1; BATCH_SIZE=1;;
+        *)
+            OLLAMA_MEMORY="${OPTIMAL_MEMORY_LIMIT}"; OLLAMA_PARALLEL=2; BATCH_SIZE=5;;
+    esac
+    
+    # .env frissítése
+    sed -i "s/MAX_WORKERS=.*/MAX_WORKERS=${MAX_WORKERS}/" .env 2>/dev/null || true
+    sed -i "s/BATCH_SIZE=.*/BATCH_SIZE=${BATCH_SIZE}/" .env 2>/dev/null || true
+    
+    # docker-compose.yml frissítése
+    sed -i "s/memory: [0-9]*G/memory: ${OLLAMA_MEMORY}/" docker-compose.yml 2>/dev/null || true
+    
+    log_success "Optimalizálás alkalmazva:"
+    log_info "  Ollama memória: ${OLLAMA_MEMORY}"
+    log_info "  Párhuzamos szálak: ${OLLAMA_PARALLEL}"
+    log_info "  Batch méret: ${BATCH_SIZE}"
 }
 
 # ============================================================
 # KÖNYVTÁR STRUKTÚRA
 # ============================================================
 create_directory_structure() {
-    mkdir -p "$PROJECT_DIR"/{nginx/ssl,backend/{templates,utils,plugins/hooks,static,translations,models},static/{css,js,images,icons,screenshots,audio},uploads/{covers,books,temp,ocr,voice},output,logs/{nginx,backend},backups/{updates,database,config},scripts,postfix,book_database,translation_memory,glossaries,collaboration,tts-service,websocket,updates,integrations/{calibre,kindle,wordpress,chrome},community_library,achievements,challenges,fine_tuning}
+    mkdir -p "$PROJECT_DIR"/{nginx/ssl,backend/{templates,utils,plugins/hooks,static,translations,models},static/{css,js,images,icons,screenshots,audio},uploads/{covers,books,temp,ocr,voice},output,logs/{nginx,backend},backups/{updates,database,config},scripts,postfix,book_database,translation_memory,glossaries,collaboration,tts-service,websocket,updates,integrations/{calibre,kindle,wordpress,chrome},community_library,achievements,challenges,fine_tuning,optimization_profiles}
 }
 
 # ============================================================
@@ -350,14 +492,8 @@ create_all_files() {
     create_nginx_config
     create_ollama_files
     create_backend_files
-    create_ai_assistant
-    create_oauth_files
-    create_ocr_files
-    create_voice_files
-    create_gamification_files
-    create_community_files
-    create_fine_tuning_files
-    create_auto_complete_files
+    create_model_optimizer
+    create_resource_monitor
     create_pwa_files
     create_scripts
     log_success "Fájlok kész"
@@ -375,26 +511,26 @@ ADMIN_EMAIL=${ADMIN_EMAIL}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE}
 SELECTED_MODEL=${SELECTED_MODEL}
+RECOMMENDED_MODEL=${RECOMMENDED_MODEL}
 MAX_WORKERS=${MAX_WORKERS}
+BATCH_SIZE=${BATCH_SIZE:-5}
+ENABLE_AUTO_OPTIMIZE=${ENABLE_AUTO_OPTIMIZE}
+ENABLE_RESOURCE_MONITOR=${ENABLE_RESOURCE_MONITOR}
+ENABLE_SMART_SWITCH=${ENABLE_SMART_SWITCH}
 ENABLE_AI_ASSISTANT=${ENABLE_AI_ASSISTANT}
 ENABLE_OAUTH=${ENABLE_OAUTH}
-ENABLE_OFFLINE_QUEUE=${ENABLE_OFFLINE_QUEUE}
 ENABLE_OCR=${ENABLE_OCR}
 ENABLE_VOICE_INPUT=${ENABLE_VOICE_INPUT}
 ENABLE_GAMIFICATION=${ENABLE_GAMIFICATION}
-ENABLE_ACHIEVEMENTS=${ENABLE_ACHIEVEMENTS}
-ENABLE_LEADERBOARD=${ENABLE_LEADERBOARD}
-ENABLE_CHALLENGES=${ENABLE_CHALLENGES}
 ENABLE_COMMUNITY=${ENABLE_COMMUNITY}
 ENABLE_FINE_TUNING=${ENABLE_FINE_TUNING}
 ENABLE_AUTO_COMPLETE=${ENABLE_AUTO_COMPLETE}
-OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID}
-OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET}
-OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID}
-OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET}
-ENABLE_DARK_MODE=${ENABLE_DARK_MODE:-i}
-ENABLE_SHORTCUTS=${ENABLE_SHORTCUTS:-i}
-ENABLE_I18N=${ENABLE_I18N:-i}
+ENABLE_DARK_MODE=${ENABLE_DARK_MODE}
+ENABLE_SHORTCUTS=${ENABLE_SHORTCUTS}
+ENABLE_I18N=${ENABLE_I18N}
+OPTIMAL_MEMORY_LIMIT=${OPTIMAL_MEMORY_LIMIT}
+OPTIMAL_REDIS=${OPTIMAL_REDIS}
+OPTIMAL_PG_BUFFERS=${OPTIMAL_PG_BUFFERS}
 OLLAMA_HOST=http://ollama:11434
 REDIS_URL=redis://redis:6379/0
 SMTP_MODE=${SMTP_MODE:-local}
@@ -421,8 +557,8 @@ services:
   backend:
     build: ./backend
     container_name: epub-backend
-    volumes: [./backend:/app, epub_uploads:/app/uploads, epub_output:/app/output, ./logs/backend:/app/logs, ./book_database:/app/book_database, ./translation_memory:/app/translation_memory, ./glossaries:/app/glossaries, ./community_library:/app/community_library, ./achievements:/app/achievements, ./fine_tuning:/app/fine_tuning, ./integrations:/app/integrations]
-    environment: [DATABASE_URL=postgresql://epub_user:epub_password@postgres:5432/epub_translator, OLLAMA_HOST=http://ollama:11434, REDIS_URL=redis://redis:6379/0, SECRET_KEY=${SECRET_KEY}, SELECTED_MODEL=${SELECTED_MODEL}, MAX_WORKERS=${MAX_WORKERS}, VERSION=${VERSION}, ENABLE_AI_ASSISTANT=${ENABLE_AI_ASSISTANT}, ENABLE_OAUTH=${ENABLE_OAUTH}, ENABLE_OFFLINE_QUEUE=${ENABLE_OFFLINE_QUEUE}, ENABLE_OCR=${ENABLE_OCR}, ENABLE_VOICE_INPUT=${ENABLE_VOICE_INPUT}, ENABLE_GAMIFICATION=${ENABLE_GAMIFICATION}, ENABLE_COMMUNITY=${ENABLE_COMMUNITY}, ENABLE_FINE_TUNING=${ENABLE_FINE_TUNING}, ENABLE_AUTO_COMPLETE=${ENABLE_AUTO_COMPLETE}, OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID}, OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET}, OAUTH_GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID}, OAUTH_GITHUB_CLIENT_SECRET=${OAUTH_GITHUB_CLIENT_SECRET}]
+    volumes: [./backend:/app, epub_uploads:/app/uploads, epub_output:/app/output, ./logs/backend:/app/logs, ./book_database:/app/book_database, ./translation_memory:/app/translation_memory, ./glossaries:/app/glossaries, ./community_library:/app/community_library, ./achievements:/app/achievements, ./fine_tuning:/app/fine_tuning, ./optimization_profiles:/app/optimization_profiles]
+    environment: [DATABASE_URL=postgresql://epub_user:epub_password@postgres:5432/epub_translator, OLLAMA_HOST=http://ollama:11434, REDIS_URL=redis://redis:6379/0, SECRET_KEY=${SECRET_KEY}, SELECTED_MODEL=${SELECTED_MODEL}, MAX_WORKERS=${MAX_WORKERS}, VERSION=${VERSION}, ENABLE_AUTO_OPTIMIZE=${ENABLE_AUTO_OPTIMIZE}, ENABLE_RESOURCE_MONITOR=${ENABLE_RESOURCE_MONITOR}, ENABLE_SMART_SWITCH=${ENABLE_SMART_SWITCH}]
     depends_on: {postgres: {condition: service_healthy}, ollama: {condition: service_healthy}, redis: {condition: service_started}}
     networks: [translator-network]
     restart: unless-stopped
@@ -438,15 +574,16 @@ services:
     build: ./ollama
     container_name: epub-ollama
     volumes: [ollama_data:/root/.ollama]
-    environment: [OLLAMA_KEEP_ALIVE=24h, OLLAMA_HOST=0.0.0.0]
+    environment: [OLLAMA_KEEP_ALIVE=24h, OLLAMA_HOST=0.0.0.0, OLLAMA_NUM_PARALLEL=2]
     networks: [translator-network]
     restart: unless-stopped
-    deploy: {resources: {limits: {memory: 24G}, reservations: {memory: 16G}}}
+    deploy: {resources: {limits: {memory: ${OPTIMAL_MEMORY_LIMIT}}, reservations: {memory: 16G}}}
     command: serve
   redis:
     image: redis:alpine
     container_name: epub-redis
     volumes: [redis_data:/data]
+    command: redis-server --maxmemory ${OPTIMAL_REDIS} --maxmemory-policy allkeys-lru
     networks: [translator-network]
     restart: unless-stopped
   mailhog:
@@ -456,13 +593,6 @@ services:
     networks: [translator-network]
     restart: unless-stopped
     profiles: [local, all]
-  tts-service:
-    build: ./tts-service
-    container_name: epub-tts
-    volumes: [./tts-service:/app, epub_output:/app/output]
-    networks: [translator-network]
-    restart: unless-stopped
-    profiles: [tts, all]
 networks:
   translator-network: {driver: bridge}
 volumes:
@@ -479,7 +609,6 @@ http {
         listen 80;
         location /health { return 200 "OK"; }
         location /api/ { proxy_pass http://backend:5000; }
-        location /ws/ { proxy_pass http://websocket:3001; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; }
         location /static { alias /usr/share/nginx/html/static; expires 30d; }
         location / { proxy_pass http://backend:5000; proxy_set_header Host $host; }
     }
@@ -537,7 +666,7 @@ GitPython==3.1.40
 packaging==23.2
 pytesseract==0.3.10
 SpeechRecognition==3.10.0
-pyaudio==0.2.13
+psutil==5.9.5
 REQEOF
 
     cat > backend/config.py << 'CONFIGEOF'
@@ -546,38 +675,35 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '10.0.0')
-    CODENAME = os.environ.get('CODENAME', 'AI Studio')
-    RELEASE_DATE = os.environ.get('RELEASE_DATE', '2025-06-20')
+    VERSION = os.environ.get('VERSION', '11.0.0')
+    CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
+    RELEASE_DATE = os.environ.get('RELEASE_DATE', '2025-07-17')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
-    DEFAULT_MODEL = os.environ.get('SELECTED_MODEL', 'deepseek-r1:8b')
+    DEFAULT_MODEL = os.environ.get('SELECTED_MODEL', 'deepseek-r1:14b')
+    RECOMMENDED_MODEL = os.environ.get('RECOMMENDED_MODEL', 'deepseek-r1:14b')
     MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 3))
+    BATCH_SIZE = int(os.environ.get('BATCH_SIZE', 5))
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@epub-translator.local')
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Abrakadabra')
+    ENABLE_AUTO_OPTIMIZE = os.environ.get('ENABLE_AUTO_OPTIMIZE', 'i').lower() == 'i'
+    ENABLE_RESOURCE_MONITOR = os.environ.get('ENABLE_RESOURCE_MONITOR', 'i').lower() == 'i'
+    ENABLE_SMART_SWITCH = os.environ.get('ENABLE_SMART_SWITCH', 'i').lower() == 'i'
     ENABLE_AI_ASSISTANT = os.environ.get('ENABLE_AI_ASSISTANT', 'i').lower() == 'i'
-    ENABLE_OAUTH = os.environ.get('ENABLE_OAUTH', 'i').lower() == 'i'
-    ENABLE_OFFLINE_QUEUE = os.environ.get('ENABLE_OFFLINE_QUEUE', 'i').lower() == 'i'
-    ENABLE_OCR = os.environ.get('ENABLE_OCR', 'i').lower() == 'i'
-    ENABLE_VOICE_INPUT = os.environ.get('ENABLE_VOICE_INPUT', 'i').lower() == 'i'
-    ENABLE_GAMIFICATION = os.environ.get('ENABLE_GAMIFICATION', 'i').lower() == 'i'
-    ENABLE_COMMUNITY = os.environ.get('ENABLE_COMMUNITY', 'i').lower() == 'i'
-    ENABLE_FINE_TUNING = os.environ.get('ENABLE_FINE_TUNING', 'i').lower() == 'i'
-    ENABLE_AUTO_COMPLETE = os.environ.get('ENABLE_AUTO_COMPLETE', 'i').lower() == 'i'
-    OAUTH_GOOGLE_CLIENT_ID = os.environ.get('OAUTH_GOOGLE_CLIENT_ID', '')
-    OAUTH_GOOGLE_CLIENT_SECRET = os.environ.get('OAUTH_GOOGLE_CLIENT_SECRET', '')
-    OAUTH_GITHUB_CLIENT_ID = os.environ.get('OAUTH_GITHUB_CLIENT_ID', '')
-    OAUTH_GITHUB_CLIENT_SECRET = os.environ.get('OAUTH_GITHUB_CLIENT_SECRET', '')
     UPLOAD_FOLDER = '/app/uploads'
     OUTPUT_FOLDER = '/app/output'
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+    OPTIMAL_MEMORY_LIMIT = os.environ.get('OPTIMAL_MEMORY_LIMIT', '24G')
+    OPTIMAL_REDIS = os.environ.get('OPTIMAL_REDIS', '512mb')
+    OPTIMAL_PG_BUFFERS = os.environ.get('OPTIMAL_PG_BUFFERS', '512MB')
 CONFIGEOF
 
     cat > backend/models.py << 'MODELSEOF'
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime
+import json
 db = SQLAlchemy()
 
 class User(UserMixin, db.Model):
@@ -593,8 +719,6 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     language = db.Column(db.String(5), default='hu')
     dark_mode = db.Column(db.Boolean, default=True)
-    oauth_provider = db.Column(db.String(20))
-    oauth_id = db.Column(db.String(100))
     points = db.Column(db.Integer, default=0)
     level = db.Column(db.Integer, default=1)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -611,47 +735,36 @@ class Translation(db.Model):
     quality_score = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-class Achievement(db.Model):
-    __tablename__ = 'achievements'
+class SystemSettings(db.Model):
+    __tablename__ = 'system_settings'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    description = db.Column(db.String(500))
-    icon = db.Column(db.String(50))
-    points = db.Column(db.Integer, default=10)
-    condition_type = db.Column(db.String(50))
-    condition_value = db.Column(db.Integer)
+    key = db.Column(db.String(100), unique=True)
+    value = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class UserAchievement(db.Model):
-    __tablename__ = 'user_achievements'
+class OptimizationLog(db.Model):
+    __tablename__ = 'optimization_logs'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    achievement_id = db.Column(db.Integer, db.ForeignKey('achievements.id'))
-    earned_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class CommunityBook(db.Model):
-    __tablename__ = 'community_books'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(500))
-    author = db.Column(db.String(300))
-    uploader_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    genre = db.Column(db.String(100))
-    downloads = db.Column(db.Integer, default=0)
-    rating = db.Column(db.Float, default=0)
+    model = db.Column(db.String(100))
+    action = db.Column(db.String(50))
+    details = db.Column(db.Text)
+    performance_before = db.Column(db.Text)
+    performance_after = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 MODELSEOF
 
     cat > backend/app.py << 'APPEOF'
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_babel import Babel, gettext as _
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
-from models import db, User, Translation, Achievement, UserAchievement, CommunityBook
+from models import db, User, Translation, SystemSettings, OptimizationLog
 from datetime import datetime
 from functools import wraps
-import os, re, json
+import os, json, psutil, requests
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -672,26 +785,27 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-@babel.localeselector
-def get_locale():
-    if current_user.is_authenticated and hasattr(current_user, 'language'):
-        return current_user.language
-    return request.accept_languages.best_match(['hu', 'en', 'de', 'fr', 'es']) or 'hu'
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 @app.route('/health')
 def health():
-    return jsonify({'status': 'healthy', 'version': app.config['VERSION'], 'codename': app.config['CODENAME'], 'release_date': app.config['RELEASE_DATE']})
+    return jsonify({
+        'status': 'healthy',
+        'version': app.config['VERSION'],
+        'codename': app.config['CODENAME'],
+        'release_date': app.config['RELEASE_DATE'],
+        'model': app.config['DEFAULT_MODEL'],
+        'memory': f"{psutil.virtual_memory().percent}%",
+        'cpu': f"{psutil.cpu_percent()}%"
+    })
 
 @app.route('/')
 def index():
     return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("10 per minute")
 def login():
     if request.method == 'POST':
         email = request.form.get('email')
@@ -699,72 +813,148 @@ def login():
         user = User.query.filter_by(email=email).first()
         if user and user.password_hash and check_password_hash(user.password_hash, password):
             login_user(user)
-            user.last_login = datetime.utcnow()
-            db.session.commit()
             return redirect(url_for('admin') if user.is_admin else url_for('dashboard'))
         flash(_('Hibás email vagy jelszó!'), 'error')
-    return render_template('login.html', oauth_enabled=app.config['ENABLE_OAUTH'])
-
-@app.route('/oauth/<provider>')
-def oauth_login(provider):
-    if not app.config['ENABLE_OAUTH']:
-        return redirect(url_for('login'))
-    # OAuth redirect - Flask-Dance kezeli
-    return redirect(url_for(f'{provider}.login'))
+    return render_template('login.html')
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     translations = Translation.query.filter_by(user_id=current_user.id).order_by(Translation.created_at.desc()).limit(20).all()
-    achievements = UserAchievement.query.filter_by(user_id=current_user.id).all()
-    stats = {'total': len(translations), 'completed': len([t for t in translations if t.status == 'completed']), 'points': current_user.points, 'level': current_user.level}
-    return render_template('dashboard.html', user=current_user, translations=translations, achievements=achievements, stats=stats)
+    return render_template('dashboard.html', user=current_user, translations=translations)
 
-@app.route('/api/ai-assistant', methods=['POST'])
+@app.route('/admin')
 @login_required
-def ai_assistant():
-    if not app.config['ENABLE_AI_ASSISTANT']:
-        return jsonify({'error': 'AI Asszisztens le van tiltva'}), 403
+@admin_required
+def admin():
+    # Rendszer információk
+    sys_info = {
+        'cpu_percent': psutil.cpu_percent(),
+        'memory_percent': psutil.virtual_memory().percent,
+        'memory_used_gb': round(psutil.virtual_memory().used / (1024**3), 2),
+        'memory_total_gb': round(psutil.virtual_memory().total / (1024**3), 2),
+        'disk_percent': psutil.disk_usage('/').percent,
+        'disk_free_gb': round(psutil.disk_usage('/').free / (1024**3), 2)
+    }
+    
+    # Modell információk
+    try:
+        resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=5)
+        models = resp.json().get('models', []) if resp.status_code == 200 else []
+    except:
+        models = []
+    
+    return render_template('admin.html', sys_info=sys_info, models=models, current_model=app.config['DEFAULT_MODEL'])
+
+@app.route('/api/models/switch', methods=['POST'])
+@login_required
+@admin_required
+def switch_model():
     data = request.get_json()
-    question = data.get('question', '')
-    context = data.get('context', '')
-    # AI válasz generálása
-    return jsonify({'answer': f'AI válasz a kérdésre: {question[:50]}...', 'alternatives': ['1. változat', '2. változat', '3. változat']})
+    model_name = data.get('model')
+    auto_optimize = data.get('auto_optimize', app.config['ENABLE_AUTO_OPTIMIZE'])
+    
+    if not model_name:
+        return jsonify({'error': 'Modell név szükséges'}), 400
+    
+    try:
+        # Modell váltás
+        from utils.model_optimizer import ModelOptimizer
+        optimizer = ModelOptimizer(app)
+        
+        # Optimalizálás ha kérték
+        opt_result = None
+        if auto_optimize:
+            opt_result = optimizer.optimize_for_model(model_name)
+        
+        # Naplózás
+        log = OptimizationLog(
+            model=model_name,
+            action='switch',
+            details=json.dumps({'auto_optimize': auto_optimize}),
+            performance_before=json.dumps({
+                'cpu': psutil.cpu_percent(),
+                'memory': psutil.virtual_memory().percent
+            })
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Modell átváltva: {model_name}',
+            'optimization': opt_result
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/ocr', methods=['POST'])
+@app.route('/api/system/monitor')
 @login_required
-def ocr_translate():
-    if not app.config['ENABLE_OCR']:
-        return jsonify({'error': 'OCR le van tiltva'}), 403
-    if 'image' not in request.files:
-        return jsonify({'error': 'Nincs kép'}), 400
-    file = request.files['image']
-    # OCR feldolgozás
-    return jsonify({'text': 'Kinyert szöveg...', 'translated': 'Fordított szöveg...'})
+@admin_required
+def system_monitor():
+    if not app.config['ENABLE_RESOURCE_MONITOR']:
+        return jsonify({'error': 'Monitor le van tiltva'}), 403
+    
+    return jsonify({
+        'cpu': {
+            'percent': psutil.cpu_percent(),
+            'cores': psutil.cpu_count(),
+            'frequency': psutil.cpu_freq().current if psutil.cpu_freq() else 0
+        },
+        'memory': {
+            'total_gb': round(psutil.virtual_memory().total / (1024**3), 2),
+            'used_gb': round(psutil.virtual_memory().used / (1024**3), 2),
+            'available_gb': round(psutil.virtual_memory().available / (1024**3), 2),
+            'percent': psutil.virtual_memory().percent
+        },
+        'disk': {
+            'total_gb': round(psutil.disk_usage('/').total / (1024**3), 2),
+            'used_gb': round(psutil.disk_usage('/').used / (1024**3), 2),
+            'free_gb': round(psutil.disk_usage('/').free / (1024**3), 2),
+            'percent': psutil.disk_usage('/').percent
+        },
+        'swap': {
+            'total_gb': round(psutil.swap_memory().total / (1024**3), 2),
+            'used_gb': round(psutil.swap_memory().used / (1024**3), 2),
+            'percent': psutil.swap_memory().percent
+        },
+        'network': {
+            'bytes_sent': psutil.net_io_counters().bytes_sent,
+            'bytes_recv': psutil.net_io_counters().bytes_recv
+        },
+        'uptime': datetime.utcnow().isoformat()
+    })
 
-@app.route('/api/voice', methods=['POST'])
+@app.route('/api/models/recommend')
 @login_required
-def voice_translate():
-    if not app.config['ENABLE_VOICE_INPUT']:
-        return jsonify({'error': 'Hangalapú fordítás le van tiltva'}), 403
-    # Hang feldolgozás
-    return jsonify({'text': 'Felismert szöveg...', 'translated': 'Fordított szöveg...'})
-
-@app.route('/api/gamification/stats')
-@login_required
-def gamification_stats():
-    if not app.config['ENABLE_GAMIFICATION']:
-        return jsonify({'error': 'Gamification le van tiltva'}), 403
-    achievements = Achievement.query.all()
-    user_achievements = [ua.achievement_id for ua in UserAchievement.query.filter_by(user_id=current_user.id).all()]
-    return jsonify({'points': current_user.points, 'level': current_user.level, 'achievements': [{'id': a.id, 'name': a.name, 'description': a.description, 'icon': a.icon, 'earned': a.id in user_achievements} for a in achievements]})
-
-@app.route('/api/community/books')
-def community_books():
-    if not app.config['ENABLE_COMMUNITY']:
-        return jsonify({'error': 'Közösségi könyvtár le van tiltva'}), 403
-    books = CommunityBook.query.order_by(CommunityBook.downloads.desc()).limit(20).all()
-    return jsonify([{'id': b.id, 'title': b.title, 'author': b.author, 'genre': b.genre, 'downloads': b.downloads, 'rating': b.rating} for b in books])
+@admin_required
+def recommend_model():
+    if not app.config['ENABLE_SMART_SWITCH']:
+        return jsonify({'error': 'Intelligens váltás le van tiltva'}), 403
+    
+    total_ram = psutil.virtual_memory().total / (1024**3)
+    free_ram = psutil.virtual_memory().available / (1024**3)
+    
+    if total_ram >= 64 and free_ram > 50:
+        recommended = 'deepseek-r1:32b'
+    elif total_ram >= 32 and free_ram > 20:
+        recommended = 'deepseek-r1:14b'
+    elif total_ram >= 16 and free_ram > 10:
+        recommended = 'deepseek-r1:8b'
+    elif total_ram >= 8:
+        recommended = 'deepseek-r1:7b'
+    else:
+        recommended = 'deepseek-r1:1.5b'
+    
+    return jsonify({
+        'recommended': recommended,
+        'current': app.config['DEFAULT_MODEL'],
+        'should_switch': recommended != app.config['DEFAULT_MODEL'],
+        'system_info': {
+            'total_ram_gb': round(total_ram, 1),
+            'free_ram_gb': round(free_ram, 1)
+        }
+    })
 
 def init_db():
     with app.app_context():
@@ -773,19 +963,6 @@ def init_db():
         if not admin:
             admin = User(username='admin', email=Config.ADMIN_EMAIL, password_hash=generate_password_hash(Config.ADMIN_PASSWORD), first_name='Admin', last_name='User', is_admin=True, tokens=999999, internal_email='admin@epub.local')
             db.session.add(admin); db.session.commit()
-        
-        # Alapértelmezett achievement-ek
-        if Achievement.query.count() == 0:
-            achievements = [
-                Achievement(name='Első fordítás', description='Fordítsd le az első könyvedet', icon='📚', points=10, condition_type='translations', condition_value=1),
-                Achievement(name='5 fordítás', description='Fordíts le 5 könyvet', icon='📖', points=25, condition_type='translations', condition_value=5),
-                Achievement(name='Minőségi fordító', description='Érj el 90% feletti minőséget', icon='⭐', points=50, condition_type='quality', condition_value=90),
-                Achievement(name='Közösségi tag', description='Tölts fel egy könyvet a közösségi könyvtárba', icon='👥', points=15, condition_type='community_upload', condition_value=1),
-                Achievement(name='Nyelvzseni', description='Fordíts 3 különböző nyelvre', icon='🌍', points=30, condition_type='languages', condition_value=3),
-            ]
-            for a in achievements:
-                db.session.add(a)
-            db.session.commit()
 
 if __name__ == '__main__':
     init_db()
@@ -794,411 +971,145 @@ APPEOF
 
     touch backend/utils/__init__.py
     
-    # Dashboard HTML (v10.0 bővített)
+    # Dashboard HTML
     cat > backend/templates/dashboard.html << 'DASHEOF'
-{% extends "base.html" %}
-{% block title %}Vezérlőpult{% endblock %}
-{% block content %}
-<h2>Üdvözlünk, {{ user.first_name }}! 🎮</h2>
+{% extends "base.html" %}{% block title %}Vezérlőpult{% endblock %}{% block content %}
+<h2>Üdvözlünk, {{ user.first_name }}! 🧠</h2>
 <div class="row mt-4">
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ stats.points }}</h1><p>🏆 Pontok</p></div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ stats.level }}</h1><p>⭐ Szint</p></div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ user.tokens }}</h1><p>💰 Token</p></div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ stats.completed }}</h1><p>✅ Fordítás</p></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ user.points }}</h1><p>🏆 Pontok</p></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ user.level }}</h1><p>⭐ Szint</p></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ translations|length }}</h1><p>📚 Fordítás</p></div></div></div>
 </div>
-
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card"><div class="card-header">🏆 Achievement-ek</div>
-        <div class="card-body"><div id="achievements" class="row">Betöltés...</div></div></div>
-    </div>
-    <div class="col-md-6">
-        <div class="card"><div class="card-header">🤖 AI Asszisztens</div>
-        <div class="card-body">
-            <div id="aiChat" style="height:200px;overflow-y:auto;border:1px solid #ddd;padding:10px;margin-bottom:10px;"></div>
-            <div class="input-group">
-                <input type="text" id="aiQuestion" class="form-control" placeholder="Kérdezz az AI-tól...">
-                <button class="btn btn-primary" onclick="askAI()">Küldés</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-{% block scripts %}
-<script>
-fetch('/api/gamification/stats').then(r=>r.json()).then(d=>{
-    document.getElementById('achievements').innerHTML = d.achievements.map(a=>`
-        <div class="col-6 mb-2"><span>${a.earned ? '✅' : '🔒'} ${a.icon} ${a.name}</span></div>
-    `).join('');
-});
-
-function askAI() {
-    const q = document.getElementById('aiQuestion').value;
-    if(!q) return;
-    const chat = document.getElementById('aiChat');
-    chat.innerHTML += `<p><strong>Te:</strong> ${q}</p>`;
-    fetch('/api/ai-assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})})
-        .then(r=>r.json()).then(d=>{
-        chat.innerHTML += `<p><strong>🤖 AI:</strong> ${d.answer}</p>`;
-        chat.scrollTop = chat.scrollHeight;
-    });
-    document.getElementById('aiQuestion').value = '';
-}
-</script>
 {% endblock %}
 DASHEEOF
 
-    # Login (OAuth gombokkal)
+    # Login HTML
     cat > backend/templates/login.html << 'LOGINEOF'
 {% extends "base.html" %}{% block title %}Bejelentkezés{% endblock %}{% block content %}
-<div class="row justify-content-center mt-5"><div class="col-md-4"><div class="card"><div class="card-header bg-primary text-white"><h3 class="text-center">Bejelentkezés</h3></div><div class="card-body"><form method="POST"><div class="mb-3"><label>Email</label><input type="email" class="form-control" name="email" required></div><div class="mb-3"><label>Jelszó</label><input type="password" class="form-control" name="password" required></div><button type="submit" class="btn btn-primary w-100 mb-3">Bejelentkezés</button></form>
-{% if oauth_enabled %}
-<hr><p class="text-center">vagy</p>
-<a href="/oauth/google" class="btn btn-danger w-100 mb-2">🔴 Google</a>
-<a href="/oauth/github" class="btn btn-dark w-100 mb-2">⚫ GitHub</a>
-<a href="/oauth/microsoft" class="btn btn-info w-100 mb-2">🔵 Microsoft</a>
-{% endif %}
-<hr><a href="/register" class="btn btn-success w-100">Új fiók</a></div></div></div></div>
+<div class="row justify-content-center mt-5"><div class="col-md-4"><div class="card"><div class="card-header bg-primary text-white"><h3 class="text-center">Bejelentkezés</h3></div><div class="card-body"><form method="POST"><div class="mb-3"><label>Email</label><input type="email" class="form-control" name="email" required></div><div class="mb-3"><label>Jelszó</label><input type="password" class="form-control" name="password" required></div><button type="submit" class="btn btn-primary w-100">Bejelentkezés</button></form></div></div></div></div>
 {% endblock %}
 LOGINEOF
 }
 
-create_ai_assistant() {
-    cat > backend/utils/ai_assistant.py << 'AIEOF'
-"""AI Fordítási Asszisztens"""
-import requests
-import json
+create_model_optimizer() {
+    cat > backend/utils/model_optimizer.py << 'OPTEOF'
+"""Automatikus Modell Optimalizáló"""
+import os, json, requests, subprocess, psutil
+from datetime import datetime
+from models import db, SystemSettings, OptimizationLog
 
-class AIAssistant:
-    def __init__(self, ollama_host="http://ollama:11434", model="deepseek-r1:8b"):
-        self.ollama_host = ollama_host
-        self.model = model
-    
-    def ask(self, question, context=""):
-        """Kérdés feltevése az AI-nak"""
-        prompt = f"""As a translation assistant, answer this question:
-Context: {context}
-Question: {question}
-
-Provide a helpful, concise answer with examples if relevant."""
-        
-        response = requests.post(f"{self.ollama_host}/api/generate", json={
-            "model": self.model, "prompt": prompt, "stream": False,
-            "options": {"temperature": 0.7, "max_tokens": 500}
-        })
-        return response.json().get('response', '') if response.status_code == 200 else "Nem sikerült választ generálni."
-    
-    def suggest_alternatives(self, text, translation):
-        """Alternatív fordítási javaslatok"""
-        prompt = f"""Original: {text}
-Current translation: {translation}
-
-Suggest 3 alternative translations with explanations."""
-        
-        response = requests.post(f"{self.ollama_host}/api/generate", json={
-            "model": self.model, "prompt": prompt, "stream": False,
-            "options": {"temperature": 0.8, "max_tokens": 300}
-        })
-        return response.json().get('response', '') if response.status_code == 200 else ""
-    
-    def explain_translation(self, original, translated):
-        """Magyarázat a fordítási döntésekről"""
-        prompt = f"""Explain why this translation was made:
-Original: {original}
-Translated: {translated}
-
-Explain the key translation decisions."""
-        
-        response = requests.post(f"{self.ollama_host}/api/generate", json={
-            "model": self.model, "prompt": prompt, "stream": False,
-            "options": {"temperature": 0.5, "max_tokens": 200}
-        })
-        return response.json().get('response', '') if response.status_code == 200 else ""
-AIEOF
-}
-
-create_oauth_files() {
-    cat > backend/utils/oauth_config.py << 'OAUTHEOF'
-"""OAuth/SSO Konfiguráció"""
-from config import Config
-
-OAUTH_PROVIDERS = {
-    'google': {
-        'client_id': Config.OAUTH_GOOGLE_CLIENT_ID,
-        'client_secret': Config.OAUTH_GOOGLE_CLIENT_SECRET,
-        'authorize_url': 'https://accounts.google.com/o/oauth2/auth',
-        'token_url': 'https://accounts.google.com/o/oauth2/token',
-        'scope': ['email', 'profile'],
-    },
-    'github': {
-        'client_id': Config.OAUTH_GITHUB_CLIENT_ID,
-        'client_secret': Config.OAUTH_GITHUB_CLIENT_SECRET,
-        'authorize_url': 'https://github.com/login/oauth/authorize',
-        'token_url': 'https://github.com/login/oauth/access_token',
-        'scope': ['user:email'],
-    },
-    'microsoft': {
-        'client_id': Config.OAUTH_MICROSOFT_CLIENT_ID,
-        'client_secret': Config.OAUTH_MICROSOFT_CLIENT_SECRET,
-        'authorize_url': 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-        'token_url': 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-        'scope': ['User.Read'],
+class ModelOptimizer:
+    MODEL_CONFIGS = {
+        'deepseek-r1:1.5b': {'max_workers': 4, 'batch_size': 8, 'memory_limit': '4G', 'num_parallel': 4, 'max_loaded_models': 2, 'redis_maxmemory': '128mb', 'pg_buffers': '128MB', 'description': 'Teszteléshez'},
+        'deepseek-r1:7b': {'max_workers': 3, 'batch_size': 6, 'memory_limit': '12G', 'num_parallel': 3, 'max_loaded_models': 2, 'redis_maxmemory': '256mb', 'pg_buffers': '256MB', 'description': '16GB RAM-hoz'},
+        'deepseek-r1:8b': {'max_workers': 3, 'batch_size': 5, 'memory_limit': '16G', 'num_parallel': 2, 'max_loaded_models': 1, 'redis_maxmemory': '512mb', 'pg_buffers': '512MB', 'description': 'Általános használatra'},
+        'deepseek-r1:14b': {'max_workers': 3, 'batch_size': 5, 'memory_limit': '24G', 'num_parallel': 2, 'max_loaded_models': 1, 'redis_maxmemory': '512mb', 'pg_buffers': '512MB', 'description': 'Jobb minőség'},
+        'deepseek-r1:32b': {'max_workers': 1, 'batch_size': 2, 'memory_limit': '30G', 'num_parallel': 1, 'max_loaded_models': 1, 'redis_maxmemory': '256mb', 'pg_buffers': '256MB', 'description': 'Max minőség'},
+        'deepseek-r1:70b': {'max_workers': 1, 'batch_size': 1, 'memory_limit': '60G', 'num_parallel': 1, 'max_loaded_models': 1, 'redis_maxmemory': '128mb', 'pg_buffers': '128MB', 'description': 'Professzionális'}
     }
-}
-OAUTHEOF
-}
-
-create_ocr_files() {
-    cat > backend/utils/ocr_processor.py << 'OCREOF'
-"""OCR és Képfordítás"""
-import pytesseract
-from PIL import Image
-import io
-
-class OCRProcessor:
-    def __init__(self):
-        self.languages = 'eng+hun'
     
-    def extract_text(self, image_data):
-        """Szöveg kinyerése képből"""
-        image = Image.open(io.BytesIO(image_data))
-        text = pytesseract.image_to_string(image, lang=self.languages)
-        confidence = self._get_confidence(image)
-        return {'text': text.strip(), 'confidence': confidence}
+    def __init__(self, app=None):
+        self.app = app
+        self.ollama_host = app.config.get('OLLAMA_HOST', 'http://localhost:11434') if app else 'http://localhost:11434'
     
-    def _get_confidence(self, image):
-        """OCR megbízhatóság számolása"""
-        data = pytesseract.image_to_data(image, lang=self.languages, output_type=pytesseract.Output.DICT)
-        confidences = [int(c) for c in data['conf'] if c != '-1']
-        return sum(confidences) / len(confidences) if confidences else 0
-    
-    def extract_and_translate(self, image_data, translator_func):
-        """Kép szövegének kinyerése és fordítása"""
-        result = self.extract_text(image_data)
-        if result['text']:
-            result['translated'] = translator_func(result['text'])
-        return result
-OCREOF
-}
-
-create_voice_files() {
-    cat > backend/utils/voice_processor.py << 'VOICEEOF'
-"""Hangalapú Fordítás"""
-import speech_recognition as sr
-
-class VoiceProcessor:
-    def __init__(self):
-        self.recognizer = sr.Recognizer()
-        self.language = 'hu-HU'
-    
-    def listen(self, timeout=5):
-        """Beszéd felismerése mikrofonból"""
-        with sr.Microphone() as source:
-            self.recognizer.adjust_for_ambient_noise(source)
-            audio = self.recognizer.listen(source, timeout=timeout)
+    def optimize_for_model(self, model_name):
+        config = self.MODEL_CONFIGS.get(model_name)
+        if not config:
+            return {'success': False, 'error': f'Ismeretlen modell: {model_name}'}
         
+        results = {'model': model_name, 'config': config, 'steps': []}
+        
+        # Környezeti változók frissítése
+        if self.app:
+            self.app.config['MAX_WORKERS'] = config['max_workers']
+            self.app.config['BATCH_SIZE'] = config['batch_size']
+        results['steps'].append({'step': 'env', 'success': True})
+        
+        # Redis optimalizálás
         try:
-            text = self.recognizer.recognize_google(audio, language=self.language)
-            return {'success': True, 'text': text}
-        except sr.UnknownValueError:
-            return {'success': False, 'error': 'Nem sikerült felismerni a beszédet'}
-        except sr.RequestError:
-            return {'success': False, 'error': 'A beszédfelismerő szolgáltatás nem elérhető'}
+            import redis
+            r = redis.Redis(host='redis', port=6379, decode_responses=True)
+            r.config_set('maxmemory', config['redis_maxmemory'])
+            results['steps'].append({'step': 'redis', 'success': True})
+        except:
+            results['steps'].append({'step': 'redis', 'success': False})
+        
+        # Naplózás
+        try:
+            log = OptimizationLog(model=model_name, action='optimize', details=json.dumps(config), created_at=datetime.utcnow())
+            db.session.add(log); db.session.commit()
+        except:
+            pass
+        
+        return results
     
-    def set_language(self, language):
-        """Nyelv beállítása"""
-        self.language = language
-VOICEEOF
+    def get_recommended_model(self):
+        total_ram = psutil.virtual_memory().total / (1024**3)
+        free_ram = psutil.virtual_memory().available / (1024**3)
+        if total_ram >= 64 and free_ram > 50: return 'deepseek-r1:32b'
+        elif total_ram >= 32 and free_ram > 20: return 'deepseek-r1:14b'
+        elif total_ram >= 16 and free_ram > 10: return 'deepseek-r1:8b'
+        elif total_ram >= 8: return 'deepseek-r1:7b'
+        return 'deepseek-r1:1.5b'
+OPTEOF
 }
 
-create_gamification_files() {
-    cat > backend/utils/gamification.py << 'GAMEEOF'
-"""Gamification Rendszer"""
-from models import db, User, Achievement, UserAchievement
+create_resource_monitor() {
+    cat > backend/utils/resource_monitor.py << 'MONEOF'
+"""Valós Idejű Erőforrás Figyelő"""
+import psutil
+import time
 from datetime import datetime
 
-class GamificationEngine:
+class ResourceMonitor:
     def __init__(self):
-        self.achievements = {}
-        self._load_achievements()
+        self.history = []
     
-    def _load_achievements(self):
-        """Achievement-ek betöltése"""
-        for a in Achievement.query.all():
-            self.achievements[a.condition_type] = self.achievements.get(a.condition_type, [])
-            self.achievements[a.condition_type].append(a)
-    
-    def check_achievements(self, user_id, condition_type, value):
-        """Achievement-ek ellenőrzése és kiosztása"""
-        if condition_type not in self.achievements:
-            return []
-        
-        earned = []
-        for achievement in self.achievements[condition_type]:
-            if value >= achievement.condition_value:
-                existing = UserAchievement.query.filter_by(
-                    user_id=user_id, achievement_id=achievement.id
-                ).first()
-                
-                if not existing:
-                    ua = UserAchievement(user_id=user_id, achievement_id=achievement.id)
-                    db.session.add(ua)
-                    
-                    user = User.query.get(user_id)
-                    user.points += achievement.points
-                    
-                    # Szintlépés ellenőrzése
-                    new_level = (user.points // 100) + 1
-                    if new_level > user.level:
-                        user.level = new_level
-                    
-                    db.session.commit()
-                    earned.append(achievement)
-        
-        return earned
-    
-    def get_leaderboard(self, limit=10):
-        """Ranglista lekérése"""
-        users = User.query.order_by(User.points.desc()).limit(limit).all()
-        return [{'name': f"{u.first_name} {u.last_name}", 'points': u.points, 'level': u.level} for u in users]
-GAMEEOF
-}
-
-create_community_files() {
-    cat > backend/utils/community.py << 'COMMEOF'
-"""Közösségi Könyvtár"""
-from models import db, CommunityBook, User
-from datetime import datetime
-
-class CommunityLibrary:
-    def __init__(self):
-        self.upload_folder = '/app/community_library'
-    
-    def add_book(self, title, author, genre, uploader_id, file_data):
-        """Könyv hozzáadása a közösségi könyvtárhoz"""
-        book = CommunityBook(
-            title=title,
-            author=author,
-            genre=genre,
-            uploader_id=uploader_id,
-            downloads=0,
-            rating=0
-        )
-        db.session.add(book)
-        db.session.commit()
-        return book
-    
-    def search(self, query=None, genre=None, sort_by='downloads'):
-        """Könyvek keresése"""
-        q = CommunityBook.query
-        
-        if query:
-            q = q.filter(
-                db.or_(
-                    CommunityBook.title.ilike(f'%{query}%'),
-                    CommunityBook.author.ilike(f'%{query}%')
-                )
-            )
-        
-        if genre:
-            q = q.filter_by(genre=genre)
-        
-        if sort_by == 'rating':
-            q = q.order_by(CommunityBook.rating.desc())
-        elif sort_by == 'newest':
-            q = q.order_by(CommunityBook.created_at.desc())
-        else:
-            q = q.order_by(CommunityBook.downloads.desc())
-        
-        return q.limit(50).all()
-    
-    def rate_book(self, book_id, rating, user_id):
-        """Könyv értékelése"""
-        book = CommunityBook.query.get(book_id)
-        if book:
-            # Egyszerűsített értékelés (egy szavazat/felhasználó)
-            book.rating = ((book.rating * book.downloads) + rating) / (book.downloads + 1)
-            db.session.commit()
-            return True
-        return False
-COMMEOF
-}
-
-create_fine_tuning_files() {
-    cat > backend/utils/fine_tuner.py << 'FINEEOF'
-"""Modell Fine-tuning"""
-import os
-import json
-
-class ModelFineTuner:
-    def __init__(self, ollama_host="http://ollama:11434"):
-        self.ollama_host = ollama_host
-        self.training_data = []
-    
-    def add_training_pair(self, source, target):
-        """Tanító pár hozzáadása"""
-        self.training_data.append({'source': source, 'target': target})
-    
-    def export_training_data(self, filepath):
-        """Tanító adatok exportálása"""
-        with open(filepath, 'w', encoding='utf-8') as f:
-            for pair in self.training_data:
-                f.write(json.dumps(pair, ensure_ascii=False) + '\n')
-        return filepath
-    
-    def import_training_data(self, filepath):
-        """Tanító adatok importálása"""
-        with open(filepath, 'r', encoding='utf-8') as f:
-            self.training_data = [json.loads(line) for line in f]
-        return len(self.training_data)
-    
-    def get_stats(self):
-        """Fine-tuning statisztikák"""
+    def get_current_stats(self):
         return {
-            'total_pairs': len(self.training_data),
-            'total_source_words': sum(len(p['source'].split()) for p in self.training_data),
-            'total_target_words': sum(len(p['target'].split()) for p in self.training_data)
+            'timestamp': datetime.utcnow().isoformat(),
+            'cpu_percent': psutil.cpu_percent(interval=1),
+            'memory_percent': psutil.virtual_memory().percent,
+            'memory_used_gb': round(psutil.virtual_memory().used / (1024**3), 2),
+            'memory_total_gb': round(psutil.virtual_memory().total / (1024**3), 2),
+            'memory_available_gb': round(psutil.virtual_memory().available / (1024**3), 2),
+            'disk_percent': psutil.disk_usage('/').percent,
+            'disk_free_gb': round(psutil.disk_usage('/').free / (1024**3), 2),
+            'swap_percent': psutil.swap_memory().percent,
+            'network_sent_mb': round(psutil.net_io_counters().bytes_sent / (1024**2), 2),
+            'network_recv_mb': round(psutil.net_io_counters().bytes_recv / (1024**2), 2)
         }
-FINEEOF
-}
-
-create_auto_complete_files() {
-    cat > backend/utils/auto_complete.py << 'AUTOEOF'
-"""Auto-Complete Fordítás"""
-import requests
-
-class AutoComplete:
-    def __init__(self, ollama_host="http://ollama:11434", model="deepseek-r1:1.5b"):
-        self.ollama_host = ollama_host
-        self.model = model
     
-    def get_suggestions(self, partial_text, context="", max_suggestions=3):
-        """Fordítási javaslatok gépelés közben"""
-        prompt = f"""Complete this Hungarian translation:
-Original context: {context}
-Partial translation: {partial_text}
-
-Suggest {max_suggestions} completions. Return only the completions, one per line."""
-        
-        response = requests.post(f"{self.ollama_host}/api/generate", json={
-            "model": self.model, "prompt": prompt, "stream": False,
-            "options": {"temperature": 0.3, "max_tokens": 100}
-        })
-        
-        if response.status_code == 200:
-            text = response.json().get('response', '')
-            return [s.strip() for s in text.split('\n') if s.strip()][:max_suggestions]
-        return []
-AUTOEOF
+    def collect_metrics(self, duration_seconds=60, interval_seconds=5):
+        metrics = []
+        for _ in range(duration_seconds // interval_seconds):
+            metrics.append(self.get_current_stats())
+            time.sleep(interval_seconds)
+        self.history.extend(metrics)
+        return metrics
+    
+    def get_average(self):
+        if not self.history:
+            return self.get_current_stats()
+        return {
+            'cpu_percent': sum(m['cpu_percent'] for m in self.history) / len(self.history),
+            'memory_percent': sum(m['memory_percent'] for m in self.history) / len(self.history)
+        }
+    
+    def is_resource_available(self, required_ram_gb=16):
+        available = psutil.virtual_memory().available / (1024**3)
+        return available >= required_ram_gb
+MONEOF
 }
 
 create_pwa_files() {
     mkdir -p static/icons
     cat > static/manifest.json << 'MANIFESTEOF'
-{"name":"EPUB Fordító v10.0","short_name":"EPUB Fordító","start_url":"/","display":"standalone","background_color":"#1a1a2e","theme_color":"#16213e","icons":[{"src":"/static/icons/icon-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/static/icons/icon-512x512.png","sizes":"512x512","type":"image/png"}]}
+{"name":"EPUB Fordító v11.0","short_name":"EPUB Fordító","start_url":"/","display":"standalone","background_color":"#1a1a2e","theme_color":"#16213e","icons":[{"src":"/static/icons/icon-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/static/icons/icon-512x512.png","sizes":"512x512","type":"image/png"}]}
 MANIFESTEOF
     cat > static/js/sw.js << 'SWEOF'
-const CACHE='epub-v10';self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/offline.html']))).then(()=>self.skipWaiting())});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))});
+const CACHE='epub-v11';self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/offline.html']))).then(()=>self.skipWaiting())});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))});
 SWEOF
 }
 
@@ -1210,14 +1121,35 @@ docker exec epub-postgres pg_dump -U epub_user epub_translator > ~/epub-backups/
 [ -d ~/epub-translator/community_library ] && tar -czf ~/epub-backups/community_$D.tar.gz -C ~/epub-translator community_library/ 2>/dev/null
 echo "✅ ~/epub-backups/db_$D.sql"
 BACKUPEOF
+
     cat > scripts/update.sh << 'UPDATEEOF'
 #!/bin/bash
 cd ~/epub-translator&&docker compose down&&git pull 2>/dev/null&&docker compose build&&docker compose up -d&&echo "✅ Frissítve!"
 UPDATEEOF
+
     cat > scripts/status.sh << 'STATUSEOF'
 #!/bin/bash
-echo "EPUB Fordító v10.0 AI Studio";docker compose ps;echo "Web: http://localhost | Email: http://localhost:8025"
+echo "EPUB Fordító v11.0 Smart Optimizer"
+docker compose ps
+echo "Web: http://localhost | Email: http://localhost:8025"
+echo "Rendszer: CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}')% | RAM: $(free -h | awk '/^Mem:/{print $3"/"$2}')"
 STATUSEOF
+
+    cat > scripts/monitor.sh << 'MONITOREOF'
+#!/bin/bash
+LOG=~/epub-translator/logs/resource_monitor.log
+echo "$(date): CPU:$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')% RAM:$(free -h | awk '/^Mem:/{print $3"/"$2}') Disk:$(df -h / | awk 'NR==2{print $5}')" >> "$LOG"
+MONITOREOF
+
+    cat > scripts/optimize.sh << 'OPTIMIZEEOF'
+#!/bin/bash
+echo "🧠 EPUB Fordító - Optimalizálás"
+cd ~/epub-translator
+curl -X POST http://localhost/api/models/recommend 2>/dev/null
+echo ""
+echo "Javasolt modell váltás az admin felületen: http://localhost/admin"
+OPTIMIZEEOF
+
     chmod +x scripts/*.sh
 }
 
@@ -1234,24 +1166,29 @@ show_summary() {
     echo ""
     echo "🌐 Web:        http://localhost"
     echo "📧 Email:      http://localhost:8025"
+    echo "📊 Monitor:    http://localhost/admin (rendszer infók)"
     echo ""
-    echo "🆕 v10.0 Újdonságok:"
-    echo "   🤖 AI Fordítási Asszisztens"
-    echo "   🔐 OAuth/SSO (Google, GitHub, Microsoft)"
-    echo "   📡 Offline Fordítási Queue"
-    echo "   📷 OCR és Képfordítás"
-    echo "   🎤 Hangalapú Fordítás"
-    echo "   🎮 Gamification (Achievement-ek, Ranglisták)"
-    echo "   📚 Közösségi Könyvtár"
-    echo "   🎯 Fine-tuning Támogatás"
-    echo "   ✨ Auto-Complete Fordítás"
+    echo "🆕 v11.0 Újdonságok:"
+    echo "   🧠 Automatikus modell optimalizálás"
+    echo "   📊 Valós idejű erőforrás figyelés"
+    echo "   🔄 Intelligens modellváltás (auto-optimize)"
+    echo "   💾 Dinamikus memória kezelés"
+    echo "   ⚡ Hardver alapú auto-konfiguráció"
+    echo ""
+    echo "🤖 Ajánlott modell: ${RECOMMENDED_MODEL}"
+    echo "🧵 Optimális szálak: ${OPTIMAL_WORKERS}"
+    echo "💾 Memória limit: ${OPTIMAL_MEMORY_LIMIT}"
     echo ""
     echo "👤 Admin: ${ADMIN_EMAIL} | 🔑 ${ADMIN_PASSWORD}"
-    echo "🤖 Modell: ${SELECTED_MODEL}"
     echo ""
-    echo "📋 ./scripts/update.sh | ./scripts/backup.sh | ./scripts/status.sh"
+    echo "📋 Parancsok:"
+    echo "   Frissítés:     ./scripts/update.sh"
+    echo "   Optimalizálás: ./scripts/optimize.sh"
+    echo "   Monitor:       ./scripts/monitor.sh"
+    echo "   Backup:        ./scripts/backup.sh"
+    echo "   Státusz:       ./scripts/status.sh"
     echo ""
-    log_success "Kész! 🚀"
+    log_success "Kész! 🚀🧠"
 }
 
 # ============================================================
@@ -1259,7 +1196,14 @@ show_summary() {
 # ============================================================
 main() {
     detect_installation_mode
-    check_system_resources
+    analyze_and_optimize
+    
+    if [ "${OPTIMIZE_ONLY:-false}" = true ]; then
+        perform_optimization_only
+        show_summary
+        exit 0
+    fi
+    
     configure_system
     
     if [ "$IS_UPDATE" = true ]; then
