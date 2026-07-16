@@ -410,6 +410,24 @@ perform_fresh_install() {
     create_all_files
     apply_optimization
     
+    # Csomagkezelő lock-ok felszabadulására várakozás
+    log_info "Csomagkezelő lock-okra várakozás..."
+    for i in $(seq 1 60); do
+        LOCKS=$(sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/cache/debconf/config.dat 2>/dev/null) || true
+        if [ -z "$LOCKS" ]; then
+            log_success "Csomagkezelő lock-ok felszabadultak"
+            break
+        fi
+        if [ "$i" -eq 60 ]; then
+            log_warn "A csomagkezelő 5 perce zárolva van, a lock-ot tartó folyamatok leállítása..."
+            sudo fuser -k /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/cache/debconf/config.dat 2>/dev/null || true
+            sleep 3
+            break
+        fi
+        log_warn "Csomagkezelő zárolva, várakozás... ($i/60)"
+        sleep 5
+    done
+    
     log_info "Rendszercsomagok telepítése (apt lock-ra várás)..."
     for i in $(seq 1 30); do
         if sudo DEBIAN_FRONTEND=noninteractive apt update -qq 2>/dev/null; then

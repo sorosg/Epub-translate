@@ -57,9 +57,13 @@
 ### 2.1 Első telepítés
 
 ```bash
-# 1. Töltsd le a telepítő scriptet
-git clone https://github.com/sorosg/Epub-translate.git
-cd Epub-translate
+# 1. Töltsd le a telepítő scriptet (ha még nincs meg)
+if [ -d "Epub-translate" ]; then
+    cd Epub-translate && git pull
+else
+    git clone https://github.com/sorosg/Epub-translate.git
+    cd Epub-translate
+fi
 
 # 2. Tedd futtathatóvá
 chmod +x install.sh
@@ -67,6 +71,8 @@ chmod +x install.sh
 # 3. Futtasd a telepítőt (NE root-ként!)
 ./install.sh
 ```
+
+> **Megjegyzés:** Ha a `git clone` hibát dob ("already exists"), használhatod a fenti `if`-es parancsot, vagy egyszerűen lépj be a meglévő könyvtárba (`cd Epub-translate`) és futtasd a scriptet – a telepítő felismeri a meglévő telepítést és felajánlja a frissítést.
 
 A telepítő végigvezet a következő lépéseken:
 
