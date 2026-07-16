@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.22
+# Verzió: 11.0.23
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.22"
+VERSION="11.0.23"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -913,7 +913,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.22')
+    VERSION = os.environ.get('VERSION', '11.0.23')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1986,22 +1986,25 @@ fi
 # Remote beállítása (ha még nincs)
 if ! git remote get-url origin &>/dev/null 2>&1; then
     git remote add origin https://github.com/sorosg/Epub-translate.git 2>/dev/null || true
+else
+    git remote set-url origin https://github.com/sorosg/Epub-translate.git 2>/dev/null || true
 fi
 
 # Legújabb verzió letöltése
 echo "📥 Legújabb verzió letöltése..."
 UPDATED=false
-if git fetch origin 2>/dev/null; then
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-    if git rev-parse --verify "origin/$CURRENT_BRANCH" &>/dev/null 2>&1; then
-        git reset --hard "origin/$CURRENT_BRANCH" 2>/dev/null || \
-        git checkout -B "$CURRENT_BRANCH" "origin/$CURRENT_BRANCH" 2>/dev/null || true
-        echo "✅ Repó frissítve"
+if git fetch origin main 2>/dev/null; then
+    git reset --hard FETCH_HEAD 2>/dev/null && { echo "✅ Repó frissítve"; UPDATED=true; }
+fi
+if [ "$UPDATED" = false ]; then
+    # Fallback: próbáljunk git pull-t
+    if git pull origin main --force 2>/dev/null; then
+        echo "✅ Repó frissítve (pull)"
         UPDATED=true
     fi
 fi
 if [ "$UPDATED" = false ]; then
-    echo "⚠️  A GitHub nem elérhető vagy a branch nem található, a meglévő fájlokkal dolgozunk"
+    echo "⚠️  A GitHub nem elérhető, a meglévő fájlokkal dolgozunk"
 fi
 
 echo "🛑 Konténerek leállítása..."
