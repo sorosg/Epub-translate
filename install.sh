@@ -686,7 +686,7 @@ ENABLE_I18N=${ENABLE_I18N}
 OPTIMAL_MEMORY_LIMIT=${OPTIMAL_MEMORY_LIMIT}
 OPTIMAL_REDIS=${OPTIMAL_REDIS}
 OPTIMAL_PG_BUFFERS=${OPTIMAL_PG_BUFFERS}
-OLLAMA_HOST=http://ollama:11434
+OLLAMA_HOST=http://host.docker.internal:11434
 REDIS_URL=redis://redis:6379/0
 SMTP_MODE=${SMTP_MODE:-local}
 SMTP_HOST=${SMTP_HOST:-mailhog}
@@ -720,7 +720,8 @@ services:
     build: ./backend
     container_name: epub-backend
     dns:
-      - 8.8.8.8
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
       - 1.1.1.1
     volumes:
       - epub_uploads:/app/uploads
@@ -735,7 +736,7 @@ services:
       - ./optimization_profiles:/app/optimization_profiles
     environment:
       - DATABASE_URL=postgresql://epub_user:epub_password@postgres:5432/epub_translator
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY}
       - SELECTED_MODEL=${SELECTED_MODEL}
@@ -920,7 +921,7 @@ class Config:
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
-    OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
+    OLLAMA_HOST = 'http://host.docker.internal:11434'
     DEFAULT_MODEL = os.environ.get('SELECTED_MODEL', 'deepseek-r1:14b')
     RECOMMENDED_MODEL = os.environ.get('RECOMMENDED_MODEL', 'deepseek-r1:14b')
     MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 3))
