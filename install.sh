@@ -1,7 +1,7 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.32
+# Verzió: 11.0.33
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.32"
+VERSION="11.0.33"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -629,6 +629,8 @@ create_all_files() {
     cp "$SRC_DIR/backend/templates/users.html" backend/templates/users.html 2>/dev/null || true
     cp "$SRC_DIR/backend/templates/users_form.html" backend/templates/users_form.html 2>/dev/null || true
     cp "$SRC_DIR/backend/templates/update.html" backend/templates/update.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/library.html" backend/templates/library.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/logs.html" backend/templates/logs.html 2>/dev/null || true
     
     # backend utils
     cp "$SRC_DIR/backend/utils/model_optimizer.py" backend/utils/model_optimizer.py 2>/dev/null || true
@@ -916,7 +918,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.32')
+    VERSION = os.environ.get('VERSION', '11.0.33')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')

@@ -1,44 +1,140 @@
 {% extends "base.html" %}{% block title %}Rendszer Logok{% endblock %}{% block content %}
-<h2>📋 Rendszer Logok <small class="text-muted">(admin)</small></h2>
+<h2 class="mb-1"><i class="bi bi-journal-text me-2"></i>Rendszer Logok</h2>
+<p class="text-secondary">Részletes hibakeresési naplók – csak adminisztrátoroknak</p>
 
-<div class="row mt-3">
-  <div class="col-md-12">
-    <div class="btn-group mb-3" role="group">
-      {% for log in available_logs %}
-      <a href="/admin/logs?type={{ log.name }}&lines={{ lines }}" class="btn btn-sm {% if log_type == log.name %}btn-primary{% else %}btn-outline-light{% endif %}">
-        {{ log.label }}{% if log.exists %} <span class="badge bg-secondary">{{ log.size_mb }} MB</span>{% endif %}
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <!-- Log típus választó -->
+      <div class="btn-group" role="group">
+        {% for log in available_logs %}
+        <a href="/admin/logs?type={{ log.name }}&lines={{ lines }}" 
+           class="btn btn-sm {% if log_type == log.name %}btn-primary{% else %}btn-outline-light{% endif %}">
+          {% if log.name == 'translation' %}<i class="bi bi-translate me-1"></i>{% else %}<i class="bi bi-gear me-1"></i>{% endif %}
+          {{ log.label }}
+          {% if log.exists %}<span class="badge bg-secondary ms-1">{{ log.size_mb }} MB</span>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+      
+      <span class="text-secondary">|</span>
+      
+      <!-- Sorszám választó -->
+      <div class="btn-group" role="group">
+        {% for n in [50, 200, 500, 1000, 3000] %}
+        <a href="/admin/logs?type={{ log_type }}&lines={{ n }}" 
+           class="btn btn-sm {% if lines == n %}btn-warning{% else %}btn-outline-light{% endif %}">
+          {{ n }} sor
+        </a>
+        {% endfor %}
+      </div>
+      
+      <!-- Frissítés gomb -->
+      <a href="/admin/logs?type={{ log_type }}&lines={{ lines }}" class="btn btn-sm btn-outline-info">
+        <i class="bi bi-arrow-clockwise me-1"></i>Frissítés
       </a>
-      {% endfor %}
+      
+      <!-- Automatikus frissítés kapcsoló -->
+      <div class="form-check form-switch ms-2">
+        <input class="form-check-input" type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()">
+        <label class="form-check-label small" for="autoRefresh">Auto-frissítés (15s)</label>
+      </div>
+      
+      <span class="ms-auto text-secondary small">
+        <i class="bi bi-file-earmark-text me-1"></i>
+        {{ (file_size / (1024*1024))|round(1) if file_size > 0 else 0 }} MB 
+        · {{ log_content.split('\n')|length }} sor
+      </span>
     </div>
-    <div class="btn-group ms-2 mb-3" role="group">
-      <a href="/admin/logs?type={{ log_type }}&lines=50" class="btn btn-sm {% if lines == 50 %}btn-warning{% else %}btn-outline-light{% endif %}">50 sor</a>
-      <a href="/admin/logs?type={{ log_type }}&lines=200" class="btn btn-sm {% if lines == 200 %}btn-warning{% else %}btn-outline-light{% endif %}">200 sor</a>
-      <a href="/admin/logs?type={{ log_type }}&lines=500" class="btn btn-sm {% if lines == 500 %}btn-warning{% else %}btn-outline-light{% endif %}">500 sor</a>
-      <a href="/admin/logs?type={{ log_type }}&lines=1000" class="btn btn-sm {% if lines == 1000 %}btn-warning{% else %}btn-outline-light{% endif %}">1000 sor</a>
-    </div>
-    <a href="/admin/logs?type={{ log_type }}&lines={{ lines }}" class="btn btn-sm btn-outline-info ms-2 mb-3">🔄 Frissítés</a>
   </div>
 </div>
 
-<div class="card mt-2">
+<div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>
-      {% if log_type == 'translation' %}🔧 Fordítási log{% else %}📄 Alkalmazás log{% endif %}
-      <small class="text-muted ms-2">(utolsó {{ lines }} sor, fájl méret: {{ "%.2f"|format(file_size / (1024*1024)) if file_size > 0 else 0 }} MB)</small>
+      {% if log_type == 'translation' %}
+        <i class="bi bi-translate me-1 text-info"></i> Fordítási log
+      {% else %}
+        <i class="bi bi-gear me-1 text-info"></i> Alkalmazás log
+      {% endif %}
+      <small class="text-secondary ms-2">utolsó {{ lines }} sor</small>
     </span>
-    <span class="text-muted small">{{ log_content.split('\n')|length }} sor</span>
+    <div>
+      <button class="btn btn-sm btn-outline-light me-1" onclick="scrollToBottom()" title="Ugrás a végére">
+        <i class="bi bi-arrow-down"></i>
+      </button>
+      <button class="btn btn-sm btn-outline-light" onclick="copyLog()" title="Másolás vágólapra">
+        <i class="bi bi-clipboard"></i>
+      </button>
+    </div>
   </div>
   <div class="card-body p-0">
-    <pre class="text-light bg-dark p-3 m-0" style="font-size: 0.8rem; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; font-family: 'Courier New', monospace;">{{ log_content }}</pre>
+    <pre id="logContent" class="text-light p-3 m-0" style="font-size: 0.78rem; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; line-height: 1.5; background: #0d1117; border-radius: 0 0 16px 16px;"><code>{{ log_content }}</code></pre>
   </div>
 </div>
 
-<div class="mt-3">
-  <a href="/admin" class="btn btn-sm btn-outline-light">⚙️ Vissza az Adminhoz</a>
+<div class="mt-3 d-flex gap-2">
+  <a href="/admin" class="btn btn-outline-light btn-sm"><i class="bi bi-gear me-1"></i>Vissza az Adminhoz</a>
+  <a href="/admin/logs" class="btn btn-outline-light btn-sm"><i class="bi bi-arrow-repeat me-1"></i>Minden log újratöltése</a>
 </div>
 
 <script>
-// Automatikus frissítés 15 másodpercenként
-setTimeout(function(){ location.reload(); }, 15000);
+let refreshTimer = null;
+
+function toggleAutoRefresh() {
+  const enabled = document.getElementById('autoRefresh').checked;
+  if (enabled) {
+    refreshTimer = setTimeout(function(){ location.reload(); }, 15000);
+  } else if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('logContent');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+
+function copyLog() {
+  const text = document.getElementById('logContent').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    // Vizuális visszajelzés
+    const btn = event.target.closest('button');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Másolva!';
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+  });
+}
+
+// Oldal betöltésekor görgessünk a végére
+document.addEventListener('DOMContentLoaded', () => {
+  scrollToBottom();
+  toggleAutoRefresh();
+});
+
+// Szintaxis kiemelés (egyszerű regex alapú)
+document.addEventListener('DOMContentLoaded', () => {
+  const pre = document.getElementById('logContent');
+  if (!pre) return;
+  let html = pre.innerHTML;
+  
+  // ERROR piros
+  html = html.replace(/(\[ERROR\]|❌.*)/g, '<span style="color:#f85149;font-weight:600">$1</span>');
+  // WARNING sárga
+  html = html.replace(/(\[WARNING\]|\[FIGYELEM\])/g, '<span style="color:#d2991d;font-weight:600">$1</span>');
+  // INFO / SUCCESS zöld
+  html = html.replace(/(\[INFO\]|✅.*|SIKER|sikeresen)/g, '<span style="color:#3fb950">$1</span>');
+  // DEBUG szürke
+  html = html.replace(/(\[DEBUG\])/g, '<span style="color:#8b949e">$1</span>');
+  // Fordítás ID-k kék
+  html = html.replace(/(\[ID:\d+\])/g, '<span style="color:#58a6ff">$1</span>');
+  // Időbélyegek halvány
+  html = html.replace(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})/g, '<span style="color:#6e7681">$1</span>');
+  // HIBA: prefix
+  html = html.replace(/(HIBA:.*)/g, '<span style="color:#f85149">$1</span>');
+  
+  pre.innerHTML = html;
+});
 </script>
 {% endblock %}

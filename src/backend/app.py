@@ -54,6 +54,11 @@ def get_locale():
 
 babel = Babel(app, locale_selector=get_locale)
 
+# Context processor: minden template számára elérhető config
+@app.context_processor
+def inject_config():
+    return {'config': Config}
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['REFERENCE_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)

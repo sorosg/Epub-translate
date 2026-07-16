@@ -1,26 +1,58 @@
 {% extends "base.html" %}{% block title %}Admin{% endblock %}{% block content %}
-<h2>⚙️ Admin Vezérlőpult</h2>
-<div class="row mt-4">
-  <div class="col-md-3"><div class="card bg-success text-white"><div class="card-body text-center"><h3>{{ sys_info.cpu_percent }}%</h3><p>CPU</p></div></div></div>
-  <div class="col-md-3"><div class="card bg-info text-white"><div class="card-body text-center"><h3>{{ sys_info.memory_percent }}%</h3><p>RAM ({{ sys_info.memory_used_gb }}/{{ sys_info.memory_total_gb }} GB)</p></div></div></div>
-  <div class="col-md-3"><div class="card bg-warning text-dark"><div class="card-body text-center"><h3>{{ sys_info.disk_percent }}%</h3><p>Lemez ({{ sys_info.disk_free_gb }} GB szabad)</p></div></div></div>
-  <div class="col-md-3"><div class="card bg-secondary text-white"><div class="card-body text-center"><h3 id="modelCount">-</h3><p>Modell</p></div></div></div>
+<h2 class="mb-1"><i class="bi bi-gear me-2"></i>Admin Vezérlőpult</h2>
+<p class="text-secondary">{{ translations_count }} fordítás · {{ users_count }} felhasználó</p>
+
+<!-- Rendszer statisztika -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-success bg-opacity-10 text-center">
+      <div class="stat-icon">💻</div>
+      <div class="stat-value">{{ sys_info.cpu_percent }}%</div>
+      <div class="stat-label">CPU</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-info bg-opacity-10 text-center">
+      <div class="stat-icon">🧠</div>
+      <div class="stat-value">{{ sys_info.memory_percent }}%</div>
+      <div class="stat-label">RAM ({{ sys_info.memory_used_gb }}/{{ sys_info.memory_total_gb }} GB)</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-warning bg-opacity-10 text-center">
+      <div class="stat-icon">💾</div>
+      <div class="stat-value">{{ sys_info.disk_percent }}%</div>
+      <div class="stat-label">Lemez ({{ sys_info.disk_free_gb }} GB szabad)</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-secondary bg-opacity-10 text-center">
+      <div class="stat-icon">🤖</div>
+      <div class="stat-value" id="modelCount">-</div>
+      <div class="stat-label">AI Modell</div>
+    </div>
+  </div>
 </div>
 
-<div class="card mt-4">
-  <div class="card-header"><h5>🤖 AI Modell státusz</h5></div>
+<!-- AI Modellek kártya -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5><i class="bi bi-cpu me-2"></i>AI Modell státusz</h5>
+    <span class="badge bg-info">{{ current_model }}</span>
+  </div>
   <div class="card-body">
-    <p>Aktuális modell: <strong>{{ current_model }}</strong></p>
-    <div id="modelProgress" class="mt-2">
-      <button class="btn btn-sm btn-outline-info" onclick="loadModels()">🔄 Státusz frissítése</button>
-      <div id="modelProgressContent" class="mt-2"></div>
+    <div class="d-flex gap-2 mb-3">
+      <button class="btn btn-outline-info btn-sm" onclick="loadModels()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Státusz frissítése
+      </button>
+      <span id="modelProgress" class="text-secondary small align-self-center"></span>
     </div>
+    <div id="modelsTable" class="table-responsive"></div>
+    
     <hr>
-    <div id="modelsTable"></div>
-    <hr>
-    <div class="card bg-dark border-secondary">
+    <div class="card bg-secondary bg-opacity-10 border-secondary">
       <div class="card-body">
-        <h6>📥 Új modell letöltése</h6>
+        <h6><i class="bi bi-download me-2"></i>Új modell letöltése</h6>
         <div class="row g-2">
           <div class="col-md-4">
             <select class="form-select form-select-sm" id="modelPreset" onchange="document.getElementById('pullModelName').value=this.value">
@@ -38,57 +70,68 @@
             </select>
           </div>
           <div class="col-md-5">
-            <input type="text" class="form-control form-control-sm" id="pullModelName" placeholder="vagy írd be egyéni modell nevét" value="deepseek-r1:14b">
+            <input type="text" class="form-control form-control-sm" id="pullModelName" placeholder="vagy egyéni modell név" value="deepseek-r1:14b">
           </div>
           <div class="col-md-3">
-            <button class="btn btn-sm btn-success w-100" id="pullBtn" onclick="pullModel()">⬇️ Letöltés</button>
+            <button class="btn btn-success btn-sm w-100" id="pullBtn" onclick="pullModel()">
+              <i class="bi bi-cloud-download me-1"></i>Letöltés
+            </button>
           </div>
         </div>
-        <small class="text-muted mt-2 d-block">A letöltés hosszú ideig (akár 30-60 perc) is eltarthat. A "Státusz frissítése" gombbal ellenőrizheted.</small>
+        <small class="text-secondary mt-2 d-block"><i class="bi bi-info-circle me-1"></i>A letöltés 30-60 percig is eltarthat. Frissítsd az oldalt a státusz ellenőrzéséhez.</small>
       </div>
     </div>
   </div>
 </div>
+
 <script>
 async function loadModels() {
-  const el = document.getElementById('modelProgressContent');
-  el.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Modellek betöltése...';
+  const el = document.getElementById('modelProgress');
+  el.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Modellek betöltése...';
   try {
     const resp = await fetch('/api/models/list', {credentials: 'same-origin'});
     const data = await resp.json();
     if (data.error) {
-      el.innerHTML = '<div class="alert alert-danger">' + data.error + '</div>';
+      el.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>' + data.error + '</span>';
       return;
     }
     document.getElementById('modelCount').textContent = data.models.length;
     if (data.models.length > 0) {
-      let html = '<table class="table table-dark table-striped"><thead><tr><th>Név</th><th>Méret</th><th>Művelet</th></tr></thead><tbody>';
+      let html = '<table class="table table-dark table-sm"><thead><tr><th>Név</th><th>Méret</th><th></th></tr></thead><tbody>';
       data.models.forEach(m => {
         const sizeGb = m.size ? (m.size / 1024 / 1024 / 1024).toFixed(1) : '?';
-        html += '<tr><td>' + m.name + '</td><td>' + sizeGb + ' GB</td><td><button class="btn btn-sm btn-outline-light switch-model" data-model="' + m.name + '">Váltás</button></td></tr>';
+        const isActive = m.name === data.current_model;
+        html += `<tr>
+          <td>${m.name} ${isActive ? '<span class="badge bg-success ms-1">aktív</span>' : ''}</td>
+          <td>${sizeGb} GB</td>
+          <td><button class="btn btn-sm btn-outline-light switch-model" data-model="${m.name}"><i class="bi bi-arrow-left-right me-1"></i>Váltás</button></td>
+        </tr>`;
       });
       html += '</tbody></table>';
       document.getElementById('modelsTable').innerHTML = html;
-      el.innerHTML = '<span class="text-success">✅ ' + data.models.length + ' modell betöltve</span>';
-      // Modellváltó gombok eseménykezelői
+      el.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + data.models.length + ' modell betöltve</span>';
+      // Modellváltó gombok
       document.querySelectorAll('.switch-model').forEach(btn => {
         btn.addEventListener('click', async () => {
           const model = btn.dataset.model;
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
           const resp = await fetch('/api/models/switch', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({model: model})
           });
           const d = await resp.json();
-          alert(d.message || d.error);
           if (d.success) location.reload();
+          else { alert(d.message || d.error); btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i>Váltás'; }
         });
       });
-      document.getElementById('modelsTable').innerHTML = '<div class="alert alert-info">Tölts le egy modellt a webes felületről:</div>';
+    } else {
+      document.getElementById('modelsTable').innerHTML = '<div class="text-center py-3 text-secondary"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2">Nincsenek modellek betöltve. Tölts le egyet!</p></div>';
+      el.innerHTML = '';
     }
-    el.innerHTML = data.models.length > 0 ? ('<span class="text-success">✅ ' + data.models.length + ' modell betöltve</span>') : '';
   } catch(e) {
-    el.innerHTML = '<div class="alert alert-danger">Hiba: ' + e.message + '</div>';
+    el.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>' + e.message + '</span>';
   }
 }
 
@@ -96,7 +139,8 @@ async function pullModel() {
   const model = document.getElementById('pullModelName').value.trim();
   if (!model) { alert('Add meg a modell nevét!'); return; }
   const btn = document.getElementById('pullBtn');
-  btn.disabled = true; btn.textContent = 'Letöltés...';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Letöltés...';
   try {
     const resp = await fetch('/api/models/pull', {
       method: 'POST',
@@ -106,14 +150,15 @@ async function pullModel() {
     });
     const data = await resp.json();
     if (data.success) {
-      alert('✅ ' + data.message + '\n\nA modell letöltése folyamatban van. Ez akár 30-60 percig is eltarthat.\nFrissítsd az oldalt később a Státusz frissítése gombbal.');
+      alert('✅ ' + data.message + '\n\nA modell letöltése a háttérben folyamatban van (30-60 perc).\nFrissítsd az oldalt később a Státusz frissítése gombbal.');
     } else {
       alert('❌ ' + (data.error || 'Ismeretlen hiba'));
     }
   } catch(e) {
     alert('Hiba: ' + e.message);
   }
-  btn.disabled = false; btn.textContent = '⬇️ Letöltés';
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Letöltés';
 }
 
 window.addEventListener('load', () => loadModels());

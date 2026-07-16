@@ -1,3 +1,37 @@
 {% extends "base.html" %}{% block title %}Bejelentkezés{% endblock %}{% block content %}
-<div class="row justify-content-center mt-5"><div class="col-md-4"><div class="card"><div class="card-header bg-primary text-white"><h3 class="text-center">Bejelentkezés</h3></div><div class="card-body"><form method="POST"><div class="mb-3"><label>Email</label><input type="email" class="form-control" name="email" required></div><div class="mb-3"><label>Jelszó</label><input type="password" class="form-control" name="password" required></div><button type="submit" class="btn btn-primary w-100">Bejelentkezés</button></form></div></div></div></div>
+<div class="row justify-content-center mt-5">
+  <div class="col-md-5 col-lg-4">
+    <div class="text-center mb-4">
+      <i class="bi bi-translate" style="font-size: 3rem; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+      <h2 class="mt-2">EPUB Fordító</h2>
+      <p class="text-secondary">Jelentkezz be a folytatáshoz</p>
+    </div>
+    <div class="card shadow-lg">
+      <div class="card-body p-4">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label fw-medium"><i class="bi bi-envelope me-1"></i>Email cím</label>
+            <div class="input-group">
+              <span class="input-group-text bg-secondary bg-opacity-25 border-secondary"><i class="bi bi-at"></i></span>
+              <input type="email" class="form-control" name="email" placeholder="nev@example.com" required autofocus autocomplete="email">
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-medium"><i class="bi bi-lock me-1"></i>Jelszó</label>
+            <div class="input-group">
+              <span class="input-group-text bg-secondary bg-opacity-25 border-secondary"><i class="bi bi-key"></i></span>
+              <input type="password" class="form-control" name="password" placeholder="Jelszó" required autocomplete="current-password">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 btn-lg">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Bejelentkezés
+          </button>
+        </form>
+      </div>
+    </div>
+    <p class="text-center text-secondary mt-3 small">
+      <i class="bi bi-shield-lock me-1"></i>Biztonságos kapcsolat · {{ config.CODENAME if config else 'Smart Optimizer' }}
+    </p>
+  </div>
+</div>
 {% endblock %}
