@@ -8,6 +8,8 @@
 #          intelligens modellváltás, valós idejű rendszerfigyelés
 
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NOWARNINGS="yes"
 
 # Színek
 RED='\033[0;31m'
@@ -410,8 +412,8 @@ perform_fresh_install() {
     
     log_info "Rendszercsomagok telepítése (apt lock-ra várás)..."
     for i in $(seq 1 30); do
-        if sudo apt update -qq 2>/dev/null; then
-            sudo apt upgrade -y -qq 2>/dev/null || true
+        if sudo DEBIAN_FRONTEND=noninteractive apt update -qq 2>/dev/null; then
+            sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y -qq 2>/dev/null || true
             break
         fi
         log_warn "Az apt zárolva van, várakozás... ($i/30)"
@@ -419,7 +421,7 @@ perform_fresh_install() {
     done
     log_info "Függőségek telepítése..."
     for i in $(seq 1 30); do
-        if sudo apt install -y -qq curl wget git ca-certificates gnupg nano htop net-tools ufw build-essential python3-pip python3-venv libxml2-dev libxslt-dev redis-tools postgresql-client clamav postfix mailutils poppler-utils ffmpeg nginx openssl tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng espeak mpg321 2>/dev/null; then
+        if sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq curl wget git ca-certificates gnupg nano htop net-tools ufw build-essential python3-pip python3-venv libxml2-dev libxslt-dev redis-tools postgresql-client clamav postfix mailutils poppler-utils ffmpeg nginx openssl tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng espeak mpg321 2>/dev/null; then
             break
         fi
         log_warn "Az apt install zárolva van, várakozás... ($i/30)"
@@ -433,7 +435,7 @@ perform_fresh_install() {
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
         log_info "Docker telepítése (apt lock-ra várás)..."
         for i in $(seq 1 30); do
-            if sudo apt update -qq 2>/dev/null && sudo apt install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null; then
+            if sudo DEBIAN_FRONTEND=noninteractive apt update -qq 2>/dev/null && sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null; then
                 break
             fi
             log_warn "Az apt zárolva van, várakozás... ($i/30)"
