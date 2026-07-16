@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.11
+# Verzió: 11.0.12
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.11"
+VERSION="11.0.12"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -845,7 +845,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.11')
+    VERSION = os.environ.get('VERSION', '11.0.12')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -947,11 +947,10 @@ app.config['UPLOAD_FOLDER'] = '/app/uploads/books'
 app.config['OUTPUT_FOLDER'] = '/app/output'
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max
 db.init_app(app)
-babel = Babel(app)
-
-@babel.localeselector
 def get_locale():
     return 'hu'
+
+babel = Babel(app, locale_selector=get_locale)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
@@ -1380,8 +1379,14 @@ def init_db():
                         tokens=999999, internal_email='admin@epub.local')
             db.session.add(admin); db.session.commit()
 
+# Adatbázis inicializálása az első kérés előtt
+with app.app_context():
+    try:
+        init_db()
+    except Exception as e:
+        app.logger.error(f"DB init error: {e}")
+
 if __name__ == '__main__':
-    init_db()
     app.run(debug=False, host='0.0.0.0', port=5000)
 APPEOF
 
