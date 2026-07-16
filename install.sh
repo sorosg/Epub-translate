@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.13
+# Verzió: 11.0.15
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.13"
+VERSION="11.0.15"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -507,10 +507,14 @@ perform_fresh_install() {
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
-    sleep 20
-    
-    $DOCKER exec -i epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell figyelmeztetés"
     sleep 10
+    
+    # Modell letöltés háttérben (nem blokkoljuk a telepítést)
+    log_info "AI modell letöltése háttérben: $SELECTED_MODEL"
+    $DOCKER exec -d epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell letöltés figyelmeztetés (háttérben fut, akár 30-60 perc is lehet)"
+    log_info "A modell letöltése a háttérben zajlik. A webes felület azonnal elérhető."
+    log_info "Amíg a modell töltődik, a fordítás nem fog működni."
+    sleep 5
     $DOCKER exec -i epub-backend python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')" 2>/dev/null || log_warn "DB figyelmeztetés"
     
     [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && $DOCKER exec -i epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' if '${GITHUB_TOKEN}' else None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
@@ -680,7 +684,7 @@ services:
       postgres:
         condition: service_healthy
       ollama:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
     networks:
@@ -845,7 +849,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.13')
+    VERSION = os.environ.get('VERSION', '11.0.15')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1963,6 +1967,9 @@ show_summary() {
 # MAIN
 # ============================================================
 main() {
+    # Eredeti munkakönyvtár elmentése (hogy a script végén vissza tudjunk térni)
+    ORIG_DIR="$(pwd)"
+
     # Docker parancs elérésének meghatározása
     if docker ps &>/dev/null 2>&1; then
         DOCKER="docker"
@@ -1978,6 +1985,8 @@ main() {
     if [ "${OPTIMIZE_ONLY:-false}" = true ]; then
         perform_optimization_only
         show_summary
+        cd "$PROJECT_DIR"
+        log_info "A telepítési könyvtár: $PROJECT_DIR"
         exit 0
     fi
     
@@ -1990,6 +1999,8 @@ main() {
     fi
     
     show_summary
+    cd "$PROJECT_DIR"
+    log_info "A telepítési könyvtár: $PROJECT_DIR"
 }
 
 main "$@"
