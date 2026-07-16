@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.4
+# Verzió: 11.0.5
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.4"
+VERSION="11.0.5"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -844,7 +844,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.4')
+    VERSION = os.environ.get('VERSION', '11.0.5')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -923,27 +923,38 @@ class OptimizationLog(db.Model):
 MODELSEOF
 
     cat > backend/app.py << 'APPEOF'
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, send_from_directory
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_babel import Babel, gettext as _
+from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 from models import db, User, Translation, SystemSettings, OptimizationLog
 from datetime import datetime
 from functools import wraps
-import os, json, psutil, requests
+import os, json, psutil, requests, threading, uuid, shutil
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config['UPLOAD_FOLDER'] = '/app/uploads/books'
+app.config['OUTPUT_FOLDER'] = '/app/output'
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max
 db.init_app(app)
 babel = Babel(app)
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
+limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["500 per day", "100 per hour"])
+
+ALLOWED_EXTENSIONS = {'epub'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def admin_required(f):
     @wraps(f)
@@ -986,17 +997,108 @@ def login():
         flash(_('Hibás email vagy jelszó!'), 'error')
     return render_template('login.html')
 
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    translations = Translation.query.filter_by(user_id=current_user.id).order_by(Translation.created_at.desc()).limit(20).all()
-    return render_template('dashboard.html', user=current_user, translations=translations)
+    translations = Translation.query.filter_by(user_id=current_user.id).order_by(Translation.created_at.desc()).all()
+    return render_template('dashboard.html', user=current_user, translations=translations, Config=Config)
+
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload_epub():
+    if 'file' not in request.files:
+        flash(_('Nincs fájl kiválasztva!'), 'error')
+        return redirect(url_for('dashboard'))
+    file = request.files['file']
+    if file.filename == '':
+        flash(_('Nincs fájl kiválasztva!'), 'error')
+        return redirect(url_for('dashboard'))
+    if not allowed_file(file.filename):
+        flash(_('Csak EPUB fájlok tölthetők fel!'), 'error')
+        return redirect(url_for('dashboard'))
+    if current_user.tokens <= 0:
+        flash(_('Nincs elég tokened a fordításhoz!'), 'error')
+        return redirect(url_for('dashboard'))
+    
+    filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    translation = Translation(
+        user_id=current_user.id,
+        original_filename=file.filename,
+        output_filename=None,
+        status='pending',
+        progress=0,
+        model_used=app.config['DEFAULT_MODEL']
+    )
+    db.session.add(translation)
+    current_user.tokens -= 1
+    db.session.commit()
+    
+    # Fordítás indítása háttérszálban
+    thread = threading.Thread(target=translate_epub, args=(app._get_current_object(), translation.id, filepath))
+    thread.daemon = True
+    thread.start()
+    
+    flash(_('Fájl feltöltve, fordítás folyamatban...'), 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/api/status/<int:translation_id>')
+@login_required
+def translation_status(translation_id):
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        return jsonify({'error': 'Nincs jogosultságod'}), 403
+    return jsonify({
+        'id': t.id,
+        'status': t.status,
+        'progress': t.progress,
+        'original_filename': t.original_filename,
+        'output_filename': t.output_filename
+    })
+
+@app.route('/download/<int:translation_id>')
+@login_required
+def download_translation(translation_id):
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        flash(_('Nincs jogosultságod'), 'error')
+        return redirect(url_for('dashboard'))
+    if t.status != 'completed' or not t.output_filename:
+        flash(_('A fordítás még nem készült el'), 'error')
+        return redirect(url_for('dashboard'))
+    output_path = os.path.join(app.config['OUTPUT_FOLDER'], t.output_filename)
+    if not os.path.exists(output_path):
+        flash(_('A fájl nem található'), 'error')
+        return redirect(url_for('dashboard'))
+    return send_file(output_path, as_attachment=True, download_name=f"forditott_{t.original_filename}")
+
+@app.route('/delete/<int:translation_id>', methods=['POST'])
+@login_required
+def delete_translation(translation_id):
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        flash(_('Nincs jogosultságod'), 'error')
+        return redirect(url_for('dashboard'))
+    if t.output_filename:
+        out = os.path.join(app.config['OUTPUT_FOLDER'], t.output_filename)
+        if os.path.exists(out): os.remove(out)
+    db.session.delete(t)
+    db.session.commit()
+    flash(_('Fordítás törölve'), 'success')
+    return redirect(url_for('dashboard'))
 
 @app.route('/admin')
 @login_required
 @admin_required
 def admin():
-    # Rendszer információk
     sys_info = {
         'cpu_percent': psutil.cpu_percent(),
         'memory_percent': psutil.virtual_memory().percent,
@@ -1005,15 +1107,17 @@ def admin():
         'disk_percent': psutil.disk_usage('/').percent,
         'disk_free_gb': round(psutil.disk_usage('/').free / (1024**3), 2)
     }
-    
-    # Modell információk
     try:
         resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=5)
         models = resp.json().get('models', []) if resp.status_code == 200 else []
     except:
         models = []
+    all_translations = Translation.query.order_by(Translation.created_at.desc()).limit(50).all()
+    users_count = User.query.count()
     
-    return render_template('admin.html', sys_info=sys_info, models=models, current_model=app.config['DEFAULT_MODEL'])
+    return render_template('admin.html', sys_info=sys_info, models=models, 
+                          current_model=app.config['DEFAULT_MODEL'], 
+                          translations=all_translations, users_count=users_count)
 
 @app.route('/api/models/switch', methods=['POST'])
 @login_required
@@ -1021,116 +1125,99 @@ def admin():
 def switch_model():
     data = request.get_json()
     model_name = data.get('model')
-    auto_optimize = data.get('auto_optimize', app.config['ENABLE_AUTO_OPTIMIZE'])
-    
     if not model_name:
         return jsonify({'error': 'Modell név szükséges'}), 400
-    
-    try:
-        # Modell váltás
-        from utils.model_optimizer import ModelOptimizer
-        optimizer = ModelOptimizer(app)
-        
-        # Optimalizálás ha kérték
-        opt_result = None
-        if auto_optimize:
-            opt_result = optimizer.optimize_for_model(model_name)
-        
-        # Naplózás
-        log = OptimizationLog(
-            model=model_name,
-            action='switch',
-            details=json.dumps({'auto_optimize': auto_optimize}),
-            performance_before=json.dumps({
-                'cpu': psutil.cpu_percent(),
-                'memory': psutil.virtual_memory().percent
-            })
-        )
-        db.session.add(log)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Modell átváltva: {model_name}',
-            'optimization': opt_result
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    app.config['DEFAULT_MODEL'] = model_name
+    log = OptimizationLog(model=model_name, action='switch', details=json.dumps({'switched_by': current_user.email}), created_at=datetime.utcnow())
+    db.session.add(log); db.session.commit()
+    return jsonify({'success': True, 'message': f'Modell átváltva: {model_name}'})
 
 @app.route('/api/system/monitor')
 @login_required
 @admin_required
 def system_monitor():
-    if not app.config['ENABLE_RESOURCE_MONITOR']:
-        return jsonify({'error': 'Monitor le van tiltva'}), 403
-    
     return jsonify({
-        'cpu': {
-            'percent': psutil.cpu_percent(),
-            'cores': psutil.cpu_count(),
-            'frequency': psutil.cpu_freq().current if psutil.cpu_freq() else 0
-        },
-        'memory': {
-            'total_gb': round(psutil.virtual_memory().total / (1024**3), 2),
-            'used_gb': round(psutil.virtual_memory().used / (1024**3), 2),
-            'available_gb': round(psutil.virtual_memory().available / (1024**3), 2),
-            'percent': psutil.virtual_memory().percent
-        },
-        'disk': {
-            'total_gb': round(psutil.disk_usage('/').total / (1024**3), 2),
-            'used_gb': round(psutil.disk_usage('/').used / (1024**3), 2),
-            'free_gb': round(psutil.disk_usage('/').free / (1024**3), 2),
-            'percent': psutil.disk_usage('/').percent
-        },
-        'swap': {
-            'total_gb': round(psutil.swap_memory().total / (1024**3), 2),
-            'used_gb': round(psutil.swap_memory().used / (1024**3), 2),
-            'percent': psutil.swap_memory().percent
-        },
-        'network': {
-            'bytes_sent': psutil.net_io_counters().bytes_sent,
-            'bytes_recv': psutil.net_io_counters().bytes_recv
-        },
+        'cpu': {'percent': psutil.cpu_percent(), 'cores': psutil.cpu_count()},
+        'memory': {'total_gb': round(psutil.virtual_memory().total/(1024**3),2), 'used_gb': round(psutil.virtual_memory().used/(1024**3),2), 'percent': psutil.virtual_memory().percent},
+        'disk': {'total_gb': round(psutil.disk_usage('/').total/(1024**3),2), 'free_gb': round(psutil.disk_usage('/').free/(1024**3),2), 'percent': psutil.disk_usage('/').percent},
         'uptime': datetime.utcnow().isoformat()
     })
 
-@app.route('/api/models/recommend')
-@login_required
-@admin_required
-def recommend_model():
-    if not app.config['ENABLE_SMART_SWITCH']:
-        return jsonify({'error': 'Intelligens váltás le van tiltva'}), 403
-    
-    total_ram = psutil.virtual_memory().total / (1024**3)
-    free_ram = psutil.virtual_memory().available / (1024**3)
-    
-    if total_ram >= 64 and free_ram > 50:
-        recommended = 'deepseek-r1:32b'
-    elif total_ram >= 32 and free_ram > 20:
-        recommended = 'deepseek-r1:14b'
-    elif total_ram >= 16 and free_ram > 10:
-        recommended = 'deepseek-r1:8b'
-    elif total_ram >= 8:
-        recommended = 'deepseek-r1:7b'
-    else:
-        recommended = 'deepseek-r1:1.5b'
-    
-    return jsonify({
-        'recommended': recommended,
-        'current': app.config['DEFAULT_MODEL'],
-        'should_switch': recommended != app.config['DEFAULT_MODEL'],
-        'system_info': {
-            'total_ram_gb': round(total_ram, 1),
-            'free_ram_gb': round(free_ram, 1)
-        }
-    })
+def translate_epub(app_ref, translation_id, filepath):
+    """EPUB fordítás Ollama API-val (háttérszálban fut)"""
+    with app_ref.app_context():
+        t = Translation.query.get(translation_id)
+        if not t: return
+        try:
+            t.status = 'processing'
+            t.progress = 5
+            db.session.commit()
+
+            # EPUB olvasása
+            from ebooklib import epub
+            from bs4 import BeautifulSoup
+            
+            book = epub.read_epub(filepath)
+            model = app_ref.config['DEFAULT_MODEL']
+            ollama_host = app_ref.config['OLLAMA_HOST']
+            
+            # Szövegek kinyerése és fordítása
+            items = list(book.get_items_of_type(9))  # ITEM_DOCUMENT
+            total = len(items)
+            
+            for idx, item in enumerate(items):
+                soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+                text = soup.get_text().strip()
+                if not text or len(text) < 10:
+                    continue
+
+                # Ollama API hívás
+                resp = requests.post(f"{ollama_host}/api/generate", json={
+                    'model': model,
+                    'prompt': f"Fordítsd le magyar nyelvre a következő szöveget. Csak a fordítást add vissza, semmi mást:\n\n{text[:3000]}",
+                    'stream': False
+                }, timeout=120)
+                
+                if resp.status_code == 200:
+                    translated = resp.json().get('response', text)
+                    new_tag = soup.new_tag('p')
+                    new_tag.string = translated
+                    soup.clear()
+                    soup.append(new_tag)
+                    item.set_content(str(soup).encode('utf-8'))
+                
+                t.progress = 5 + int(90 * (idx + 1) / total)
+                db.session.commit()
+            
+            # EPUB mentése
+            output_filename = f"translated_{uuid.uuid4().hex[:8]}.epub"
+            output_path = os.path.join(app_ref.config['OUTPUT_FOLDER'], output_filename)
+            epub.write_epub(output_path, book)
+            
+            t.output_filename = output_filename
+            t.status = 'completed'
+            t.progress = 100
+            t.quality_score = 85
+            db.session.commit()
+            
+        except Exception as e:
+            t.status = 'failed'
+            t.progress = 0
+            t.output_filename = str(e)[:200]
+            db.session.commit()
+        finally:
+            if os.path.exists(filepath):
+                os.remove(filepath)
 
 def init_db():
     with app.app_context():
         db.create_all()
         admin = User.query.filter_by(email=Config.ADMIN_EMAIL).first()
         if not admin:
-            admin = User(username='admin', email=Config.ADMIN_EMAIL, password_hash=generate_password_hash(Config.ADMIN_PASSWORD), first_name='Admin', last_name='User', is_admin=True, tokens=999999, internal_email='admin@epub.local')
+            admin = User(username='admin', email=Config.ADMIN_EMAIL,
+                        password_hash=generate_password_hash(Config.ADMIN_PASSWORD),
+                        first_name='Admin', last_name='User', is_admin=True,
+                        tokens=999999, internal_email='admin@epub.local')
             db.session.add(admin); db.session.commit()
 
 if __name__ == '__main__':
@@ -1182,12 +1269,78 @@ BASEEOF
     cat > backend/templates/dashboard.html << 'DASHEOF'
 {% extends "base.html" %}{% block title %}Vezérlőpult{% endblock %}{% block content %}
 <h2>Üdvözlünk, {{ user.first_name }}! 🧠</h2>
-<div class="row mt-4">
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ user.tokens }}</h1><p>💰 Token</p></div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ user.points }}</h1><p>🏆 Pontok</p></div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ user.level }}</h1><p>⭐ Szint</p></div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ translations|length }}</h1><p>📚 Fordítás</p></div></div></div>
+<div class="row mt-3">
+    <div class="col-md-3"><div class="card bg-primary text-white"><div class="card-body text-center"><h1>{{ user.tokens }}</h1><p>💰 Token</p></div></div></div>
+    <div class="col-md-3"><div class="card bg-success text-white"><div class="card-body text-center"><h1>{{ user.points }}</h1><p>🏆 Pontok</p></div></div></div>
+    <div class="col-md-3"><div class="card bg-warning text-dark"><div class="card-body text-center"><h1>{{ user.level }}</h1><p>⭐ Szint</p></div></div></div>
+    <div class="col-md-3"><div class="card bg-info text-white"><div class="card-body text-center"><h1>{{ translations|length }}</h1><p>📚 Fordítás</p></div></div></div>
 </div>
+
+<div class="card mt-4">
+  <div class="card-header"><h5>📤 Új EPUB feltöltése</h5></div>
+  <div class="card-body">
+    <form action="/upload" method="POST" enctype="multipart/form-data" class="row g-3">
+      <div class="col-md-8">
+        <input type="file" class="form-control" name="file" accept=".epub" required>
+        <small class="text-muted">Maximum 200MB, EPUB formátum</small>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-success w-100">⬆️ Feltöltés és fordítás</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header"><h5>📋 Fordításaim</h5></div>
+  <div class="card-body">
+    {% if translations %}
+    <table class="table table-dark table-striped">
+      <thead><tr><th>Fájl</th><th>Modell</th><th>Státusz</th><th>Haladás</th><th>Dátum</th><th>Műveletek</th></tr></thead>
+      <tbody>
+      {% for t in translations %}
+      <tr>
+        <td>{{ t.original_filename }}</td>
+        <td>{{ t.model_used }}</td>
+        <td>
+          {% if t.status == 'pending' %}<span class="badge bg-secondary">Várakozik</span>
+          {% elif t.status == 'processing' %}<span class="badge bg-warning">Fordítás alatt</span>
+          {% elif t.status == 'completed' %}<span class="badge bg-success">Kész</span>
+          {% elif t.status == 'failed' %}<span class="badge bg-danger">Hiba</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if t.status == 'processing' %}
+          <div class="progress" style="height:20px"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:{{ t.progress }}%">{{ t.progress }}%</div></div>
+          {% elif t.status == 'pending' %}
+          <small class="text-muted">Sorban áll...</small>
+          {% elif t.status == 'completed' %}
+          <span class="text-success">✅ 100%</span>
+          {% endif %}
+        </td>
+        <td><small>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</small></td>
+        <td>
+          {% if t.status == 'completed' %}<a href="/download/{{ t.id }}" class="btn btn-sm btn-success">📥 Letöltés</a>{% endif %}
+          <form action="/delete/{{ t.id }}" method="POST" style="display:inline">
+            <button class="btn btn-sm btn-danger" onclick="return confirm('Biztosan törlöd?')">🗑️</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center py-3">Még nincsenek fordításaid. Tölts fel egy EPUB fájlt a fordításhoz!</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if translations|selectattr('status','equalto','processing')|list|length > 0 %}
+<script>
+// Automatikus frissítés ha van folyamatban lévő fordítás
+setTimeout(function(){ location.reload(); }, 10000);
+</script>
+{% endif %}
 {% endblock %}
 DASHEOF
 
