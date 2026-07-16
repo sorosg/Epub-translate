@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.17
+# Verzió: 11.0.18
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.17"
+VERSION="11.0.18"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -860,7 +860,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.17')
+    VERSION = os.environ.get('VERSION', '11.0.18')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -939,6 +939,17 @@ class OptimizationLog(db.Model):
     details = db.Column(db.Text)
     performance_before = db.Column(db.Text)
     performance_after = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ReferenceBook(db.Model):
+    __tablename__ = 'reference_books'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    filename = db.Column(db.String(255))
+    title = db.Column(db.String(255))
+    language = db.Column(db.String(10), default='hu')
+    file_path = db.Column(db.String(500))
+    extracted_text = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 MODELSEOF
 
