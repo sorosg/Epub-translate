@@ -1,6 +1,6 @@
 # 📚 EPUB Fordító Rendszer – Felhasználói Kézikönyv
 
-**Verzió:** 11.0.8 – "Smart Optimizer"
+**Verzió:** 11.0.10 – "Smart Optimizer"
 **Utolsó frissítés:** 2026-07-16
 
 ---
@@ -54,25 +54,32 @@
 
 ## 2. Telepítés
 
-### 2.1 Első telepítés
+### 2.1 Első telepítés (és ismételt futtatás)
 
 ```bash
-# 1. Töltsd le a telepítő scriptet (ha még nincs meg)
+# 1. Töltsd le vagy frissítsd a telepítő scriptet
 if [ -d "Epub-translate" ]; then
+    # Már letöltötted korábban – frissítsd és lépj be
     cd Epub-translate && git pull
 else
+    # Első letöltés
     git clone https://github.com/sorosg/Epub-translate.git
     cd Epub-translate
 fi
 
-# 2. Tedd futtathatóvá
+# 2. Tedd futtathatóvá (csak ha még nem az)
 chmod +x install.sh
 
 # 3. Futtasd a telepítőt (NE root-ként!)
 ./install.sh
 ```
 
-> **Megjegyzés:** Ha a `git clone` hibát dob ("already exists"), használhatod a fenti `if`-es parancsot, vagy egyszerűen lépj be a meglévő könyvtárba (`cd Epub-translate`) és futtasd a scriptet – a telepítő felismeri a meglévő telepítést és felajánlja a frissítést.
+> ⚠️ **Ismételt futtatás:** Ha már korábban lefuttattad a telepítőt, **ne klónozd újra** a repository-t! Egyszerűen lépj be a meglévő könyvtárba:
+> ```bash
+> cd Epub-translate
+> ./install.sh
+> ```
+> A telepítő felismeri a meglévő telepítést és felajánlja a frissítést vagy újratelepítést.
 
 A telepítő végigvezet a következő lépéseken:
 

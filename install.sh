@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.8
+# Verzió: 11.0.10
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.8"
+VERSION="11.0.10"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -845,7 +845,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.8')
+    VERSION = os.environ.get('VERSION', '11.0.10')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1231,6 +1231,49 @@ def switch_model():
     db.session.add(log); db.session.commit()
     return jsonify({'success': True, 'message': f'Modell átváltva: {model_name}'})
 
+@app.route('/admin/update')
+@login_required
+@admin_required
+def admin_update():
+    return render_template('update.html', current_version=app.config['VERSION'])
+
+@app.route('/api/update/check')
+@login_required
+@admin_required
+def api_update_check():
+    try:
+        resp = requests.get('https://api.github.com/repos/sorosg/Epub-translate/releases/latest', 
+                           headers={'Accept': 'application/vnd.github.v3+json'}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            remote_version = data.get('tag_name', '').lstrip('v')
+            has_update = remote_version > app.config['VERSION']
+            return jsonify({
+                'remote_version': remote_version or 'ismeretlen',
+                'current': app.config['VERSION'],
+                'has_update': has_update,
+                'release_url': data.get('html_url', ''),
+                'release_notes': (data.get('body', '') or '')[:500]
+            })
+        return jsonify({'error': f'GitHub API hiba: {resp.status_code}'}), resp.status_code
+    except Exception as e:
+        return jsonify({'error': f'Nem sikerült ellenőrizni: {str(e)[:100]}'}), 500
+
+@app.route('/api/update/run', methods=['POST'])
+@login_required
+@admin_required
+def api_update_run():
+    import subprocess
+    try:
+        result = subprocess.run(['bash', '/app/../scripts/update.sh'], capture_output=True, text=True, timeout=600)
+        log = OptimizationLog(model='system', action='update', 
+                             details=json.dumps({'output': result.stdout[-500:], 'returncode': result.returncode}),
+                             created_at=datetime.utcnow())
+        db.session.add(log); db.session.commit()
+        return jsonify({'success': result.returncode == 0, 'output': result.stdout[-500:]})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)[:200]}), 500
+
 @app.route('/api/system/monitor')
 @login_required
 @admin_required
@@ -1343,7 +1386,7 @@ APPEOF
     <div class="navbar-nav ms-auto">
       {% if current_user.is_authenticated %}
         <a class="nav-link" href="/dashboard">Vezérlőpult</a>
-        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a><a class="nav-link" href="/admin/users">Felhasználók</a>{% endif %}
+        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a><a class="nav-link" href="/admin/users">Felhasználók</a><a class="nav-link" href="/admin/update">Frissítés</a>{% endif %}
         <a class="nav-link" href="/logout">Kijelentkezés</a>
       {% endif %}
     </div>
@@ -1549,6 +1592,85 @@ USERSEOF
 {% endblock %}
 USERFORMEOF
 
+    # Admin Update HTML (frissítés ellenőrző)
+    cat > backend/templates/update.html << 'UPDHTML'
+{% extends "base.html" %}{% block title %}Frissítés{% endblock %}{% block content %}
+<h2>🔄 Frissítés ellenőrzése</h2>
+<div class="row mt-4">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><h5>Verzió információk</h5></div>
+      <div class="card-body">
+        <p><strong>Jelenlegi verzió:</strong> v{{ current_version }}</p>
+        <div id="updateStatus">
+          <button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>
+        </div>
+        <div id="updateResult" class="mt-3" style="display:none"></div>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-header"><h5>📋 Frissítési napló</h5></div>
+      <div class="card-body">
+        <p class="text-muted">A frissítések naplózása az <a href="/admin">Admin oldalon</a> látható.</p>
+        <p class="text-muted">Automatikus ellenőrzés: 2 óránként</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+async function checkUpdate() {
+  document.getElementById('updateStatus').innerHTML = '<div class="spinner-border text-primary"></div> Ellenőrzés folyamatban...';
+  try {
+    const resp = await fetch('/api/update/check');
+    const data = await resp.json();
+    const div = document.getElementById('updateResult');
+    div.style.display = 'block';
+    if (data.error) {
+      div.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+      document.getElementById('updateStatus').innerHTML = '<button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>';
+      return;
+    }
+    if (data.has_update) {
+      div.innerHTML = `
+        <div class="alert alert-warning">
+          <strong>🚀 Új verzió elérhető: v${data.remote_version}</strong>
+          <p class="mt-2">${data.release_notes || 'Nincs részletes leírás.'}</p>
+          <a href="${data.release_url}" target="_blank" class="btn btn-sm btn-outline-light me-2">📋 Release notes</a>
+          <button class="btn btn-success" onclick="runUpdate()">⬆️ Frissítés telepítése</button>
+        </div>`;
+      document.getElementById('updateStatus').innerHTML = '<span class="badge bg-warning">Frissítés elérhető!</span>';
+    } else {
+      div.innerHTML = `<div class="alert alert-success">✅ A rendszer naprakész. (v${data.current})</div>`;
+      document.getElementById('updateStatus').innerHTML = '<button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>';
+    }
+  } catch(e) {
+    document.getElementById('updateResult').style.display = 'block';
+    document.getElementById('updateResult').innerHTML = `<div class="alert alert-danger">Hiba: ${e.message}</div>`;
+    document.getElementById('updateStatus').innerHTML = '<button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>';
+  }
+}
+async function runUpdate() {
+  if (!confirm('Biztosan futtatod a frissítést? Ez újraindítja a konténereket!')) return;
+  document.getElementById('updateResult').innerHTML = '<div class="alert alert-info"><div class="spinner-border spinner-border-sm"></div> Frissítés folyamatban... Ez eltarthat néhány percig.</div>';
+  try {
+    const resp = await fetch('/api/update/run', {method: 'POST'});
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('updateResult').innerHTML = `<div class="alert alert-success">✅ Frissítés sikeres!<br><pre style="font-size:12px">${data.output || ''}</pre></div>`;
+      setTimeout(() => location.reload(), 5000);
+    } else {
+      document.getElementById('updateResult').innerHTML = `<div class="alert alert-danger">❌ Frissítés sikertelen!<br><pre style="font-size:12px">${data.error || data.output || ''}</pre></div>`;
+    }
+  } catch(e) {
+    document.getElementById('updateResult').innerHTML = `<div class="alert alert-danger">Hiba: ${e.message}</div>`;
+  }
+}
+// Automatikus ellenőrzés oldal betöltésekor
+window.addEventListener('load', () => checkUpdate());
+</script>
+{% endblock %}
+UPDHTML
+
     # Admin HTML
     cat > backend/templates/admin.html << 'ADMINEOF'
 {% extends "base.html" %}{% block title %}Admin{% endblock %}{% block content %}
@@ -1733,7 +1855,13 @@ BACKUPEOF
 
     cat > scripts/update.sh << 'UPDATEEOF'
 #!/bin/bash
-cd ~/epub-translator&&docker compose down&&git pull 2>/dev/null&&docker compose build&&docker compose up -d&&echo "✅ Frissítve!"
+cd ~/epub-translator
+DOCKER=$(docker ps &>/dev/null 2>&1 && echo "docker" || echo "sudo docker")
+$DOCKER compose down 2>/dev/null || true
+git pull 2>/dev/null || true
+$DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+$DOCKER compose up -d
+echo "✅ Frissítve!"
 UPDATEEOF
 
     cat > scripts/status.sh << 'STATUSEOF'
