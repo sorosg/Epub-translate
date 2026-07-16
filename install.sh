@@ -2120,8 +2120,17 @@ main() {
     fi
     
     show_summary
-    cd "$PROJECT_DIR"
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════"
     log_info "A telepítési könyvtár: $PROJECT_DIR"
+    log_info "A script befejeződött. A terminál visszaállt a futtatási könyvtárba."
+    echo ""
+    log_info "A webes felület eléréséhez futtasd:"
+    echo "    cd ~/epub-translator"
+    echo "    sudo docker compose ps"
+    echo ""
+    log_info "VAGY lépj be a telepítési könyvtárba:"
+    echo "    cd ~/epub-translator"
 }
 
 main "$@"
