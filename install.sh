@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.28"
+VERSION="11.0.29"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -384,6 +384,9 @@ perform_update() {
     [ -d .git ] && { git fetch origin 2>/dev/null && git pull origin main 2>/dev/null || log_warn "Git pull nem sikerült"; }
     
     create_all_files
+    log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
+    $DOCKER compose build --no-cache backend 2>/dev/null || $DOCKER compose build backend
+    log_info "Többi konténer építése..."
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
     sleep 15
@@ -913,7 +916,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.28')
+    VERSION = os.environ.get('VERSION', '11.0.29')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
