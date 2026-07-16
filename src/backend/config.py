@@ -8,7 +8,7 @@ class Config:
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
-    OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://ollama:11434')
+    OLLAMA_HOST = 'http://host.docker.internal:11434'
     DEFAULT_MODEL = os.environ.get('SELECTED_MODEL', 'deepseek-r1:14b')
     RECOMMENDED_MODEL = os.environ.get('RECOMMENDED_MODEL', 'deepseek-r1:14b')
     MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 3))
