@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.20
+# Verzió: 11.0.21
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.20"
+VERSION="11.0.21"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -588,7 +588,7 @@ create_directory_structure() {
 # ============================================================
 create_all_files() {
     log_info "Fájlok másolása a forrás könyvtárból..."
-    SRC_DIR="$(pwd)/src"
+    SRC_DIR="${SCRIPT_DIR}/src"
     
     # Ha a src könyvtár nem létezik (pl. régi install.sh), használjuk a heredoc-generálást
     if [ ! -d "$SRC_DIR" ]; then
@@ -641,7 +641,13 @@ create_all_files() {
 # Fallback: régi heredoc alapú fájlgenerálás (ha nincs src/)
 _create_files_from_script() {
     create_env_file
-    # docker-compose, nginx, ollama, backend generálása (csak ha nincs src/)
+    create_docker_compose
+    create_nginx_config
+    create_ollama_files
+    create_backend_files
+    create_model_optimizer
+    create_resource_monitor
+    create_pwa_files
     create_scripts
 }
 
@@ -905,7 +911,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.20')
+    VERSION = os.environ.get('VERSION', '11.0.21')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -2077,8 +2083,8 @@ show_summary() {
 # MAIN
 # ============================================================
 main() {
-    # Eredeti munkakönyvtár elmentése (hogy a script végén vissza tudjunk térni)
-    ORIG_DIR="$(pwd)"
+    # Script saját könyvtárának elmentése (ahol az install.sh és a src/ található)
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
     # Docker parancs elérésének meghatározása
     if docker ps &>/dev/null 2>&1; then
