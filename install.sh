@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.5
+# Verzió: 11.0.6
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.5"
+VERSION="11.0.6"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -844,7 +844,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.5')
+    VERSION = os.environ.get('VERSION', '11.0.6')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1043,7 +1043,7 @@ def upload_epub():
     db.session.commit()
     
     # Fordítás indítása háttérszálban
-    thread = threading.Thread(target=translate_epub, args=(app._get_current_object(), translation.id, filepath))
+    thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath))
     thread.daemon = True
     thread.start()
     
@@ -1110,8 +1110,11 @@ def admin():
     try:
         resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=5)
         models = resp.json().get('models', []) if resp.status_code == 200 else []
-    except:
+        if not models:
+            flash(_('Nincsenek modellek betöltve az Ollama-ban. Futtasd: docker exec -it epub-ollama ollama pull deepseek-r1:14b'), 'warning')
+    except Exception as e:
         models = []
+        flash(_(f'Nem sikerült lekérni az Ollama modelleket: {str(e)[:100]}'), 'error')
     all_translations = Translation.query.order_by(Translation.created_at.desc()).limit(50).all()
     users_count = User.query.count()
     
