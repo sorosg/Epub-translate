@@ -450,25 +450,23 @@ perform_fresh_install() {
     done
     pip3 install pytesseract SpeechRecognition pyaudio pyttsx3 psutil 2>/dev/null || true
     
-    if ! command -v docker &> /dev/null; then
-        sudo mkdir -p /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-        log_info "Docker telepítése..."
-        for i in $(seq 1 5); do
-            if sudo DEBIAN_FRONTEND=noninteractive apt update -qq 2>/dev/null && sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null; then
-                break
-            fi
-            log_warn "Az apt zárolva van, várakozás... ($i/5)"
-            sleep 10
-        done
-        sudo systemctl enable docker && sudo systemctl start docker
-        sudo usermod -aG docker $USER
+    if ! docker ps &>/dev/null 2>&1; then
+        if ! command -v docker &> /dev/null; then
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            log_info "Docker telepítése..."
+            for i in $(seq 1 5); do
+                if sudo DEBIAN_FRONTEND=noninteractive apt update -qq 2>/dev/null && sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin 2>/dev/null; then
+                    break
+                fi
+                log_warn "Az apt zárolva van, várakozás... ($i/5)"
+                sleep 10
+            done
+            sudo systemctl enable docker && sudo systemctl start docker
+            sudo usermod -aG docker $USER
+        fi
         DOCKER="sudo docker"
-        log_warn "A docker csoporttagság a következő bejelentkezéskor lép életbe."
-        log_warn "Addig a script 'sudo docker'-t használ."
-    else
-        DOCKER="docker"
     fi
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
