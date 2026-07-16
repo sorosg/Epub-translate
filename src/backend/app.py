@@ -275,15 +275,22 @@ def api_models_pull():
     model_name = data.get('model', '').strip()
     if not model_name:
         return jsonify({'error': 'Modell név szükséges'}), 400
-    try:
-        resp = requests.post(f"{app.config['OLLAMA_HOST']}/api/pull", json={
-            'name': model_name, 'stream': False
-        }, timeout=5)
-        if resp.status_code == 200:
-            return jsonify({'success': True, 'message': f'Modell letöltés elindítva: {model_name}'})
-        return jsonify({'error': f'Ollama API hiba: {resp.status_code}'}), resp.status_code
-    except Exception as e:
-        return jsonify({'error': f'Nem sikerült elindítani a letöltést: {str(e)[:100]}'}), 500
+    
+    # Háttérszálban indítjuk, hogy ne blokkoljuk a választ
+    def pull_in_background(app_ref, model):
+        with app_ref.app_context():
+            try:
+                requests.post(f"{app_ref.config['OLLAMA_HOST']}/api/pull",
+                             json={'name': model, 'stream': False},
+                             timeout=7200)
+            except Exception as e:
+                app_ref.logger.error(f"Model pull failed: {e}")
+    
+    thread = threading.Thread(target=pull_in_background, args=(app, model_name))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'success': True, 'message': f'Modell letöltés elindítva: {model_name} (akár 30-60 percig is eltarthat)'})
 
 @app.route('/api/models/list')
 @login_required
