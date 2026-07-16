@@ -1,0 +1,215 @@
+{% extends "base.html" %}{% block title %}Könyvtár{% endblock %}{% block content %}
+<h2>📚 Könyvtár</h2>
+
+<!-- Drag & Drop feltöltő zóna -->
+<div class="card mt-3" id="dropZone" style="border:2px dashed #666; border-radius:10px; padding:30px; text-align:center; cursor:pointer; transition: all .3s;">
+  <h4>📁 Húzd ide a EPUB fájlokat</h4>
+  <p class="text-muted">vagy kattints a feltöltéshez</p>
+  <input type="file" id="fileInput" accept=".epub" style="display:none" multiple>
+</div>
+
+<!-- Feltöltött könyv űrlap (a drop után jelenik meg) -->
+<div id="uploadForm" style="display:none" class="card mt-3">
+  <div class="card-header"><h5>📝 Könyv adatai</h5></div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">Cím</label><input type="text" class="form-control" id="bookTitle"></div>
+      <div class="col-md-6"><label class="form-label">Szerző</label><input type="text" class="form-control" id="bookAuthor"></div>
+      <div class="col-md-3"><label class="form-label">Nyelv</label><select class="form-select" id="bookLanguage"><option value="en">Angol</option><option value="hu">Magyar</option><option value="de">Német</option><option value="fr">Francia</option><option value="es">Spanyol</option></select></div>
+      <div class="col-md-3"><label class="form-label">Típus/Műfaj</label><select class="form-select" id="bookGenre"><option value="">Válassz...</option><option value="sci-fi">Sci-Fi</option><option value="fantasy">Fantasy</option><option value="adventure">Kaland</option><option value="mystery">Krimi</option><option value="romance">Romantikus</option><option value="horror">Horror</option><option value="historical">Történelmi</option><option value="biography">Életrajz</option><option value="science">Tudományos</option><option value="other">Egyéb</option></select></div>
+      <div class="col-md-4"><label class="form-label">Sorozat</label><input type="text" class="form-control" id="bookSeries" placeholder="Sorozat címe (ha van)"></div>
+      <div class="col-md-2"><label class="form-label">Könyv #</label><input type="number" class="form-control" id="bookSeriesNumber" min="1" placeholder="#"></div>
+    </div>
+    <div class="mt-3">
+      <button class="btn btn-primary" onclick="fetchMetadata()">🔍 Keresés az interneten</button>
+      <button class="btn btn-success" onclick="uploadBook()">✅ Mentés</button>
+      <button class="btn btn-secondary" onclick="cancelUpload()">Mégse</button>
+    </div>
+    <div id="searchResults" class="mt-3"></div>
+  </div>
+</div>
+
+<!-- Szűrők -->
+<div class="card mt-3">
+  <div class="card-body">
+    <div class="row g-2">
+      <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="filterTitle" placeholder="Cím szűrés" oninput="renderBooks()"></div>
+      <div class="col-md-2"><input type="text" class="form-control form-control-sm" id="filterAuthor" placeholder="Szerző szűrés" oninput="renderBooks()"></div>
+      <div class="col-md-2">
+        <select class="form-select form-select-sm" id="filterGenre" onchange="renderBooks()">
+          <option value="">Minden műfaj</option><option value="sci-fi">Sci-Fi</option><option value="fantasy">Fantasy</option><option value="adventure">Kaland</option><option value="mystery">Krimi</option><option value="romance">Romantikus</option><option value="horror">Horror</option><option value="historical">Történelmi</option><option value="biography">Életrajz</option><option value="science">Tudományos</option><option value="other">Egyéb</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select form-select-sm" id="filterLanguage" onchange="renderBooks()">
+          <option value="">Minden nyelv</option><option value="en">Angol</option><option value="hu">Magyar</option><option value="de">Német</option><option value="fr">Francia</option><option value="es">Spanyol</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-sm btn-outline-info" onclick="loadBooks()">🔄 Frissítés</button>
+        <small class="text-muted ms-2">Összesen: <span id="bookCount">0</span> könyv</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Könyvek táblázata -->
+<div class="card mt-3">
+  <div class="card-body">
+    <div id="booksTable"></div>
+  </div>
+</div>
+
+<script>
+let currentFile = null;
+let allBooks = [];
+
+// Drag & Drop
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#0d6efd'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#666'; });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.style.borderColor = '#666';
+  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) handleFile(fileInput.files[0]); });
+
+function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.epub')) { alert('Csak EPUB fájl tölthető fel!'); return; }
+  currentFile = file;
+  document.getElementById('uploadForm').style.display = 'block';
+  document.getElementById('bookTitle').value = file.name.replace('.epub','').replace(/_/g,' ');
+  document.getElementById('bookAuthor').value = '';
+  document.getElementById('searchResults').innerHTML = '';
+}
+
+async function fetchMetadata() {
+  const title = document.getElementById('bookTitle').value.trim();
+  const author = document.getElementById('bookAuthor').value.trim();
+  const query = [title, author].filter(x => x).join(' ');
+  if (query.length < 3) { alert('Adj meg egy címet vagy szerzőt a kereséshez!'); return; }
+  document.getElementById('searchResults').innerHTML = '<div class="spinner-border spinner-border-sm"></div> Keresés...';
+  try {
+    const resp = await fetch('/api/library/fetch-metadata', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, credentials:'same-origin',
+      body: JSON.stringify({query: query})
+    });
+    const data = await resp.json();
+    if (data.results && data.results.length > 0) {
+      let html = '<h6>Találatok:</h6>';
+      data.results.forEach((r, i) => {
+        html += `<div class="card bg-dark mb-2 p-2" style="cursor:pointer" onclick="fillMetadata(${i})">
+          <strong>${r.title}</strong><br>
+          <small>${r.author || 'Ismeretlen szerző'} | ${r.first_publish || '?'} | Nyelv: ${r.language || '?'}</small><br>
+          <small class="text-muted">${r.subjects.join(', ')}</small>
+        </div>`;
+      });
+      document.getElementById('searchResults').innerHTML = html;
+      window._searchResults = data.results;
+    } else {
+      document.getElementById('searchResults').innerHTML = '<div class="text-muted">Nincs találat.</div>';
+    }
+  } catch(e) { document.getElementById('searchResults').innerHTML = '<div class="text-danger">Hiba: '+e.message+'</div>'; }
+}
+
+function fillMetadata(idx) {
+  const r = window._searchResults[idx];
+  if (!r) return;
+  document.getElementById('bookTitle').value = r.title || '';
+  document.getElementById('bookAuthor').value = r.author || '';
+  if (r.language) {
+    const lang = r.language.split(',')[0].trim().substring(0,2);
+    document.getElementById('bookLanguage').value = lang;
+  }
+  if (r.subjects && r.subjects.length > 0) {
+    const genreMap = { 'science fiction':'sci-fi','fantasy':'fantasy','adventure':'adventure','mystery':'mystery','romance':'romance','horror':'horror','historical':'historical','biography':'biography','science':'science'};
+    for (let s of r.subjects) { for (let [k,v] of Object.entries(genreMap)) { if (s.toLowerCase().includes(k)) { document.getElementById('bookGenre').value = v; return; }}}
+  }
+}
+
+async function uploadBook() {
+  if (!currentFile) return;
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  fd.append('title', document.getElementById('bookTitle').value);
+  fd.append('author', document.getElementById('bookAuthor').value);
+  fd.append('language', document.getElementById('bookLanguage').value);
+  fd.append('genre', document.getElementById('bookGenre').value);
+  fd.append('series', document.getElementById('bookSeries').value);
+  fd.append('series_number', document.getElementById('bookSeriesNumber').value);
+  const resp = await fetch('/api/library/upload', {method:'POST', credentials:'same-origin', body:fd});
+  const data = await resp.json();
+  if (data.success) { cancelUpload(); loadBooks(); } else { alert(data.error); }
+}
+
+function cancelUpload() { currentFile = null; document.getElementById('uploadForm').style.display='none'; document.getElementById('searchResults').innerHTML=''; }
+
+async function loadBooks() {
+  const resp = await fetch('/api/library/list', {credentials:'same-origin'});
+  const data = await resp.json();
+  allBooks = data.books || [];
+  document.getElementById('bookCount').textContent = allBooks.length;
+  renderBooks();
+}
+
+function renderBooks() {
+  const ft = document.getElementById('filterTitle').value.toLowerCase();
+  const fa = document.getElementById('filterAuthor').value.toLowerCase();
+  const fg = document.getElementById('filterGenre').value;
+  const fl = document.getElementById('filterLanguage').value;
+  const filtered = allBooks.filter(b => {
+    return (!ft || (b.title||'').toLowerCase().includes(ft)) &&
+           (!fa || (b.author||'').toLowerCase().includes(fa)) &&
+           (!fg || b.genre === fg) &&
+           (!fl || b.language === fl);
+  });
+  let html = '';
+  if (filtered.length === 0) {
+    html = '<p class="text-muted text-center py-3">Nincsenek könyvek a könyvtárban. Húzz ide EPUB fájlokat a feltöltéshez!</p>';
+  } else {
+    html = '<table class="table table-dark table-striped"><thead><tr><th>Cím</th><th>Szerző</th><th>Nyelv</th><th>Műfaj</th><th>Sorozat</th><th>Művelet</th></tr></thead><tbody>';
+    filtered.forEach(b => {
+      const seriesStr = b.series ? (b.series + (b.series_number ? ' #'+b.series_number : '')) : '-';
+      html += `<tr>
+        <td>${b.title || '-'}</td><td>${b.author || '-'}</td><td>${b.language || '-'}</td><td>${b.genre || '-'}</td><td>${seriesStr}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-warning" onclick="editBook(${b.id})">✏️</button>
+          <form action="/api/library/delete/${b.id}" method="POST" style="display:inline" onsubmit="return confirm('Biztosan törlöd?')">
+            <button class="btn btn-sm btn-outline-danger">🗑️</button>
+          </form>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  document.getElementById('booksTable').innerHTML = html;
+}
+
+async function editBook(id) {
+  const b = allBooks.find(x => x.id === id);
+  if (!b) return;
+  const title = prompt('Cím:', b.title || '');
+  if (title === null) return;
+  const author = prompt('Szerző:', b.author || '');
+  if (author === null) return;
+  const genre = prompt('Műfaj:', b.genre || '');
+  if (genre === null) return;
+  const series = prompt('Sorozat:', b.series || '');
+  if (series === null) return;
+  const sn = prompt('Sorozat száma:', b.series_number || '');
+  if (sn === null) return;
+  const lang = prompt('Nyelv (en/hu/de/fr/es):', b.language || 'en');
+  if (lang === null) return;
+  const fd = new FormData();
+  fd.append('title', title); fd.append('author', author); fd.append('genre', genre);
+  fd.append('series', series); fd.append('series_number', sn); fd.append('language', lang);
+  await fetch('/api/library/edit/'+id, {method:'POST', credentials:'same-origin', body:fd});
+  loadBooks();
+}
+
+window.addEventListener('load', () => loadBooks());
+</script>
+{% endblock %}

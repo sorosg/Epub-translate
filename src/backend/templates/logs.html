@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% block title %}Rendszer Logok{% endblock %}{% block content %}
+<h2>📋 Rendszer Logok <small class="text-muted">(admin)</small></h2>
+
+<div class="row mt-3">
+  <div class="col-md-12">
+    <div class="btn-group mb-3" role="group">
+      {% for log in available_logs %}
+      <a href="/admin/logs?type={{ log.name }}&lines={{ lines }}" class="btn btn-sm {% if log_type == log.name %}btn-primary{% else %}btn-outline-light{% endif %}">
+        {{ log.label }}{% if log.exists %} <span class="badge bg-secondary">{{ log.size_mb }} MB</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    <div class="btn-group ms-2 mb-3" role="group">
+      <a href="/admin/logs?type={{ log_type }}&lines=50" class="btn btn-sm {% if lines == 50 %}btn-warning{% else %}btn-outline-light{% endif %}">50 sor</a>
+      <a href="/admin/logs?type={{ log_type }}&lines=200" class="btn btn-sm {% if lines == 200 %}btn-warning{% else %}btn-outline-light{% endif %}">200 sor</a>
+      <a href="/admin/logs?type={{ log_type }}&lines=500" class="btn btn-sm {% if lines == 500 %}btn-warning{% else %}btn-outline-light{% endif %}">500 sor</a>
+      <a href="/admin/logs?type={{ log_type }}&lines=1000" class="btn btn-sm {% if lines == 1000 %}btn-warning{% else %}btn-outline-light{% endif %}">1000 sor</a>
+    </div>
+    <a href="/admin/logs?type={{ log_type }}&lines={{ lines }}" class="btn btn-sm btn-outline-info ms-2 mb-3">🔄 Frissítés</a>
+  </div>
+</div>
+
+<div class="card mt-2">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>
+      {% if log_type == 'translation' %}🔧 Fordítási log{% else %}📄 Alkalmazás log{% endif %}
+      <small class="text-muted ms-2">(utolsó {{ lines }} sor, fájl méret: {{ "%.2f"|format(file_size / (1024*1024)) if file_size > 0 else 0 }} MB)</small>
+    </span>
+    <span class="text-muted small">{{ log_content.split('\n')|length }} sor</span>
+  </div>
+  <div class="card-body p-0">
+    <pre class="text-light bg-dark p-3 m-0" style="font-size: 0.8rem; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; font-family: 'Courier New', monospace;">{{ log_content }}</pre>
+  </div>
+</div>
+
+<div class="mt-3">
+  <a href="/admin" class="btn btn-sm btn-outline-light">⚙️ Vissza az Adminhoz</a>
+</div>
+
+<script>
+// Automatikus frissítés 15 másodpercenként
+setTimeout(function(){ location.reload(); }, 15000);
+</script>
+{% endblock %}

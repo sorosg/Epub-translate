@@ -69,6 +69,35 @@
 </div>
 
 <div class="card mt-4">
+  <div class="card-header"><h5>📚 Könyvtári könyveim <small class="text-muted">(relevancia kijelölés)</small></h5></div>
+  <div class="card-body">
+    {% if books %}
+    <p class="text-muted small">Jelöld be azokat a könyveket, amelyeket a rendszer figyelembe vegyen a következő fordításnál (stílus, terminológia).</p>
+    <div class="row">
+    {% for b in books %}
+      <div class="col-md-6 mb-2">
+        <div class="card bg-dark p-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="book_{{ b.id }}" {% if b.is_selected %}checked{% endif %} onchange="toggleBook({{ b.id }}, this.checked)">
+            <label class="form-check-label" for="book_{{ b.id }}">
+              <strong>{{ b.title or b.filename }}</strong>
+              {% if b.author %}<br><small class="text-muted">{{ b.author }}</small>{% endif %}
+              {% if b.genre %}<span class="badge bg-secondary ms-1">{{ b.genre }}</span>{% endif %}
+              {% if b.language %}<span class="badge bg-info ms-1">{{ b.language }}</span>{% endif %}
+            </label>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+    <a href="/library" class="btn btn-sm btn-outline-light mt-2">📚 Könyvtár megnyitása</a>
+    {% else %}
+    <p class="text-muted">Még nincsenek könyvek a könyvtáradban. <a href="/library">Tölts fel könyveket a Könyvtárban</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mt-4">
   <div class="card-header"><h5>📋 Fordításaim</h5></div>
   <div class="card-body">
     {% if translations %}
@@ -76,8 +105,13 @@
       <thead><tr><th>Fájl</th><th>Modell</th><th>Státusz</th><th>Haladás</th><th>Dátum</th><th>Műveletek</th></tr></thead>
       <tbody>
       {% for t in translations %}
-      <tr>
-        <td>{{ t.original_filename }}</td>
+       <tr>
+        <td>
+          {{ t.original_filename }}
+          {% if t.status == 'failed' and t.output_filename and t.output_filename.startswith('HIBA:') %}
+          <br><small class="text-danger" title="{{ t.output_filename }}">{{ t.output_filename[:80] }}{% if t.output_filename|length > 80 %}...{% endif %}</small>
+          {% endif %}
+        </td>
         <td>{{ t.model_used }}</td>
         <td>
           {% if t.status == 'pending' %}<span class="badge bg-secondary">Várakozik</span>
@@ -93,6 +127,8 @@
           <small class="text-muted">Sorban áll...</small>
           {% elif t.status == 'completed' %}
           <span class="text-success">✅ 100%</span>
+          {% elif t.status == 'failed' %}
+          <span class="text-danger">❌ Sikertelen</span>
           {% endif %}
         </td>
         <td><small>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</small></td>
@@ -117,4 +153,9 @@
 setTimeout(function(){ location.reload(); }, 10000);
 </script>
 {% endif %}
+<script>
+async function toggleBook(bookId, checked) {
+  await fetch('/api/library/toggle/' + bookId, {method: 'POST', credentials: 'same-origin'});
+}
+</script>
 {% endblock %}

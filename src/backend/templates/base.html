@@ -13,7 +13,8 @@
     <div class="navbar-nav ms-auto">
       {% if current_user.is_authenticated %}
         <a class="nav-link" href="/dashboard">Vezérlőpult</a>
-        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a><a class="nav-link" href="/admin/users">Felhasználók</a><a class="nav-link" href="/admin/update">Frissítés</a>{% endif %}
+        <a class="nav-link" href="/library">📚 Könyvtár</a>
+         {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a><a class="nav-link" href="/admin/users">Felhasználók</a><a class="nav-link" href="/admin/update">Frissítés</a><a class="nav-link" href="/admin/logs">📋 Logok</a>{% endif %}
         <a class="nav-link" href="/logout">Kijelentkezés</a>
       {% endif %}
     </div>

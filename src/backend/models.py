@@ -54,6 +54,21 @@ class OptimizationLog(db.Model):
     performance_after = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Book(db.Model):
+    __tablename__ = 'books'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500))
+    title = db.Column(db.String(500))
+    author = db.Column(db.String(255))
+    language = db.Column(db.String(10), default='en')
+    genre = db.Column(db.String(100))
+    series = db.Column(db.String(255))
+    series_number = db.Column(db.Integer)
+    is_selected = db.Column(db.Boolean, default=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class ReferenceBook(db.Model):
     __tablename__ = 'reference_books'
     id = db.Column(db.Integer, primary_key=True)
