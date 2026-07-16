@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.0
+# Verzió: 11.0.2
 # Kódnév: "Smart Optimizer"
-# Dátum: 2025-07-17
+# Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
 #          intelligens modellváltás, valós idejű rendszerfigyelés
 
@@ -23,9 +23,9 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.0"
+VERSION="11.0.2"
 CODENAME="Smart Optimizer"
-RELEASE_DATE="2025-07-17"
+RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
 
 # Alapértelmezések
@@ -447,7 +447,7 @@ perform_fresh_install() {
     done
     log_info "Függőségek telepítése..."
     for i in $(seq 1 5); do
-        if sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq curl wget git ca-certificates gnupg nano htop net-tools ufw build-essential python3-pip python3-venv libxml2-dev libxslt-dev redis-tools postgresql-client clamav postfix mailutils poppler-utils ffmpeg nginx openssl tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng espeak mpg321 2>/dev/null; then
+        if sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq curl wget git ca-certificates gnupg nano htop net-tools ufw build-essential python3-pip python3-venv libxml2-dev libxslt-dev redis-tools postgresql-client cron clamav postfix mailutils poppler-utils ffmpeg nginx openssl tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng espeak mpg321 2>/dev/null; then
             break
         fi
         log_warn "Az apt install zárolva van, várakozás... ($i/5)"
@@ -515,9 +515,14 @@ perform_fresh_install() {
     
     [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && $DOCKER exec -i epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' if '${GITHUB_TOKEN}' else None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
     
-    (crontab -l 2>/dev/null; echo "0 3 * * 0 $PROJECT_DIR/scripts/backup.sh") | crontab -
-    (crontab -l 2>/dev/null; echo "0 4 * * 0 docker system prune -f") | crontab -
-    (crontab -l 2>/dev/null; echo "*/30 * * * * $PROJECT_DIR/scripts/monitor.sh") | crontab -
+    if command -v crontab &>/dev/null; then
+        (crontab -l 2>/dev/null; echo "0 3 * * 0 $PROJECT_DIR/scripts/backup.sh") | crontab - 2>/dev/null || true
+        (crontab -l 2>/dev/null; echo "0 4 * * 0 docker system prune -f") | crontab - 2>/dev/null || true
+        (crontab -l 2>/dev/null; echo "*/30 * * * * $PROJECT_DIR/scripts/monitor.sh") | crontab - 2>/dev/null || true
+        log_info "Cron jobok beállítva"
+    else
+        log_warn "A 'crontab' parancs nem elérhető, cron jobok kihagyva"
+    fi
     
     echo "v${VERSION} - $(date +%Y-%m-%d)" > VERSION.txt
 }
@@ -839,9 +844,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.0')
+    VERSION = os.environ.get('VERSION', '11.0.2')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
-    RELEASE_DATE = os.environ.get('RELEASE_DATE', '2025-07-17')
+    RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')

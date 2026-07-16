@@ -1,7 +1,7 @@
 # 📚 EPUB Fordító Rendszer – Felhasználói Kézikönyv
 
-**Verzió:** 11.0.0 – "Smart Optimizer"
-**Utolsó frissítés:** 2025-07-17
+**Verzió:** 11.0.2 – "Smart Optimizer"
+**Utolsó frissítés:** 2026-07-16
 
 ---
 

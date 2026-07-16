@@ -3,7 +3,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.0-blue)
+![Version](https://img.shields.io/badge/version-11.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -293,9 +293,9 @@ curl http://localhost/health
 # Válasz:
 {
     "status": "healthy",
-    "version": "11.0.0",
+    "version": "11.0.2",
     "codename": "Smart Optimizer",
-    "release_date": "2025-07-17",
+    "release_date": "2026-07-16",
     "model": "deepseek-r1:14b",
     "memory": "70.3%",
     "cpu": "45.2%"
@@ -311,8 +311,8 @@ A rendszer 30 percenként automatikusan naplózza az erőforrásokat:
 tail -f logs/resource_monitor.log
 
 # Kimenet:
-# 2025-07-17 14:30: CPU:45.2% RAM:22.5G/32.0G Disk:30%
-# 2025-07-17 15:00: CPU:52.1% RAM:24.1G/32.0G Disk:30%
+# 2026-07-16 14:30: CPU:45.2% RAM:22.5G/32.0G Disk:30%
+# 2026-07-16 15:00: CPU:52.1% RAM:24.1G/32.0G Disk:30%
 ```
 
 ---
@@ -478,9 +478,9 @@ Ajánlott:
 
 ```env
 # Verzió
-VERSION=11.0.0
+VERSION=11.0.2
 CODENAME="Smart Optimizer"
-RELEASE_DATE=2025-07-17
+RELEASE_DATE=2026-07-16
 
 # Admin
 ADMIN_EMAIL=admin@epub-translator.local
@@ -687,7 +687,7 @@ V: logs/resource_monitor.log fájlban.
 
 📊 Verzió Történet
 
-v11.0.0 (2025-07-17) - "Smart Optimizer"
+v11.0.2 (2026-07-16) - "Smart Optimizer"
 
 · 🆕 Intelligens modell optimalizáló
 · 🆕 Valós idejű erőforrás monitor
