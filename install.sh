@@ -469,10 +469,23 @@ perform_fresh_install() {
         DOCKER="sudo docker"
     fi
     
-    # Korábbi konténerek leállítása (előző sikertelen telepítés maradványai)
-    log_info "Korábbi konténerek leállítása..."
-    sudo docker compose down --remove-orphans 2>/dev/null || $DOCKER compose down --remove-orphans 2>/dev/null || true
-    sudo docker rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
+    # Korábbi konténerek és portfoglaló folyamatok leállítása
+    log_info "Korábbi konténerek és portfoglaló folyamatok leállítása..."
+    set +e
+    $DOCKER compose down --remove-orphans 2>/dev/null || true
+    $DOCKER rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
+    # Ha a 80-as portot más folyamat foglalja (pl. host nginx), állítsuk le
+    PORT80_PID=$(sudo lsof -ti :80 2>/dev/null) || true
+    if [ -n "$PORT80_PID" ]; then
+        log_warn "A 80-as portot foglalja a(z) $PORT80_PID PID. Leállítás..."
+        sudo kill -9 $PORT80_PID 2>/dev/null || true
+        sleep 2
+    fi
+    PORT443_PID=$(sudo lsof -ti :443 2>/dev/null) || true
+    if [ -n "$PORT443_PID" ]; then
+        sudo kill -9 $PORT443_PID 2>/dev/null || true
+    fi
+    set -e
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
