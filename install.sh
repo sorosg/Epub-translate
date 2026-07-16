@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.12
+# Verzió: 11.0.13
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.12"
+VERSION="11.0.13"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -845,7 +845,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.12')
+    VERSION = os.environ.get('VERSION', '11.0.13')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1371,6 +1371,14 @@ def translate_epub(app_ref, translation_id, filepath):
 def init_db():
     with app.app_context():
         db.create_all()
+        # Hiányzó oszlopok hozzáadása (ha a tábla már létezett korábbi verzióból)
+        try:
+            for col, col_type in [('address', 'VARCHAR(255)'), ('birth_date', 'VARCHAR(20)'), ('tax_id', 'VARCHAR(50)'), ('phone', 'VARCHAR(30)')]:
+                db.session.execute(db.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+        
         admin = User.query.filter_by(email=Config.ADMIN_EMAIL).first()
         if not admin:
             admin = User(username='admin', email=Config.ADMIN_EMAIL,
