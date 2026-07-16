@@ -394,8 +394,8 @@ def admin_update():
 def api_update_check():
     for attempt in range(1, 4):
         try:
-            resp = requests.get('https://api.github.com/repos/sorosg/Epub-translate/releases/latest', 
-                               headers={'Accept': 'application/vnd.github.v3+json'}, timeout=15)
+            resp = requests.get('https://api.github.com/repos/sorosg/Epub-translate/releases/latest',
+                               headers={'Accept': 'application/vnd.github.v3+json'}, timeout=30, verify=True)
             if resp.status_code == 200:
                 data = resp.json()
                 remote_version = data.get('tag_name', '').lstrip('v')
@@ -408,10 +408,36 @@ def api_update_check():
                     'release_notes': (data.get('body', '') or '')[:500]
                 })
             return jsonify({'error': f'GitHub API hiba: {resp.status_code}'}), resp.status_code
+        except requests.exceptions.SSLError:
+            # SSL hiba esetén próbáljuk verify=False-szal
+            try:
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                resp = requests.get('https://api.github.com/repos/sorosg/Epub-translate/releases/latest',
+                                   headers={'Accept': 'application/vnd.github.v3+json'}, timeout=30, verify=False)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    remote_version = data.get('tag_name', '').lstrip('v')
+                    has_update = remote_version > app.config['VERSION']
+                    return jsonify({
+                        'remote_version': remote_version or 'ismeretlen',
+                        'current': app.config['VERSION'],
+                        'has_update': has_update,
+                        'release_url': data.get('html_url', ''),
+                        'release_notes': (data.get('body', '') or '')[:500]
+                    })
+            except:
+                pass
+            if attempt == 3:
+                return jsonify({
+                    'error': 'SSL tanúsítvány hiba. A konténer nem éri el a GitHub API-t.',
+                    'current': app.config['VERSION'],
+                    'has_update': False
+                })
         except Exception as e:
             if attempt == 3:
                 return jsonify({
-                    'error': 'Nem sikerült ellenőrizni a frissítéseket. Ellenőrizd az internetkapcsolatot.',
+                    'error': f'Nem sikerült ellenőrizni a frissítéseket: {str(e)[:100]}',
                     'current': app.config['VERSION'],
                     'has_update': False
                 })
