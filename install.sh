@@ -409,24 +409,11 @@ perform_fresh_install() {
     
     create_directory_structure
     
-    # Port ellenőrzése a fájlok generálása ELŐTT
+    # Port detektálás és beállítás
     HTTP_PORT=80
     HTTPS_PORT=443
-    if sudo fuser 80/tcp 2>/dev/null; then
-        log_warn "A 80-as port foglalt, alternatív port használata: 8080"
-        HTTP_PORT=8080
-        HTTPS_PORT=8443
-    fi
     
     create_all_files
-    
-    # Port beállítása a generált compose fájlban (ha alternatív port kell)
-    if [ "$HTTP_PORT" != "80" ]; then
-        sed -i "s|- \"80:80\"|- \"$HTTP_PORT:80\"|" docker-compose.yml
-        sed -i "s|- \"443:443\"|- \"$HTTPS_PORT:443\"|" docker-compose.yml
-        log_info "Portok átállítva: ${HTTP_PORT}:80, ${HTTPS_PORT}:443"
-    fi
-    
     apply_optimization
     
     # Csomagkezelő lock-ok felszabadulására várakozás
@@ -487,12 +474,25 @@ perform_fresh_install() {
         DOCKER="sudo docker"
     fi
     
-    # Korábbi konténerek leállítása
+    # Korábbi konténerek leállítása és port felszabadítás
     log_info "Korábbi konténerek leállítása..."
     set +e
     $DOCKER compose down --remove-orphans 2>/dev/null || true
     $DOCKER rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
+    sudo fuser -k 80/tcp 2>/dev/null || true
+    sudo fuser -k 443/tcp 2>/dev/null || true
     sleep 5
+    # Ha a 80-as port még mindig foglalt, alternatív port használata
+    if sudo fuser 80/tcp 2>/dev/null; then
+        log_warn "A 80-as port továbbra is foglalt, alternatív port használata: 8080"
+        HTTP_PORT=8080
+        HTTPS_PORT=8443
+        sed -i 's/"80:80"/"8080:80"/' docker-compose.yml
+        sed -i 's/"443:443"/"8443:443"/' docker-compose.yml
+        log_info "Portok átállítva a docker-compose.yml-ben"
+        log_info "Ellenőrzés:"
+        grep -n '8080:80\|8443:443' docker-compose.yml || log_warn "A portcsere nem sikerült, a 80-as porttal próbálkozunk"
+    fi
     set -e
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
