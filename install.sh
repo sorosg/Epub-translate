@@ -469,6 +469,11 @@ perform_fresh_install() {
         DOCKER="sudo docker"
     fi
     
+    # Korábbi konténerek leállítása (előző sikertelen telepítés maradványai)
+    log_info "Korábbi konténerek leállítása..."
+    sudo docker compose down --remove-orphans 2>/dev/null || $DOCKER compose down --remove-orphans 2>/dev/null || true
+    sudo docker rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
+    
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
     sleep 20
