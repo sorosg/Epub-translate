@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.41')
+    VERSION = os.environ.get('VERSION', '11.0.45')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -22,6 +22,6 @@ class Config:
     UPLOAD_FOLDER = '/app/uploads'
     OUTPUT_FOLDER = '/app/output'
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
-    OPTIMAL_MEMORY_LIMIT = os.environ.get('OPTIMAL_MEMORY_LIMIT', '24G')
-    OPTIMAL_REDIS = os.environ.get('OPTIMAL_REDIS', '512mb')
-    OPTIMAL_PG_BUFFERS = os.environ.get('OPTIMAL_PG_BUFFERS', '512MB')
+    OPTIMAL_MEMORY_LIMIT = os.environ.get('OPTIMAL_MEMORY_LIMIT', '28G')
+    OPTIMAL_REDIS = os.environ.get('OPTIMAL_REDIS', '768mb')
+    OPTIMAL_PG_BUFFERS = os.environ.get('OPTIMAL_PG_BUFFERS', '768MB')

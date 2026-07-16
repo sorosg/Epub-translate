@@ -1,7 +1,7 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.41
+# Verzió: 11.0.45
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.41"
+VERSION="11.0.45"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -188,9 +188,9 @@ analyze_and_optimize() {
         OPTIMAL_REDIS="1024mb"
         OPTIMAL_PG_BUFFERS="1GB"
     elif [ "$TOTAL_RAM" -ge 32 ]; then
-        OPTIMAL_MEMORY_LIMIT="24G"
-        OPTIMAL_REDIS="512mb"
-        OPTIMAL_PG_BUFFERS="512MB"
+        OPTIMAL_MEMORY_LIMIT="28G"
+        OPTIMAL_REDIS="768mb"
+        OPTIMAL_PG_BUFFERS="768MB"
     elif [ "$TOTAL_RAM" -ge 16 ]; then
         OPTIMAL_MEMORY_LIMIT="12G"
         OPTIMAL_REDIS="256mb"

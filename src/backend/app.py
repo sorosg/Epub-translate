@@ -703,23 +703,41 @@ Minták a kívánt stílushoz:
                         except Exception:
                             pass
                     
-                    # Ollama API hívás – stream mód, extrém timeout a minőségi deepseek fordításért
-                    source_chunk = combined_source[:250]
-                    prompt = f"""{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szövegrészleteket magyarra.
+                    # Ollama API hívás – optimalizált paraméterek + few-shot prompt
+                    source_chunk = combined_source[:500]
+                    
+                    # Few-shot fordítási példák a jobb minőségért
+                    few_shot = """Fordítási példák (stílus és formátum referenciaként):
+
+Angol: The quick brown fox jumps over the lazy dog.
+Magyar: A gyors barna róka átugorja a lusta kutyát.
+
+Angol: She walked through the garden, admiring the beautiful flowers that bloomed in the morning sun.
+Magyar: Átsétált a kerten, gyönyörködve a gyönyörű virágokban, amelyek a reggeli napfényben nyíltak.
+
+---
+"""
+                    
+                    prompt = f"""{few_shot}{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szövegrészleteket magyarra.
 A szövegrészletek a '{NODE_SEP}' elválasztóval vannak szétválasztva.
 FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a lefordított részek között!
 Őrizd meg a szövegrészletek sorrendjét. Csak a fordítást add vissza, semmi mást!
 
 {source_chunk}"""
                     
-                    # Stream mód: folyamatos kapcsolat, nincs read timeout
+                    # Stream mód optimalizált paraméterekkel
                     translated_response = ""
                     try:
                         resp = requests.post(f"{ollama_host}/api/generate", json={
                             'model': model,
                             'prompt': prompt,
                             'stream': True,
-                            'options': {'num_predict': 512}
+                            'options': {
+                                'num_predict': 1024,
+                                'temperature': 0.2,
+                                'repeat_penalty': 1.1,
+                                'top_p': 0.9
+                            }
                         }, timeout=(60, 3600), stream=True)
                         
                         if resp.status_code != 200:
@@ -727,13 +745,16 @@ FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a leford�
                             failed_items += 1
                             continue
                         
-                        # Stream válasz feldolgozása (NDJSON sorok)
+                        # Stream válasz feldolgozása (NDJSON sorok) – minden chunk response összefűzve
+                        translated_response = ""
                         for line in resp.iter_lines(decode_unicode=True):
                             if line:
                                 try:
                                     chunk_data = json.loads(line)
+                                    # Minden chunk hozzáadása a válaszhoz
+                                    if 'response' in chunk_data and chunk_data['response']:
+                                        translated_response += chunk_data['response']
                                     if chunk_data.get('done', False):
-                                        translated_response = chunk_data.get('response', '')
                                         break
                                 except (json.JSONDecodeError, AttributeError):
                                     pass
