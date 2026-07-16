@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.18
+# Verzió: 11.0.19
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.18"
+VERSION="11.0.19"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -587,17 +587,62 @@ create_directory_structure() {
 # ÖSSZES FÁJL LÉTREHOZÁSA
 # ============================================================
 create_all_files() {
-    log_info "Fájlok létrehozása..."
+    log_info "Fájlok másolása a forrás könyvtárból..."
+    SRC_DIR="$(pwd)/src"
+    
+    # Ha a src könyvtár nem létezik (pl. régi install.sh), használjuk a heredoc-generálást
+    if [ ! -d "$SRC_DIR" ]; then
+        log_warn "A src/ könyvtár nem található, fájlok generálása a scriptből..."
+        _create_files_from_script
+        return
+    fi
+    
+    # docker-compose.yml másolása
+    cp "$SRC_DIR/docker-compose.yml" docker-compose.yml
+    
+    # nginx config
+    mkdir -p nginx
+    cp "$SRC_DIR/nginx/nginx.conf" nginx/nginx.conf
+    
+    # ollama fájlok
+    mkdir -p ollama
+    cp "$SRC_DIR/ollama/Dockerfile" ollama/Dockerfile
+    cp "$SRC_DIR/ollama/healthcheck.sh" ollama/healthcheck.sh
+    chmod +x ollama/healthcheck.sh
+    
+    # backend fájlok
+    mkdir -p backend/utils backend/templates backend/translations
+    cp "$SRC_DIR/backend/Dockerfile" backend/Dockerfile
+    cp "$SRC_DIR/backend/requirements.txt" backend/requirements.txt
+    cp "$SRC_DIR/backend/config.py" backend/config.py
+    cp "$SRC_DIR/backend/models.py" backend/models.py
+    cp "$SRC_DIR/backend/app.py" backend/app.py
+    
+    # backend template-ek
+    cp "$SRC_DIR/backend/templates/base.html" backend/templates/base.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/login.html" backend/templates/login.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/dashboard.html" backend/templates/dashboard.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/admin.html" backend/templates/admin.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/users.html" backend/templates/users.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/users_form.html" backend/templates/users_form.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/update.html" backend/templates/update.html 2>/dev/null || true
+    
+    # backend utils
+    cp "$SRC_DIR/backend/utils/model_optimizer.py" backend/utils/model_optimizer.py 2>/dev/null || true
+    cp "$SRC_DIR/backend/utils/resource_monitor.py" backend/utils/resource_monitor.py 2>/dev/null || true
+    touch backend/utils/__init__.py
+    
     create_env_file
-    create_docker_compose
-    create_nginx_config
-    create_ollama_files
-    create_backend_files
-    create_model_optimizer
-    create_resource_monitor
-    create_pwa_files
     create_scripts
+    
     log_success "Fájlok kész"
+}
+
+# Fallback: régi heredoc alapú fájlgenerálás (ha nincs src/)
+_create_files_from_script() {
+    create_env_file
+    # docker-compose, nginx, ollama, backend generálása (csak ha nincs src/)
+    create_scripts
 }
 
 create_env_file() {
@@ -860,7 +905,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.18')
+    VERSION = os.environ.get('VERSION', '11.0.19')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')

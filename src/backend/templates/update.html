@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% block title %}Frissítés{% endblock %}{% block content %}
+<h2>🔄 Frissítés ellenőrzése</h2>
+<div class="row mt-4">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><h5>Verzió információk</h5></div>
+      <div class="card-body">
+        <p><strong>Jelenlegi verzió:</strong> v{{ current_version }}</p>
+        <div id="updateStatus">
+          <button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>
+        </div>
+        <div id="updateResult" class="mt-3" style="display:none"></div>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-header"><h5>📋 Frissítési napló</h5></div>
+      <div class="card-body">
+        <p class="text-muted">A frissítések naplózása az <a href="/admin">Admin oldalon</a> látható.</p>
+        <p class="text-muted">Automatikus ellenőrzés: 2 óránként</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+async function checkUpdate() {
+  document.getElementById('updateStatus').innerHTML = '<div class="spinner-border text-primary"></div> Ellenőrzés folyamatban...';
+  try {
+    const resp = await fetch('/api/update/check');
+    const data = await resp.json();
+    const div = document.getElementById('updateResult');
+    div.style.display = 'block';
+    if (data.error) {
+      div.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+      document.getElementById('updateStatus').innerHTML = '<button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>';
+      return;
+    }
+    if (data.has_update) {
+      div.innerHTML = `
+        <div class="alert alert-warning">
+          <strong>🚀 Új verzió elérhető: v${data.remote_version}</strong>
+          <p class="mt-2">${data.release_notes || 'Nincs részletes leírás.'}</p>
+          <a href="${data.release_url}" target="_blank" class="btn btn-sm btn-outline-light me-2">📋 Release notes</a>
+          <button class="btn btn-success" onclick="runUpdate()">⬆️ Frissítés telepítése</button>
+        </div>`;
+      document.getElementById('updateStatus').innerHTML = '<span class="badge bg-warning">Frissítés elérhető!</span>';
+    } else {
+      div.innerHTML = `<div class="alert alert-success">✅ A rendszer naprakész. (v${data.current})</div>`;
+      document.getElementById('updateStatus').innerHTML = '<button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>';
+    }
+  } catch(e) {
+    document.getElementById('updateResult').style.display = 'block';
+    document.getElementById('updateResult').innerHTML = `<div class="alert alert-danger">Hiba: ${e.message}</div>`;
+    document.getElementById('updateStatus').innerHTML = '<button class="btn btn-primary" onclick="checkUpdate()">🔍 Frissítés keresése</button>';
+  }
+}
+async function runUpdate() {
+  if (!confirm('Biztosan futtatod a frissítést? Ez újraindítja a konténereket!')) return;
+  document.getElementById('updateResult').innerHTML = '<div class="alert alert-info"><div class="spinner-border spinner-border-sm"></div> Frissítés folyamatban... Ez eltarthat néhány percig.</div>';
+  try {
+    const resp = await fetch('/api/update/run', {method: 'POST'});
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('updateResult').innerHTML = `<div class="alert alert-success">✅ Frissítés sikeres!<br><pre style="font-size:12px">${data.output || ''}</pre></div>`;
+      setTimeout(() => location.reload(), 5000);
+    } else {
+      document.getElementById('updateResult').innerHTML = `<div class="alert alert-danger">❌ Frissítés sikertelen!<br><pre style="font-size:12px">${data.error || data.output || ''}</pre></div>`;
+    }
+  } catch(e) {
+    document.getElementById('updateResult').innerHTML = `<div class="alert alert-danger">Hiba: ${e.message}</div>`;
+  }
+}
+window.addEventListener('load', () => checkUpdate());
+</script>
+{% endblock %}

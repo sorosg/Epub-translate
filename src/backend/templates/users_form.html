@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}{% if edit_mode %}Felhasználó szerkesztése{% else %}Új felhasználó{% endif %}{% endblock %}{% block content %}
+<h2>{% if edit_mode %}✏️ Felhasználó szerkesztése: {{ user.email }}{% else %}➕ Új felhasználó létrehozása{% endif %}</h2>
+<div class="card mt-3">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Vezetéknév</label><input type="text" class="form-control" name="last_name" value="{% if edit_mode %}{{ user.last_name or '' }}{% else %}{{ user_data.get('last_name', '') }}{% endif %}"></div>
+        <div class="col-md-6"><label class="form-label">Keresztnév</label><input type="text" class="form-control" name="first_name" value="{% if edit_mode %}{{ user.first_name or '' }}{% else %}{{ user_data.get('first_name', '') }}{% endif %}"></div>
+        <div class="col-md-6"><label class="form-label">Email cím <span class="text-danger">*</span></label><input type="email" class="form-control" name="email" required value="{% if edit_mode %}{{ user.email }}{% else %}{{ user_data.get('email', '') }}{% endif %}"></div>
+        <div class="col-md-6"><label class="form-label">Telefonszám</label><input type="text" class="form-control" name="phone" value="{% if edit_mode %}{{ user.phone or '' }}{% else %}{{ user_data.get('phone', '') }}{% endif %}"></div>
+        <div class="col-md-12"><label class="form-label">Cím</label><input type="text" class="form-control" name="address" value="{% if edit_mode %}{{ user.address or '' }}{% else %}{{ user_data.get('address', '') }}{% endif %}"></div>
+        <div class="col-md-4"><label class="form-label">Születési dátum</label><input type="date" class="form-control" name="birth_date" value="{% if edit_mode %}{{ user.birth_date or '' }}{% else %}{{ user_data.get('birth_date', '') }}{% endif %}"></div>
+        <div class="col-md-4"><label class="form-label">Adószám</label><input type="text" class="form-control" name="tax_id" value="{% if edit_mode %}{{ user.tax_id or '' }}{% else %}{{ user_data.get('tax_id', '') }}{% endif %}"></div>
+        <div class="col-md-4"><label class="form-label">Tokenek száma <span class="text-danger">*</span></label><input type="number" class="form-control" name="tokens" required value="{% if edit_mode %}{{ user.tokens }}{% else %}5{% endif %}" min="0"></div>
+        <div class="col-md-6"><label class="form-label">Jelszó {% if not edit_mode %}<span class="text-danger">*</span>{% else %}(ha üres, nem változik){% endif %}</label><input type="password" class="form-control" name="password" {% if not edit_mode %}required{% endif %}></div>
+        <div class="col-md-6"><label class="form-label">Admin jogosultság</label><div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_admin" value="1" id="isAdmin" {% if edit_mode and user.is_admin %}checked{% endif %}><label class="form-check-label" for="isAdmin">Adminisztrátor</label></div></div>
+      </div>
+      <div class="mt-4"><button type="submit" class="btn btn-success">💾 Mentés</button><a href="/admin/users" class="btn btn-secondary">Mégse</a></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,136 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: epub-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html/static:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - translator-network
+    restart: unless-stopped
+  backend:
+    build: ./backend
+    container_name: epub-backend
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./backend:/app
+      - epub_uploads:/app/uploads
+      - epub_output:/app/output
+      - ./logs/backend:/app/logs
+      - ./book_database:/app/book_database
+      - ./translation_memory:/app/translation_memory
+      - ./glossaries:/app/glossaries
+      - ./community_library:/app/community_library
+      - ./achievements:/app/achievements
+      - ./fine_tuning:/app/fine_tuning
+      - ./optimization_profiles:/app/optimization_profiles
+    environment:
+      - DATABASE_URL=postgresql://epub_user:epub_password@postgres:5432/epub_translator
+      - OLLAMA_HOST=http://ollama:11434
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - SELECTED_MODEL=${SELECTED_MODEL}
+      - MAX_WORKERS=${MAX_WORKERS}
+      - VERSION=${VERSION}
+      - ENABLE_AUTO_OPTIMIZE=${ENABLE_AUTO_OPTIMIZE}
+      - ENABLE_RESOURCE_MONITOR=${ENABLE_RESOURCE_MONITOR}
+      - ENABLE_SMART_SWITCH=${ENABLE_SMART_SWITCH}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - translator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    command: gunicorn -w 2 -b 0.0.0.0:5000 app:app --timeout 600 --worker-class eventlet
+  postgres:
+    image: postgres:15-alpine
+    container_name: epub-postgres
+    environment:
+      - POSTGRES_DB=epub_translator
+      - POSTGRES_USER=epub_user
+      - POSTGRES_PASSWORD=epub_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - translator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epub_user -d epub_translator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  ollama:
+    build: ./ollama
+    container_name: epub-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=2
+    networks:
+      - translator-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${OPTIMAL_MEMORY_LIMIT}
+        reservations:
+          memory: 16G
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    command: serve
+  redis:
+    image: redis:alpine
+    container_name: epub-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory ${OPTIMAL_REDIS} --maxmemory-policy allkeys-lru
+    networks:
+      - translator-network
+    restart: unless-stopped
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: epub-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - translator-network
+    restart: unless-stopped
+    profiles:
+      - local
+      - all
+networks:
+  translator-network:
+    driver: bridge
+volumes:
+  postgres_data:
+  ollama_data:
+  redis_data:
+  epub_uploads:
+  epub_output:
