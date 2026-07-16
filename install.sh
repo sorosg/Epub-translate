@@ -479,9 +479,19 @@ perform_fresh_install() {
     set +e
     $DOCKER compose down --remove-orphans 2>/dev/null || true
     $DOCKER rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
+    # Host webszerverek leállítása és letiltása (hogy ne induljanak újra)
+    sudo systemctl stop nginx 2>/dev/null || true
+    sudo systemctl stop apache2 2>/dev/null || true
+    sudo systemctl disable nginx 2>/dev/null || true
+    sudo systemctl disable apache2 2>/dev/null || true
+    # Portok felszabadítása
     sudo fuser -k 80/tcp 2>/dev/null || true
     sudo fuser -k 443/tcp 2>/dev/null || true
     sleep 5
+    # Még egyszer, ha a folyamat azonnal újraindult
+    sudo fuser -k 80/tcp 2>/dev/null || true
+    sudo fuser -k 443/tcp 2>/dev/null || true
+    sleep 2
     # Ha a 80-as port még mindig foglalt, alternatív port használata
     if sudo fuser 80/tcp 2>/dev/null; then
         log_warn "A 80-as port továbbra is foglalt, alternatív port használata: 8080"
