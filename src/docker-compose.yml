@@ -19,6 +19,7 @@ services:
     build: ./backend
     container_name: epub-backend
     dns:
+      - 127.0.0.11
       - 8.8.8.8
       - 1.1.1.1
     volumes:
@@ -83,6 +84,7 @@ services:
     build: ./ollama
     container_name: epub-ollama
     dns:
+      - 127.0.0.11
       - 8.8.8.8
       - 1.1.1.1
     volumes:
