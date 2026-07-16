@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.16
+# Verzió: 11.0.17
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.16"
+VERSION="11.0.17"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -529,6 +529,14 @@ perform_fresh_install() {
     fi
     
     echo "v${VERSION} - $(date +%Y-%m-%d)" > VERSION.txt
+    
+    # Git repo inicializálása a frissítésekhez (ha még nincs)
+    if [ ! -d .git ]; then
+        git init . 2>/dev/null || true
+        git remote add origin "$GITHUB_REPO" 2>/dev/null || true
+        git fetch origin 2>/dev/null || true
+        log_info "Git repo inicializálva a frissítésekhez"
+    fi
 }
 
 # ============================================================
@@ -852,7 +860,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.16')
+    VERSION = os.environ.get('VERSION', '11.0.17')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1901,13 +1909,34 @@ BACKUPEOF
 
     cat > scripts/update.sh << 'UPDATEEOF'
 #!/bin/bash
+set -e
 cd ~/epub-translator
+
+echo "🔄 EPUB Fordító - Frissítés"
+
+# Git repo ellenőrzése és frissítése
+if [ ! -d .git ]; then
+    echo "Git repo inicializálása..."
+    git init .
+    git remote add origin https://github.com/sorosg/Epub-translate.git 2>/dev/null || true
+fi
+
+echo "📥 Legújabb verzió letöltése..."
+git fetch origin 2>/dev/null || { echo "⚠️  A GitHub nem elérhető, meglévő fájlokkal próbálkozunk..."; }
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+git reset --hard "origin/$CURRENT_BRANCH" 2>/dev/null || git pull origin "$CURRENT_BRANCH" 2>/dev/null || echo "⚠️  Nem sikerült frissíteni a repót."
+
+echo "🛑 Konténerek leállítása..."
 DOCKER=$(docker ps &>/dev/null 2>&1 && echo "docker" || echo "sudo docker")
 $DOCKER compose down 2>/dev/null || true
-git pull 2>/dev/null || true
+
+echo "🔨 Újraépítés..."
 $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+
+echo "🚀 Konténerek indítása..."
 $DOCKER compose up -d
-echo "✅ Frissítve!"
+
+echo "✅ Frissítés kész!"
 UPDATEEOF
 
     cat > scripts/status.sh << 'STATUSEOF'
