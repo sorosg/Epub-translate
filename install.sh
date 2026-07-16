@@ -419,6 +419,14 @@ perform_fresh_install() {
     fi
     
     create_all_files
+    
+    # Port beállítása a generált compose fájlban (ha alternatív port kell)
+    if [ "$HTTP_PORT" != "80" ]; then
+        sed -i "s|- \"80:80\"|- \"$HTTP_PORT:80\"|" docker-compose.yml
+        sed -i "s|- \"443:443\"|- \"$HTTPS_PORT:443\"|" docker-compose.yml
+        log_info "Portok átállítva: ${HTTP_PORT}:80, ${HTTPS_PORT}:443"
+    fi
+    
     apply_optimization
     
     # Csomagkezelő lock-ok felszabadulására várakozás
@@ -609,14 +617,14 @@ ENVEOF
 }
 
 create_docker_compose() {
-    cat > docker-compose.yml << DOCKEREOF
+    cat > docker-compose.yml << 'DOCKEREOF'
 services:
   nginx:
     image: nginx:alpine
     container_name: epub-nginx
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./static:/usr/share/nginx/html/static:ro
