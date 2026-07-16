@@ -723,7 +723,6 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     volumes:
-      - ./backend:/app
       - epub_uploads:/app/uploads
       - epub_output:/app/output
       - ./logs/backend:/app/logs
