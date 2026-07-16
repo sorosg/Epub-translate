@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.2
+# Verzió: 11.0.3
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.2"
+VERSION="11.0.3"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -844,7 +844,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.2')
+    VERSION = os.environ.get('VERSION', '11.0.3')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1140,6 +1140,44 @@ APPEOF
 
     touch backend/utils/__init__.py
     
+    # Base HTML
+    cat > backend/templates/base.html << 'BASEEOF'
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}EPUB Fordító{% endblock %}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary mb-4">
+  <div class="container">
+    <a class="navbar-brand" href="/">🧠 EPUB Fordító</a>
+    <div class="navbar-nav ms-auto">
+      {% if current_user.is_authenticated %}
+        <a class="nav-link" href="/dashboard">Vezérlőpult</a>
+        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a>{% endif %}
+        <a class="nav-link" href="/logout">Kijelentkezés</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+<div class="container">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+{% block content %}{% endblock %}
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+BASEEOF
+
     # Dashboard HTML
     cat > backend/templates/dashboard.html << 'DASHEOF'
 {% extends "base.html" %}{% block title %}Vezérlőpult{% endblock %}{% block content %}
