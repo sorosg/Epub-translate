@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.15
+# Verzió: 11.0.16
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.15"
+VERSION="11.0.16"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -657,6 +657,9 @@ services:
   backend:
     build: ./backend
     container_name: epub-backend
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - ./backend:/app
       - epub_uploads:/app/uploads
@@ -849,7 +852,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.15')
+    VERSION = os.environ.get('VERSION', '11.0.16')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1262,23 +1265,31 @@ def admin_update():
 @login_required
 @admin_required
 def api_update_check():
-    try:
-        resp = requests.get('https://api.github.com/repos/sorosg/Epub-translate/releases/latest', 
-                           headers={'Accept': 'application/vnd.github.v3+json'}, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            remote_version = data.get('tag_name', '').lstrip('v')
-            has_update = remote_version > app.config['VERSION']
-            return jsonify({
-                'remote_version': remote_version or 'ismeretlen',
-                'current': app.config['VERSION'],
-                'has_update': has_update,
-                'release_url': data.get('html_url', ''),
-                'release_notes': (data.get('body', '') or '')[:500]
-            })
-        return jsonify({'error': f'GitHub API hiba: {resp.status_code}'}), resp.status_code
-    except Exception as e:
-        return jsonify({'error': f'Nem sikerült ellenőrizni: {str(e)[:100]}'}), 500
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get('https://api.github.com/repos/sorosg/Epub-translate/releases/latest', 
+                               headers={'Accept': 'application/vnd.github.v3+json'}, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                remote_version = data.get('tag_name', '').lstrip('v')
+                has_update = remote_version > app.config['VERSION']
+                return jsonify({
+                    'remote_version': remote_version or 'ismeretlen',
+                    'current': app.config['VERSION'],
+                    'has_update': has_update,
+                    'release_url': data.get('html_url', ''),
+                    'release_notes': (data.get('body', '') or '')[:500]
+                })
+            return jsonify({'error': f'GitHub API hiba: {resp.status_code}'}), resp.status_code
+        except Exception as e:
+            if attempt == 3:
+                return jsonify({
+                    'error': 'Nem sikerült ellenőrizni a frissítéseket. Ellenőrizd az internetkapcsolatot.',
+                    'current': app.config['VERSION'],
+                    'has_update': False
+                })
+            import time
+            time.sleep(3)
 
 @app.route('/api/update/run', methods=['POST'])
 @login_required
