@@ -464,17 +464,22 @@ perform_fresh_install() {
         done
         sudo systemctl enable docker && sudo systemctl start docker
         sudo usermod -aG docker $USER
+        DOCKER="sudo docker"
+        log_warn "A docker csoporttagság a következő bejelentkezéskor lép életbe."
+        log_warn "Addig a script 'sudo docker'-t használ."
+    else
+        DOCKER="docker"
     fi
     
-    docker compose build 2>/dev/null || docker compose build --no-cache
-    docker compose up -d
+    $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+    $DOCKER compose up -d
     sleep 20
     
-    docker exec -i epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell figyelmeztetés"
+    $DOCKER exec -i epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell figyelmeztetés"
     sleep 10
-    docker exec -i epub-backend python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')" 2>/dev/null || log_warn "DB figyelmeztetés"
+    $DOCKER exec -i epub-backend python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')" 2>/dev/null || log_warn "DB figyelmeztetés"
     
-    [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && docker exec -i epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' if '${GITHUB_TOKEN}' else None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
+    [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && $DOCKER exec -i epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' if '${GITHUB_TOKEN}' else None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
     
     (crontab -l 2>/dev/null; echo "0 3 * * 0 $PROJECT_DIR/scripts/backup.sh") | crontab -
     (crontab -l 2>/dev/null; echo "0 4 * * 0 docker system prune -f") | crontab -
@@ -589,7 +594,6 @@ ENVEOF
 
 create_docker_compose() {
     cat > docker-compose.yml << 'DOCKEREOF'
-version: '3.8'
 services:
   nginx:
     image: nginx:alpine
