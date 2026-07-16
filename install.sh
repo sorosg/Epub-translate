@@ -249,14 +249,14 @@ perform_optimization_only() {
     sed -i "s/memory: [0-9]*G/memory: ${OPTIMAL_MEMORY_LIMIT}/" docker-compose.yml
     
     # Redis optimalizálás
-    docker exec epub-redis redis-cli CONFIG SET maxmemory "${OPTIMAL_REDIS}" 2>/dev/null || true
+    $DOCKER exec epub-redis redis-cli CONFIG SET maxmemory "${OPTIMAL_REDIS}" 2>/dev/null || true
     
     # PostgreSQL optimalizálás
-    docker exec epub-postgres psql -U epub_user -c "ALTER SYSTEM SET shared_buffers = '${OPTIMAL_PG_BUFFERS}';" 2>/dev/null || true
-    docker exec epub-postgres psql -U epub_user -c "SELECT pg_reload_conf();" 2>/dev/null || true
+    $DOCKER exec epub-postgres psql -U epub_user -c "ALTER SYSTEM SET shared_buffers = '${OPTIMAL_PG_BUFFERS}';" 2>/dev/null || true
+    $DOCKER exec epub-postgres psql -U epub_user -c "SELECT pg_reload_conf();" 2>/dev/null || true
     
     # Konténerek újraindítása az új beállításokkal
-    docker compose restart ollama backend
+    $DOCKER compose restart ollama backend
     
     log_success "Optimalizálás befejezve!"
 }
@@ -374,21 +374,21 @@ perform_update() {
     
     BACK="$PROJECT_DIR/backups/updates/pre_${EXISTING_VERSION}_$(date +%Y%m%d_%H%M%S)"
     mkdir -p "$BACK"
-    docker compose ps 2>/dev/null | grep -q postgres && docker exec epub-postgres pg_dump -U epub_user epub_translator > "$BACK/database.sql" 2>/dev/null || true
+    $DOCKER compose ps 2>/dev/null | grep -q postgres && $DOCKER exec epub-postgres pg_dump -U epub_user epub_translator > "$BACK/database.sql" 2>/dev/null || true
     cp .env "$BACK/.env" 2>/dev/null || true
     [ -d book_database ] && tar -czf "$BACK/book_database.tar.gz" book_database/ 2>/dev/null || true
     [ -d translation_memory ] && tar -czf "$BACK/translation_memory.tar.gz" translation_memory/ 2>/dev/null || true
     log_success "Mentés: $BACK"
     
-    docker compose down 2>/dev/null || true
+    $DOCKER compose down 2>/dev/null || true
     [ -d .git ] && { git fetch origin 2>/dev/null && git pull origin main 2>/dev/null || log_warn "Git pull nem sikerült"; }
     
     create_all_files
-    docker compose build 2>/dev/null || docker compose build --no-cache
-    docker compose up -d
+    $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+    $DOCKER compose up -d
     sleep 15
     
-    docker exec -i epub-backend python3 -c "from app import app, db; app.app_context().push(); db.create_all(); print('OK')" 2>/dev/null || log_warn "Migráció figyelmeztetés"
+    $DOCKER exec -i epub-backend python3 -c "from app import app, db; app.app_context().push(); db.create_all(); print('OK')" 2>/dev/null || log_warn "Migráció figyelmeztetés"
     
     # Optimalizálás alkalmazása
     apply_optimization
@@ -1325,6 +1325,15 @@ show_summary() {
 # MAIN
 # ============================================================
 main() {
+    # Docker parancs elérésének meghatározása
+    if docker ps &>/dev/null 2>&1; then
+        DOCKER="docker"
+    elif sudo docker ps &>/dev/null 2>&1; then
+        DOCKER="sudo docker"
+    else
+        DOCKER="docker"  # még nincs telepítve, a perform_fresh_install beállítja
+    fi
+
     detect_installation_mode
     analyze_and_optimize
     
