@@ -469,23 +469,26 @@ perform_fresh_install() {
         DOCKER="sudo docker"
     fi
     
-    # Korábbi konténerek és portfoglaló folyamatok leállítása
-    log_info "Korábbi konténerek és portfoglaló folyamatok leállítása..."
+    # Portok felszabadítása és korábbi konténerek leállítása
+    log_info "Korábbi konténerek leállítása..."
     set +e
     $DOCKER compose down --remove-orphans 2>/dev/null || true
     $DOCKER rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
-    # Ha a 80-as portot más folyamat foglalja (pl. host nginx), állítsuk le
-    PORT80_PID=$(sudo lsof -ti :80 2>/dev/null) || true
-    if [ -n "$PORT80_PID" ]; then
-        log_warn "A 80-as portot foglalja a(z) $PORT80_PID PID. Leállítás..."
-        sudo kill -9 $PORT80_PID 2>/dev/null || true
-        sleep 2
-    fi
-    PORT443_PID=$(sudo lsof -ti :443 2>/dev/null) || true
-    if [ -n "$PORT443_PID" ]; then
-        sudo kill -9 $PORT443_PID 2>/dev/null || true
-    fi
+    sleep 5
     set -e
+    
+    # Port ellenőrzése és alternatív port választása
+    HTTP_PORT=80
+    HTTPS_PORT=443
+    if sudo fuser 80/tcp 2>/dev/null; then
+        log_warn "A 80-as port foglalt, alternatív port használata: 8080"
+        HTTP_PORT=8080
+        HTTPS_PORT=8443
+    fi
+    
+    # Portok beállítása a compose fájlban
+    sed -i "s/\"80:80\"/\"$HTTP_PORT:80\"/" docker-compose.yml
+    sed -i "s/\"443:443\"/\"$HTTPS_PORT:443\"/" docker-compose.yml
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
@@ -1310,7 +1313,7 @@ show_summary() {
     log_header "║   \"${CODENAME}\"                            ║"
     log_header "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "🌐 Web:        http://localhost"
+    echo "🌐 Web:        http://localhost:${HTTP_PORT:-80}"
     echo "📧 Email:      http://localhost:8025"
     echo "📊 Monitor:    http://localhost/admin (rendszer infók)"
     echo ""
