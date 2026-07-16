@@ -573,47 +573,220 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None):
         try:
             t.status = 'processing'; t.progress = 5; db.session.commit()
             translation_logger.info(f"[ID:{translation_id}] EPUB olvasása...")
-            from ebooklib import epub
-            from bs4 import BeautifulSoup
-            book = epub.read_epub(filepath)
+            from ebooklib import epub as epub_lib
+            from bs4 import BeautifulSoup, NavigableString, Tag
+            book = epub_lib.read_epub(filepath)
             model = app_ref.config['DEFAULT_MODEL']
             ollama_host = app_ref.config['OLLAMA_HOST']
-            items = list(book.get_items_of_type(9))
+            items = list(book.get_items_of_type(9))  # ITEM_DOCUMENT
             total = len(items)
-            translation_logger.info(f"[ID:{translation_id}] {total} szöveges elem található, fordítás kezdése a(z) {model} modellel...")
-            translated_count = 0; failed_items = 0
+            translation_logger.info(f"[ID:{translation_id}] {total} szöveges elem található, fordítás kezdése a(z) {model} modellel (struktúra-megőrző mód)...")
+            translated_count = 0; failed_items = 0; total_nodes_translated = 0
+            
+            # Szeparátor a text node-ok batch fordításához
+            NODE_SEP = '\n---NEXT_TEXT_NODE---\n'
+            
+            # === FEJLETT PROMPT KONTEXTUS ELŐKÉSZÍTÉSE ===
+            style_instruction = ""
+            terminology_list = ""
+            
+            # 1. Stílus-instrukció gyűjtése referencia (minta) könyvekből
+            try:
+                ref_books = ReferenceBook.query.filter_by(user_id=t.user_id).all()
+                if ref_books:
+                    style_samples = []
+                    for rb in ref_books[:3]:  # maximum 3 referencia könyv
+                        try:
+                            r_book = epub_lib.read_epub(rb.file_path)
+                            r_items = list(r_book.get_items_of_type(9))
+                            if r_items:
+                                r_soup = BeautifulSoup(r_items[0].get_body_content(), 'html.parser')
+                                sample_text = r_soup.get_text()[:2000].strip()
+                                if sample_text:
+                                    style_samples.append(sample_text)
+                        except Exception:
+                            pass
+                    if style_samples:
+                        combined_sample = "\n".join(style_samples[:2])[:1500]
+                        style_instruction = f"""Stílusinstrukció: A következő mintaszövegek alapján azonos stílusban, 
+hasonló szókinccsel és mondatszerkezettel fordítsd a szövegeket magyarra.
+Minták a kívánt stílushoz:
+{combined_sample}
+---
+"""
+                        translation_logger.debug(f"[ID:{translation_id}] Stílusinstrukció betöltve ({len(style_samples)} referencia könyvből)")
+            except Exception as style_err:
+                translation_logger.debug(f"[ID:{translation_id}] Stílusinstrukció nem elérhető: {style_err}")
+            
+            # 2. Terminológia gyűjtése könyvtári könyvekből
+            try:
+                library_books = Book.query.filter_by(user_id=t.user_id, is_selected=True).all()
+                if not library_books:
+                    library_books = Book.query.filter_by(user_id=t.user_id).limit(3).all()
+                if library_books:
+                    # Kontextus fájlok is lehetnek
+                    all_book_paths = []
+                    if context_files:
+                        all_book_paths.extend(context_files)
+                    all_book_paths.extend([lb.file_path for lb in library_books if lb.file_path])
+                    all_book_paths = all_book_paths[:5]  # max 5 könyv
+                    
+                    # Kulcsszavak kigyűjtése: tulajdonnevek, speciális kifejezések
+                    import re
+                    terms = set()
+                    for bp in set(all_book_paths):
+                        try:
+                            if os.path.exists(bp):
+                                lb_book = epub_lib.read_epub(bp)
+                                lb_items = list(lb_book.get_items_of_type(9))[:10]
+                                for lb_item in lb_items:
+                                    lb_soup = BeautifulSoup(lb_item.get_body_content(), 'html.parser')
+                                    lb_text = lb_soup.get_text()
+                                    # Tulajdonnevek keresése (nagybetűs szavak, amik nem mondatkezdők)
+                                    proper_nouns = re.findall(r'(?<![.\!?]\s)\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\b', lb_text)
+                                    for pn in proper_nouns:
+                                        if len(pn) > 3 and pn.lower() not in ('the', 'this', 'that', 'there', 'these', 'those', 'they', 'their', 'them', 'chapter', 'part', 'section', 'book', 'page'):
+                                            terms.add(pn.strip())
+                                    # Hosszabb speciális kifejezések (legalább 10 karakter)
+                                    special_terms = re.findall(r'\b[A-Z][a-z]{3,}(?:\s[A-Z][a-z]{3,}){1,3}\b', lb_text)
+                                    for st in special_terms[:5]:
+                                        terms.add(st.strip())
+                        except Exception:
+                            pass
+                    
+                    if terms:
+                        term_list = sorted(list(terms))[:30]
+                        terminology_list = f"""Fontos terminológia és tulajdonnevek (ezeket NE fordítsd le, hagyd eredeti formában):
+{', '.join(term_list)}
+
+"""
+                        translation_logger.debug(f"[ID:{translation_id}] Terminológia betöltve: {len(term_list)} kifejezés")
+            except Exception as term_err:
+                translation_logger.debug(f"[ID:{translation_id}] Terminológia gyűjtés nem sikerült: {term_err}")
+            
             for idx, item in enumerate(items):
                 try:
                     soup = BeautifulSoup(item.get_body_content(), 'html.parser')
-                    text = soup.get_text().strip()
-                    if not text or len(text) < 10:
+                    
+                    # 1. szakasz: Gyűjtsük ki az összes lefordítandó NavigableString-et
+                    # Kizárjuk: script, style, code, pre tartalmat, illetve csak whitespace-t
+                    text_nodes = []
+                    for node in soup.descendants:
+                        if isinstance(node, NavigableString):
+                            stripped = node.strip()
+                            if not stripped:
+                                continue
+                            # Hagyjuk ki a nem fordítandó elemeket
+                            if node.parent and node.parent.name in ('script', 'style', 'code', 'pre'):
+                                continue
+                            text_nodes.append((node, stripped))
+                    
+                    if not text_nodes:
+                        translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}: nincs lefordítandó szöveg, kihagyva")
                         continue
-                    translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}, szöveghossz: {len(text)} karakter")
-                    resp = requests.post(f"{ollama_host}/api/generate", json={'model':model,'prompt':f"Fordítsd le magyar nyelvre a következő szöveget. Csak a fordítást add vissza, semmi mást:\n\n{text[:3000]}",'stream':False}, timeout=120)
-                    if resp.status_code == 200:
-                        translated = resp.json().get('response', text)
-                        new_tag = soup.new_tag('p'); new_tag.string = translated; soup.clear(); soup.append(new_tag)
-                        item.set_content(str(soup).encode('utf-8'))
-                        translated_count += 1
-                    else:
+                    
+                    translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}: {len(text_nodes)} text node, fordítás batch-ben...")
+                    
+                    # 2. szakasz: Batch fordítás – összefűzzük a szövegeket, lefordítjuk, majd szétbontjuk
+                    source_texts = [tn[1] for tn in text_nodes]
+                    combined_source = NODE_SEP.join(source_texts)
+                    
+                    # Ha túl hosszú (>3500 karakter), akkor több batch-re bontjuk
+                    if len(combined_source) > 3500:
+                        batch_size = max(3, len(text_nodes) // ((len(combined_source) // 3000) + 1))
+                        translation_logger.debug(f"[ID:{translation_id}] Nagy tartalom ({len(combined_source)} karakter), {batch_size} node/batch feldolgozás")
+                    
+                    # 3. Sliding window kontextus: előző node szövegének első 200 karaktere
+                    surrounding_context = ""
+                    if idx > 0 and len(text_nodes) > 0:
+                        try:
+                            prev_item = items[idx-1]
+                            prev_soup = BeautifulSoup(prev_item.get_body_content(), 'html.parser')
+                            prev_text = prev_soup.get_text()[:300].strip()
+                            if prev_text:
+                                surrounding_context = f"Előző fejezet/bekezdés kontextusa: {prev_text}\n---\n"
+                        except Exception:
+                            pass
+                    
+                    # Ollama API hívás a kombinált szövegekkel – fejlett prompt
+                    source_chunk = combined_source[:3000]  # kisebb limit a fejlett prompt miatt
+                    prompt = f"""{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szövegrészleteket magyarra.
+A szövegrészletek a '{NODE_SEP}' elválasztóval vannak szétválasztva.
+FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a lefordított részek között!
+Őrizd meg a szövegrészletek sorrendjét. Csak a fordítást add vissza, semmi mást!
+
+{source_chunk}"""
+                    
+                    resp = requests.post(f"{ollama_host}/api/generate", json={
+                        'model': model,
+                        'prompt': prompt,
+                        'stream': False
+                    }, timeout=120)
+                    
+                    if resp.status_code != 200:
                         translation_logger.warning(f"[ID:{translation_id}] Ollama hibás válasz (HTTP {resp.status_code}) a(z) {idx+1}. elemnél: {resp.text[:200]}")
                         failed_items += 1
+                        continue
+                    
+                    translated_response = resp.json().get('response', '')
+                    translated_parts = translated_response.split(NODE_SEP)
+                    
+                    # 3. szakasz: Cseréljük ki a text node-okat a fordított szövegre
+                    if len(translated_parts) == len(text_nodes):
+                        for i, (node, original) in enumerate(text_nodes):
+                            translated = translated_parts[i].strip()
+                            if translated and translated != original:
+                                # NavigableString.replace_with() megtartja a HTML struktúrát
+                                node.replace_with(translated)
+                                total_nodes_translated += 1
+                        translated_count += 1
+                        translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}: {len(text_nodes)} node sikeresen lefordítva")
+                    else:
+                        # Fallback: ha a node-ok száma nem egyezik, próbáljuk egyesével
+                        translation_logger.warning(f"[ID:{translation_id}] Batch darabszám eltérés: {len(translated_parts)} vs {len(text_nodes)}. Egyedi fordításra váltás...")
+                        fallback_success = 0
+                        for node, original in text_nodes:
+                            try:
+                                if len(original) < 5:
+                                    continue  # túl rövid, kihagyjuk
+                                fr = requests.post(f"{ollama_host}/api/generate", json={
+                                    'model': model,
+                                    'prompt': f"Fordítsd le magyarra ezt az angol szöveget. CSAK a fordítást add vissza:\n\n{original}",
+                                    'stream': False
+                                }, timeout=60)
+                                if fr.status_code == 200:
+                                    tr = fr.json().get('response', '').strip()
+                                    if tr and tr != original:
+                                        node.replace_with(tr)
+                                        fallback_success += 1
+                                        total_nodes_translated += 1
+                            except Exception:
+                                pass
+                        translation_logger.info(f"[ID:{translation_id}] Fallback egyedi fordítás: {fallback_success}/{len(text_nodes)} node sikeres")
+                        if fallback_success > 0:
+                            translated_count += 1
+                    
+                    # Frissítsük az item tartalmát a módosított soup-pal
+                    item.set_content(str(soup).encode('utf-8'))
+                    
                 except requests.exceptions.ConnectionError as ce:
                     translation_logger.error(f"[ID:{translation_id}] Ollama kapcsolódási hiba a(z) {idx+1}. elemnél: {ce}")
-                    raise  # végzetes hiba, ne folytassuk
+                    raise
                 except Exception as item_err:
-                    translation_logger.warning(f"[ID:{translation_id}] Hiba a(z) {idx+1}. elem fordításakor: {item_err}")
+                    translation_logger.warning(f"[ID:{translation_id}] Hiba a(z) {idx+1}. elem feldolgozásakor: {item_err}")
                     failed_items += 1
+                
                 t.progress = 5 + int(90 * (idx + 1) / total)
                 db.session.commit()
-            translation_logger.info(f"[ID:{translation_id}] Fordítás kész: {translated_count}/{total} elem lefordítva, {failed_items} hiba")
+            
+            translation_logger.info(f"[ID:{translation_id}] Fordítás kész: {translated_count}/{total} dokumentum, {total_nodes_translated} szöveges csomópont lefordítva, {failed_items} hiba")
             output_filename = f"translated_{uuid.uuid4().hex[:8]}.epub"
             output_path = os.path.join(app_ref.config['OUTPUT_FOLDER'], output_filename)
             epub.write_epub(output_path, book)
             t.output_filename = output_filename; t.status = 'completed'; t.progress = 100; t.quality_score = 85
             db.session.commit()
             translation_logger.info(f"[ID:{translation_id}] ✅ Fordítás sikeresen befejezve: {output_filename}")
-            app_logger.info(f"Fordítás kész: {t.original_filename} -> {output_filename} (user: {user_info})")
+            app_logger.info(f"Fordítás kész: {t.original_filename} -> {output_filename} (user: {user_info}, {total_nodes_translated} node)")
         except Exception as e:
             error_detail = _traceback.format_exc()
             t.status = 'failed'; t.progress = 0; t.output_filename = f"HIBA: {str(e)[:500]}"
