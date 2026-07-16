@@ -990,7 +990,7 @@ APPEOF
     <div class="col-md-3"><div class="card"><div class="card-body text-center"><h1>{{ translations|length }}</h1><p>📚 Fordítás</p></div></div></div>
 </div>
 {% endblock %}
-DASHEEOF
+DASHEOF
 
     # Login HTML
     cat > backend/templates/login.html << 'LOGINEOF'
