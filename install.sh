@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.10
+# Verzió: 11.0.11
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.10"
+VERSION="11.0.11"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -845,7 +845,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.10')
+    VERSION = os.environ.get('VERSION', '11.0.11')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -948,6 +948,11 @@ app.config['OUTPUT_FOLDER'] = '/app/output'
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max
 db.init_app(app)
 babel = Babel(app)
+
+@babel.localeselector
+def get_locale():
+    return 'hu'
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
@@ -990,17 +995,30 @@ def health():
 def index():
     return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('login'))
 
+import traceback as _traceback
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin') if current_user.is_admin else url_for('dashboard'))
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        user = User.query.filter_by(email=email).first()
-        if user and user.password_hash and check_password_hash(user.password_hash, password):
-            login_user(user)
-            return redirect(url_for('admin') if user.is_admin else url_for('dashboard'))
-        flash(_('Hibás email vagy jelszó!'), 'error')
+        try:
+            email = request.form.get('email', '').strip()
+            password = request.form.get('password', '')
+            user = User.query.filter_by(email=email).first()
+            if user and user.password_hash and check_password_hash(user.password_hash, password):
+                login_user(user)
+                return redirect(url_for('admin') if user.is_admin else url_for('dashboard'))
+            flash(_('Hibás email vagy jelszó!'), 'error')
+        except Exception as e:
+            app.logger.error(f"Login error: {_traceback.format_exc()}")
+            flash(_(f'Bejelentkezési hiba: {str(e)[:100]}'), 'error')
     return render_template('login.html')
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    app.logger.error(f"500 error: {_traceback.format_exc()}")
+    return f"<h2>500 Internal Server Error</h2><pre>{_traceback.format_exc()}</pre>", 500
+
 
 @app.route('/logout')
 @login_required

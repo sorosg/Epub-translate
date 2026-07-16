@@ -1,6 +1,6 @@
 # 📚 EPUB Fordító Rendszer – Felhasználói Kézikönyv
 
-**Verzió:** 11.0.10 – "Smart Optimizer"
+**Verzió:** 11.0.11 – "Smart Optimizer"
 **Utolsó frissítés:** 2026-07-16
 
 ---
