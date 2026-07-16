@@ -58,7 +58,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    command: gunicorn -w 2 -b 0.0.0.0:5000 app:app --timeout 600 --worker-class eventlet
+    command: gunicorn -w 1 -b 0.0.0.0:5000 app:app --timeout 7200 --worker-class eventlet
   postgres:
     image: postgres:15-alpine
     container_name: epub-postgres
