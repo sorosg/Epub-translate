@@ -408,6 +408,16 @@ perform_fresh_install() {
     mkdir -p "$PROJECT_DIR" && cd "$PROJECT_DIR"
     
     create_directory_structure
+    
+    # Port ellenőrzése a fájlok generálása ELŐTT
+    HTTP_PORT=80
+    HTTPS_PORT=443
+    if sudo fuser 80/tcp 2>/dev/null; then
+        log_warn "A 80-as port foglalt, alternatív port használata: 8080"
+        HTTP_PORT=8080
+        HTTPS_PORT=8443
+    fi
+    
     create_all_files
     apply_optimization
     
@@ -469,26 +479,13 @@ perform_fresh_install() {
         DOCKER="sudo docker"
     fi
     
-    # Portok felszabadítása és korábbi konténerek leállítása
+    # Korábbi konténerek leállítása
     log_info "Korábbi konténerek leállítása..."
     set +e
     $DOCKER compose down --remove-orphans 2>/dev/null || true
     $DOCKER rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
     sleep 5
     set -e
-    
-    # Port ellenőrzése és alternatív port választása
-    HTTP_PORT=80
-    HTTPS_PORT=443
-    if sudo fuser 80/tcp 2>/dev/null; then
-        log_warn "A 80-as port foglalt, alternatív port használata: 8080"
-        HTTP_PORT=8080
-        HTTPS_PORT=8443
-    fi
-    
-    # Portok beállítása a compose fájlban
-    sed -i "s/\"80:80\"/\"$HTTP_PORT:80\"/" docker-compose.yml
-    sed -i "s/\"443:443\"/\"$HTTPS_PORT:443\"/" docker-compose.yml
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
@@ -612,14 +609,14 @@ ENVEOF
 }
 
 create_docker_compose() {
-    cat > docker-compose.yml << 'DOCKEREOF'
+    cat > docker-compose.yml << DOCKEREOF
 services:
   nginx:
     image: nginx:alpine
     container_name: epub-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./static:/usr/share/nginx/html/static:ro
