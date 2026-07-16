@@ -703,8 +703,8 @@ Minták a kívánt stílushoz:
                         except Exception:
                             pass
                     
-                    # Ollama API hívás – fejlett prompt
-                    source_chunk = combined_source[:3000]
+                    # Ollama API hívás – fejlett prompt, kisebb chunk + hosszabb timeout
+                    source_chunk = combined_source[:1500]
                     prompt = f"""{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szövegrészleteket magyarra.
 A szövegrészletek a '{NODE_SEP}' elválasztóval vannak szétválasztva.
 FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a lefordított részek között!
@@ -716,7 +716,7 @@ FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a leford�
                         'model': model,
                         'prompt': prompt,
                         'stream': False
-                    }, timeout=120)
+                    }, timeout=300)
                     
                     if resp.status_code != 200:
                         translation_logger.warning(f"[ID:{translation_id}] Ollama hibás válasz (HTTP {resp.status_code}) a(z) {idx+1}. elemnél: {resp.text[:200]}")
