@@ -24,7 +24,7 @@ async function loadModels() {
   const el = document.getElementById('modelProgressContent');
   el.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Modellek betöltése...';
   try {
-    const resp = await fetch('/api/models/list');
+    const resp = await fetch('/api/models/list', {credentials: 'same-origin'});
     const data = await resp.json();
     if (data.error) {
       el.innerHTML = '<div class="alert alert-danger">' + data.error + '</div>';

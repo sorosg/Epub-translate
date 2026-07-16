@@ -269,7 +269,6 @@ def admin():
 
 @app.route('/api/models/list')
 @login_required
-@admin_required
 def api_models_list():
     models = []
     error = None
