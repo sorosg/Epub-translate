@@ -67,7 +67,7 @@ os.makedirs(app.config['LIBRARY_FOLDER'], exist_ok=True)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["500 per day", "100 per hour"])
+limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["5000 per day", "2000 per hour"])
 
 ALLOWED_EXTENSIONS = {'epub'}
 
