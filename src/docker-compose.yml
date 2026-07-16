@@ -82,6 +82,9 @@ services:
   ollama:
     build: ./ollama
     container_name: epub-ollama
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - ollama_data:/root/.ollama
     environment:
