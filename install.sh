@@ -7,7 +7,7 @@
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
 #          intelligens modellváltás, valós idejű rendszerfigyelés
 
-set -e
+set -euo pipefail
 
 # Színek
 RED='\033[0;31m'
@@ -385,7 +385,7 @@ perform_update() {
     docker compose up -d
     sleep 15
     
-    docker exec -it epub-backend python3 -c "from app import app, db; app.app_context().push(); db.create_all(); print('OK')" 2>/dev/null || log_warn "Migráció figyelmeztetés"
+    docker exec -i epub-backend python3 -c "from app import app, db; app.app_context().push(); db.create_all(); print('OK')" 2>/dev/null || log_warn "Migráció figyelmeztetés"
     
     # Optimalizálás alkalmazása
     apply_optimization
@@ -425,11 +425,11 @@ perform_fresh_install() {
     docker compose up -d
     sleep 20
     
-    docker exec -it epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell figyelmeztetés"
+    docker exec -i epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell figyelmeztetés"
     sleep 10
-    docker exec -it epub-backend python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')" 2>/dev/null || log_warn "DB figyelmeztetés"
+    docker exec -i epub-backend python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')" 2>/dev/null || log_warn "DB figyelmeztetés"
     
-    [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && docker exec -it epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' or None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
+    [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && docker exec -i epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' if '${GITHUB_TOKEN}' else None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
     
     (crontab -l 2>/dev/null; echo "0 3 * * 0 $PROJECT_DIR/scripts/backup.sh") | crontab -
     (crontab -l 2>/dev/null; echo "0 4 * * 0 docker system prune -f") | crontab -
@@ -562,6 +562,7 @@ services:
     depends_on: {postgres: {condition: service_healthy}, ollama: {condition: service_healthy}, redis: {condition: service_started}}
     networks: [translator-network]
     restart: unless-stopped
+    healthcheck: {test: ["CMD", "curl", "-f", "http://localhost:5000/health"], interval: 15s, timeout: 10s, retries: 5, start_period: 30s}
     command: gunicorn -w 2 -b 0.0.0.0:5000 app:app --timeout 600 --worker-class eventlet
   postgres:
     image: postgres:15-alpine
@@ -570,6 +571,7 @@ services:
     volumes: [postgres_data:/var/lib/postgresql/data, ./backups:/backups]
     networks: [translator-network]
     restart: unless-stopped
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U epub_user -d epub_translator"], interval: 10s, timeout: 5s, retries: 5}
   ollama:
     build: ./ollama
     container_name: epub-ollama
@@ -578,6 +580,7 @@ services:
     networks: [translator-network]
     restart: unless-stopped
     deploy: {resources: {limits: {memory: ${OPTIMAL_MEMORY_LIMIT}}, reservations: {memory: 16G}}}
+    healthcheck: {test: ["CMD", "/healthcheck.sh"], interval: 10s, timeout: 5s, retries: 5}
     command: serve
   redis:
     image: redis:alpine
@@ -596,7 +599,11 @@ services:
 networks:
   translator-network: {driver: bridge}
 volumes:
-  postgres_data: {}; ollama_data: {}; redis_data: {}; epub_uploads: {}; epub_output: {}
+  postgres_data: {}
+  ollama_data: {}
+  redis_data: {}
+  epub_uploads: {}
+  epub_output: {}
 DOCKEREOF
 }
 
@@ -619,6 +626,7 @@ NGINXEOF
 create_ollama_files() {
     mkdir -p ollama
     echo 'FROM ollama/ollama:latest' > ollama/Dockerfile
+    echo 'RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*' >> ollama/Dockerfile
     echo 'COPY healthcheck.sh /healthcheck.sh' >> ollama/Dockerfile
     echo 'RUN chmod +x /healthcheck.sh' >> ollama/Dockerfile
     echo '#!/bin/bash' > ollama/healthcheck.sh
