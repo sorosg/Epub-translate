@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.6
+# Verzió: 11.0.8
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.6"
+VERSION="11.0.8"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -733,7 +733,8 @@ services:
       test: ["CMD", "/healthcheck.sh"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
     command: serve
   redis:
     image: redis:alpine
@@ -844,7 +845,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.6')
+    VERSION = os.environ.get('VERSION', '11.0.8')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -890,6 +891,10 @@ class User(UserMixin, db.Model):
     dark_mode = db.Column(db.Boolean, default=True)
     points = db.Column(db.Integer, default=0)
     level = db.Column(db.Integer, default=1)
+    address = db.Column(db.String(255))
+    birth_date = db.Column(db.String(20))
+    tax_id = db.Column(db.String(50))
+    phone = db.Column(db.String(30))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Translation(db.Model):
@@ -1107,20 +1112,111 @@ def admin():
         'disk_percent': psutil.disk_usage('/').percent,
         'disk_free_gb': round(psutil.disk_usage('/').free / (1024**3), 2)
     }
-    try:
-        resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=5)
-        models = resp.json().get('models', []) if resp.status_code == 200 else []
-        if not models:
-            flash(_('Nincsenek modellek betöltve az Ollama-ban. Futtasd: docker exec -it epub-ollama ollama pull deepseek-r1:14b'), 'warning')
-    except Exception as e:
-        models = []
-        flash(_(f'Nem sikerült lekérni az Ollama modelleket: {str(e)[:100]}'), 'error')
+    models = []
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=10)
+            if resp.status_code == 200:
+                models = resp.json().get('models', [])
+                if not models:
+                    flash(_('Nincsenek modellek betöltve az Ollama-ban. Futtasd: docker exec -it epub-ollama ollama pull deepseek-r1:14b'), 'warning')
+                break
+        except Exception as e:
+            if attempt == 3:
+                flash(_(f'Nem sikerült lekérni az Ollama modelleket ({attempt}. próbálkozás): {str(e)[:80]}'), 'error')
+            else:
+                import time
+                time.sleep(3)
     all_translations = Translation.query.order_by(Translation.created_at.desc()).limit(50).all()
     users_count = User.query.count()
     
     return render_template('admin.html', sys_info=sys_info, models=models, 
                           current_model=app.config['DEFAULT_MODEL'], 
-                          translations=all_translations, users_count=users_count)
+                          translations=all_translations, users_count=users_count,
+                          translations_count=Translation.query.count())
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('users.html', users=users)
+
+@app.route('/admin/users/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_users_add():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        tokens = request.form.get('tokens', '5').strip()
+        if not email or not password:
+            flash(_('Az email és a jelszó kötelező!'), 'error')
+            return render_template('users_form.html', user_data=request.form, edit_mode=False)
+        if User.query.filter_by(email=email).first():
+            flash(_('Ez az email cím már használatban van!'), 'error')
+            return render_template('users_form.html', user_data=request.form, edit_mode=False)
+        user = User(
+            username=email.split('@')[0],
+            email=email,
+            password_hash=generate_password_hash(password),
+            first_name=request.form.get('first_name', '').strip(),
+            last_name=request.form.get('last_name', '').strip(),
+            address=request.form.get('address', '').strip(),
+            birth_date=request.form.get('birth_date', '').strip(),
+            tax_id=request.form.get('tax_id', '').strip(),
+            phone=request.form.get('phone', '').strip(),
+            tokens=int(tokens) if tokens.isdigit() else 5,
+            is_admin=request.form.get('is_admin') == '1'
+        )
+        db.session.add(user)
+        db.session.commit()
+        flash(_('Felhasználó létrehozva!'), 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('users_form.html', user_data={}, edit_mode=False)
+
+@app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_users_edit(user_id):
+    user = User.query.get_or_404(user_id)
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        tokens = request.form.get('tokens', str(user.tokens)).strip()
+        existing = User.query.filter_by(email=email).first()
+        if existing and existing.id != user.id:
+            flash(_('Ez az email cím már használatban van!'), 'error')
+            return render_template('users_form.html', user_data=request.form, edit_mode=True, user=user)
+        user.email = email
+        user.first_name = request.form.get('first_name', '').strip()
+        user.last_name = request.form.get('last_name', '').strip()
+        user.address = request.form.get('address', '').strip()
+        user.birth_date = request.form.get('birth_date', '').strip()
+        user.tax_id = request.form.get('tax_id', '').strip()
+        user.phone = request.form.get('phone', '').strip()
+        user.tokens = int(tokens) if tokens.isdigit() else user.tokens
+        user.is_admin = request.form.get('is_admin') == '1'
+        if password:
+            user.password_hash = generate_password_hash(password)
+        db.session.commit()
+        flash(_('Felhasználó módosítva!'), 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('users_form.html', user_data={}, edit_mode=True, user=user)
+
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_users_delete(user_id):
+    if user_id == current_user.id:
+        flash(_('Saját magadat nem törölheted!'), 'error')
+        return redirect(url_for('admin_users'))
+    user = User.query.get_or_404(user_id)
+    Translation.query.filter_by(user_id=user.id).delete()
+    db.session.delete(user)
+    db.session.commit()
+    flash(_('Felhasználó törölve!'), 'success')
+    return redirect(url_for('admin_users'))
 
 @app.route('/api/models/switch', methods=['POST'])
 @login_required
@@ -1247,7 +1343,7 @@ APPEOF
     <div class="navbar-nav ms-auto">
       {% if current_user.is_authenticated %}
         <a class="nav-link" href="/dashboard">Vezérlőpult</a>
-        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a>{% endif %}
+        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a><a class="nav-link" href="/admin/users">Felhasználók</a>{% endif %}
         <a class="nav-link" href="/logout">Kijelentkezés</a>
       {% endif %}
     </div>
@@ -1353,6 +1449,105 @@ DASHEOF
 <div class="row justify-content-center mt-5"><div class="col-md-4"><div class="card"><div class="card-header bg-primary text-white"><h3 class="text-center">Bejelentkezés</h3></div><div class="card-body"><form method="POST"><div class="mb-3"><label>Email</label><input type="email" class="form-control" name="email" required></div><div class="mb-3"><label>Jelszó</label><input type="password" class="form-control" name="password" required></div><button type="submit" class="btn btn-primary w-100">Bejelentkezés</button></form></div></div></div></div>
 {% endblock %}
 LOGINEOF
+
+    # Admin Users HTML (felhasználók listája)
+    cat > backend/templates/users.html << 'USERSEOF'
+{% extends "base.html" %}{% block title %}Felhasználók{% endblock %}{% block content %}
+<h2>👥 Felhasználók kezelése</h2>
+<div class="mb-3"><a href="/admin/users/add" class="btn btn-primary">➕ Új felhasználó</a></div>
+<div class="card">
+  <div class="card-body">
+    {% if users %}
+    <table class="table table-dark table-striped">
+      <thead><tr><th>ID</th><th>Név</th><th>Email</th><th>Token</th><th>Admin</th><th>Regisztrált</th><th>Műveletek</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.last_name }} {{ u.first_name }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.tokens }}</td>
+        <td>{% if u.is_admin %}✅{% else %}❌{% endif %}</td>
+        <td><small>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '-' }}</small></td>
+        <td>
+          <a href="/admin/users/edit/{{ u.id }}" class="btn btn-sm btn-warning">✏️</a>
+          <form action="/admin/users/delete/{{ u.id }}" method="POST" style="display:inline">
+            <button class="btn btn-sm btn-danger" onclick="return confirm('Biztosan törlöd a felhasználót?')">🗑️</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Nincsenek felhasználók.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+USERSEOF
+
+    # Admin Users Form HTML (felhasználó hozzáadás/szerkesztés)
+    cat > backend/templates/users_form.html << 'USERFORMEOF'
+{% extends "base.html" %}{% block title %}{% if edit_mode %}Felhasználó szerkesztése{% else %}Új felhasználó{% endif %}{% endblock %}{% block content %}
+<h2>{% if edit_mode %}✏️ Felhasználó szerkesztése: {{ user.email }}{% else %}➕ Új felhasználó létrehozása{% endif %}</h2>
+<div class="card mt-3">
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Vezetéknév</label>
+          <input type="text" class="form-control" name="last_name" value="{% if edit_mode %}{{ user.last_name or '' }}{% else %}{{ user_data.get('last_name', '') }}{% endif %}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Keresztnév</label>
+          <input type="text" class="form-control" name="first_name" value="{% if edit_mode %}{{ user.first_name or '' }}{% else %}{{ user_data.get('first_name', '') }}{% endif %}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email cím <span class="text-danger">*</span></label>
+          <input type="email" class="form-control" name="email" required value="{% if edit_mode %}{{ user.email }}{% else %}{{ user_data.get('email', '') }}{% endif %}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Telefonszám</label>
+          <input type="text" class="form-control" name="phone" value="{% if edit_mode %}{{ user.phone or '' }}{% else %}{{ user_data.get('phone', '') }}{% endif %}">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Cím</label>
+          <input type="text" class="form-control" name="address" value="{% if edit_mode %}{{ user.address or '' }}{% else %}{{ user_data.get('address', '') }}{% endif %}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Születési dátum</label>
+          <input type="date" class="form-control" name="birth_date" value="{% if edit_mode %}{{ user.birth_date or '' }}{% else %}{{ user_data.get('birth_date', '') }}{% endif %}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Adószám</label>
+          <input type="text" class="form-control" name="tax_id" value="{% if edit_mode %}{{ user.tax_id or '' }}{% else %}{{ user_data.get('tax_id', '') }}{% endif %}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tokenek száma <span class="text-danger">*</span></label>
+          <input type="number" class="form-control" name="tokens" required value="{% if edit_mode %}{{ user.tokens }}{% else %}5{% endif %}" min="0">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Jelszó {% if not edit_mode %}<span class="text-danger">*</span>{% else %}(ha üres, nem változik){% endif %}</label>
+          <input type="password" class="form-control" name="password" {% if not edit_mode %}required{% endif %}>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Admin jogosultság</label>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="is_admin" value="1" id="isAdmin" {% if edit_mode and user.is_admin %}checked{% endif %}>
+            <label class="form-check-label" for="isAdmin">Adminisztrátor</label>
+          </div>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button type="submit" class="btn btn-success">💾 Mentés</button>
+        <a href="/admin/users" class="btn btn-secondary">Mégse</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+USERFORMEOF
 
     # Admin HTML
     cat > backend/templates/admin.html << 'ADMINEOF'
