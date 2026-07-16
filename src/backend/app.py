@@ -267,6 +267,24 @@ def admin():
                           translations_count=Translation.query.count(),
                           users_count=User.query.count())
 
+@app.route('/api/models/pull', methods=['POST'])
+@login_required
+@admin_required
+def api_models_pull():
+    data = request.get_json()
+    model_name = data.get('model', '').strip()
+    if not model_name:
+        return jsonify({'error': 'Modell név szükséges'}), 400
+    try:
+        resp = requests.post(f"{app.config['OLLAMA_HOST']}/api/pull", json={
+            'name': model_name, 'stream': False
+        }, timeout=5)
+        if resp.status_code == 200:
+            return jsonify({'success': True, 'message': f'Modell letöltés elindítva: {model_name}'})
+        return jsonify({'error': f'Ollama API hiba: {resp.status_code}'}), resp.status_code
+    except Exception as e:
+        return jsonify({'error': f'Nem sikerült elindítani a letöltést: {str(e)[:100]}'}), 500
+
 @app.route('/api/models/list')
 @login_required
 def api_models_list():

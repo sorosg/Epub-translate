@@ -17,6 +17,36 @@
     </div>
     <hr>
     <div id="modelsTable"></div>
+    <hr>
+    <div class="card bg-dark border-secondary">
+      <div class="card-body">
+        <h6>📥 Új modell letöltése</h6>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <select class="form-select form-select-sm" id="modelPreset" onchange="document.getElementById('pullModelName').value=this.value">
+              <option value="">-- Válassz modellt --</option>
+              <option value="deepseek-r1:1.5b">deepseek-r1:1.5b (1.5 GB)</option>
+              <option value="deepseek-r1:7b">deepseek-r1:7b (7 GB)</option>
+              <option value="deepseek-r1:8b">deepseek-r1:8b (8 GB)</option>
+              <option value="deepseek-r1:14b" selected>deepseek-r1:14b (14 GB) ★</option>
+              <option value="deepseek-r1:32b">deepseek-r1:32b (32 GB)</option>
+              <option value="deepseek-r1:70b">deepseek-r1:70b (70 GB)</option>
+              <option value="llama3:8b">llama3:8b (8 GB)</option>
+              <option value="llama3:70b">llama3:70b (40 GB)</option>
+              <option value="mistral:7b">mistral:7b (4.1 GB)</option>
+              <option value="gemma2:9b">gemma2:9b (5.4 GB)</option>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <input type="text" class="form-control form-control-sm" id="pullModelName" placeholder="vagy írd be egyéni modell nevét" value="deepseek-r1:14b">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-sm btn-success w-100" id="pullBtn" onclick="pullModel()">⬇️ Letöltés</button>
+          </div>
+        </div>
+        <small class="text-muted mt-2 d-block">A letöltés hosszú ideig (akár 30-60 perc) is eltarthat. A "Státusz frissítése" gombbal ellenőrizheted.</small>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -54,14 +84,38 @@ async function loadModels() {
           if (d.success) location.reload();
         });
       });
-    } else {
-      document.getElementById('modelsTable').innerHTML = '<p class="text-muted">Nincsenek modellek betöltve. Tölts le egy modellt: <code>docker exec -it epub-ollama ollama pull deepseek-r1:14b</code></p>';
-      el.innerHTML = '<span class="text-warning">⚠️ Nincsenek modellek</span>';
+      document.getElementById('modelsTable').innerHTML = '<div class="alert alert-info">Tölts le egy modellt a webes felületről:</div>';
     }
+    el.innerHTML = data.models.length > 0 ? ('<span class="text-success">✅ ' + data.models.length + ' modell betöltve</span>') : '';
   } catch(e) {
     el.innerHTML = '<div class="alert alert-danger">Hiba: ' + e.message + '</div>';
   }
 }
+
+async function pullModel() {
+  const model = document.getElementById('pullModelName').value.trim();
+  if (!model) { alert('Add meg a modell nevét!'); return; }
+  const btn = document.getElementById('pullBtn');
+  btn.disabled = true; btn.textContent = 'Letöltés...';
+  try {
+    const resp = await fetch('/api/models/pull', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({model: model})
+    });
+    const data = await resp.json();
+    if (data.success) {
+      alert('✅ ' + data.message + '\n\nA modell letöltése folyamatban van. Ez akár 30-60 percig is eltarthat.\nFrissítsd az oldalt később a Státusz frissítése gombbal.');
+    } else {
+      alert('❌ ' + (data.error || 'Ismeretlen hiba'));
+    }
+  } catch(e) {
+    alert('Hiba: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '⬇️ Letöltés';
+}
+
 window.addEventListener('load', () => loadModels());
 </script>
 {% endblock %}
