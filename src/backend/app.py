@@ -262,24 +262,30 @@ def admin():
         'disk_percent': psutil.disk_usage('/').percent,
         'disk_free_gb': round(psutil.disk_usage('/').free / (1024**3), 2)
     }
+    return render_template('admin.html', sys_info=sys_info,
+                          current_model=app.config['DEFAULT_MODEL'],
+                          translations_count=Translation.query.count(),
+                          users_count=User.query.count())
+
+@app.route('/api/models/list')
+@login_required
+@admin_required
+def api_models_list():
     models = []
+    error = None
     for attempt in range(1, 4):
         try:
-            resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=10)
+            resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=5)
             if resp.status_code == 200:
                 models = resp.json().get('models', [])
                 break
         except Exception as e:
             if attempt == 3:
-                flash(_(f'Nem sikerült lekérni az Ollama modelleket: {str(e)[:80]}'), 'error')
+                error = str(e)[:100]
             else:
                 import time
-                time.sleep(3)
-    
-    return render_template('admin.html', sys_info=sys_info, models=models, 
-                          current_model=app.config['DEFAULT_MODEL'], 
-                          translations_count=Translation.query.count(),
-                          users_count=User.query.count())
+                time.sleep(2)
+    return jsonify({'models': models, 'current_model': app.config['DEFAULT_MODEL'], 'error': error})
 
 @app.route('/admin/users')
 @login_required
