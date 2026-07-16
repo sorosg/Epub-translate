@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.3
+# Verzió: 11.0.4
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.3"
+VERSION="11.0.4"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -844,7 +844,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.3')
+    VERSION = os.environ.get('VERSION', '11.0.4')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
@@ -1197,6 +1197,57 @@ DASHEOF
 <div class="row justify-content-center mt-5"><div class="col-md-4"><div class="card"><div class="card-header bg-primary text-white"><h3 class="text-center">Bejelentkezés</h3></div><div class="card-body"><form method="POST"><div class="mb-3"><label>Email</label><input type="email" class="form-control" name="email" required></div><div class="mb-3"><label>Jelszó</label><input type="password" class="form-control" name="password" required></div><button type="submit" class="btn btn-primary w-100">Bejelentkezés</button></form></div></div></div></div>
 {% endblock %}
 LOGINEOF
+
+    # Admin HTML
+    cat > backend/templates/admin.html << 'ADMINEOF'
+{% extends "base.html" %}{% block title %}Admin{% endblock %}{% block content %}
+<h2>⚙️ Admin Vezérlőpult</h2>
+<div class="row mt-4">
+  <div class="col-md-3"><div class="card bg-success text-white"><div class="card-body text-center"><h3>{{ sys_info.cpu_percent }}%</h3><p>CPU</p></div></div></div>
+  <div class="col-md-3"><div class="card bg-info text-white"><div class="card-body text-center"><h3>{{ sys_info.memory_percent }}%</h3><p>RAM ({{ sys_info.memory_used_gb }}/{{ sys_info.memory_total_gb }} GB)</p></div></div></div>
+  <div class="col-md-3"><div class="card bg-warning text-dark"><div class="card-body text-center"><h3>{{ sys_info.disk_percent }}%</h3><p>Lemez ({{ sys_info.disk_free_gb }} GB szabad)</p></div></div></div>
+  <div class="col-md-3"><div class="card bg-secondary text-white"><div class="card-body text-center"><h3>{{ models|length }}</h3><p>Modell</p></div></div></div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header"><h5>🤖 AI Modellek</h5></div>
+  <div class="card-body">
+    <p>Aktuális modell: <strong>{{ current_model }}</strong></p>
+    {% if models %}
+    <table class="table table-dark table-striped">
+      <thead><tr><th>Név</th><th>Méret</th><th>Művelet</th></tr></thead>
+      <tbody>
+      {% for m in models %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>{{ (m.size / 1024 / 1024 / 1024)|round(1) }} GB</td>
+          <td><button class="btn btn-sm btn-outline-light switch-model" data-model="{{ m.name }}">Váltás</button></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Nincsenek modellek betöltve.</p>
+    {% endif %}
+  </div>
+</div>
+<script>
+document.querySelectorAll('.switch-model').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const model = btn.dataset.model;
+    const resp = await fetch('/api/models/switch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model: model, auto_optimize: true})
+    });
+    const data = await resp.json();
+    alert(data.message || data.error);
+    if (data.success) location.reload();
+  });
+});
+</script>
+{% endblock %}
+ADMINEOF
 }
 
 create_model_optimizer() {
