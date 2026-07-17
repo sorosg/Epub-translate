@@ -63,6 +63,9 @@
       <button class="btn btn-sm btn-outline-light me-1" onclick="scrollToBottom()" title="Ugrás a végére">
         <i class="bi bi-arrow-down"></i>
       </button>
+      <button class="btn btn-sm btn-outline-danger" onclick="clearLog()" title="Log törlése">
+        <i class="bi bi-trash"></i>
+      </button>
       <button class="btn btn-sm btn-outline-light" onclick="copyLog()" title="Másolás vágólapra">
         <i class="bi bi-clipboard"></i>
       </button>
@@ -112,6 +115,24 @@ document.addEventListener('DOMContentLoaded', () => {
   scrollToBottom();
   toggleAutoRefresh();
 });
+
+function clearLog() {
+  if (!confirm('Biztosan törlöd a jelenlegi log fájlt? Ez a művelet nem vonható vissza!')) return;
+  const logType = '{{ log_type }}';  // Jinja2 template változó
+  fetch('/admin/logs/clear', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'type=' + encodeURIComponent(logType)
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Hiba: ' + (data.message || data.error || 'Ismeretlen hiba'));
+    }
+  }).catch(err => {
+    alert('Hálózati hiba: ' + err.message);
+  });
+}
 
 // Szintaxis kiemelés (egyszerű regex alapú)
 document.addEventListener('DOMContentLoaded', () => {

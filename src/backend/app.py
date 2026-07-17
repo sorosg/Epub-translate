@@ -580,6 +580,33 @@ def admin_logs():
     return render_template('logs.html', log_content=log_content, log_type=log_type, 
                           lines=lines, file_size=file_size, available_logs=available_logs)
 
+@app.route('/admin/logs/clear', methods=['POST'])
+@login_required
+@admin_required
+def admin_logs_clear():
+    """Log fájlok törlése (törli a fájlt, majd újra létrehozza üresen)"""
+    log_type = request.form.get('type', 'translation')
+    log_file_map = {
+        'translation': os.path.join(LOG_DIR, 'translation.log'),
+        'app': os.path.join(LOG_DIR, 'app.log'),
+    }
+    log_file = log_file_map.get(log_type)
+    if not log_file:
+        return jsonify({'error': 'Ismeretlen log típus'}), 400
+    
+    try:
+        if os.path.exists(log_file):
+            # Töröljük a fájlt, majd újra létrehozzuk üresen
+            os.remove(log_file)
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('')
+            app_logger.info(f"Log fájl törölve: {log_file} (admin: {current_user.email})")
+            return jsonify({'success': True, 'message': f'Log fájl törölve: {os.path.basename(log_file)}'})
+        else:
+            return jsonify({'success': False, 'message': 'A log fájl nem létezik'})
+    except Exception as e:
+        return jsonify({'error': str(e)[:200]}), 500
+
 def translate_epub(app_ref, translation_id, filepath, context_files=None):
     with app_ref.app_context():
         t = Translation.query.get(translation_id)
@@ -787,215 +814,171 @@ Minták a kívánt stílushoz:
                         except Exception:
                             pass
                     
-                    # Ollama API hívás – optimalizált paraméterek + few-shot prompt, timeout nélkül
-                    source_chunk = combined_source[:800]
+                    # === NODE-ONKÉNTI FORDÍTÁS (megbízhatóbb, mint a batch) ===
+                    # Batch fordítás helyett minden text node-ot egyesével fordítunk,
+                    # mert a deepseek-r1 nem használja megbízhatóan a NODE_SEP szeparátort.
+                    # Ez több API hívást jelent, de a megbízhatóság garantált.
+                    import hashlib
+                    nodes_translated_here = 0
+                    placeholders = []
                     
-                    # Few-shot fordítási példák a jobb minőségért
-                    few_shot = """Fordítási példák (stílus és formátum referenciaként):
-
-Angol: The quick brown fox jumps over the lazy dog.
-Magyar: A gyors barna róka átugorja a lusta kutyát.
-
-Angol: She walked through the garden, admiring the beautiful flowers that bloomed in the morning sun.
-Magyar: Átsétált a kerten, gyönyörködve a gyönyörű virágokban, amelyek a reggeli napfényben nyíltak.
-
----
-"""
-                    
-                    prompt = f"""{few_shot}{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szövegrészleteket magyarra.
-A szövegrészletek a '{NODE_SEP}' elválasztóval vannak szétválasztva.
-FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a lefordított részek között!
-Őrizd meg a szövegrészletek sorrendjét. Csak a fordítást add vissza, semmi mást!
-
-{source_chunk}"""
-                    
-                    # Nincs timeout – a deepseek-r1 CPU-n nagyon lassú, az idő nem számít
-                    translated_response = ""
-                    try:
-                        resp = requests.post(f"{ollama_host}/api/generate", json={
-                            'model': model,
-                            'prompt': prompt,
-                            'stream': False,
-                            'options': {
-                                'num_predict': 2048,
-                                'temperature': 0.2,
-                                'repeat_penalty': 1.1,
-                                'top_p': 0.9
-                            }
-                        }, timeout=None)
+                    for node_idx, (node, original) in enumerate(text_nodes):
+                        if len(original) < 5:
+                            continue  # túl rövid szöveg, nem érdemes fordítani
                         
-                        if resp.status_code != 200:
-                            translation_logger.warning(f"[ID:{translation_id}] Ollama hibás válasz (HTTP {resp.status_code}) a(z) {idx+1}. elemnél: {resp.text[:200]}")
-                            failed_items += 1
+                        # Fordítási memória keresés: ha már lefordítottuk ezt a szöveget
+                        cached = search_tm(original, t.user_id)
+                        if cached:
+                            ph = f"__CACHED_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
+                            node.replace_with(ph)
+                            placeholders.append((ph, cached, True))
+                            nodes_translated_here += 1
+                            total_nodes_translated += 1
+                            translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}, node {node_idx+1}/{len(text_nodes)}: TM cache találat")
                             continue
                         
-                        translated_response = resp.json().get('response', '')
-                    except Exception as req_err:
-                        translation_logger.warning(f"[ID:{translation_id}] Ollama kérés hiba a(z) {idx+1}. elemnél: {req_err}")
-                        failed_items += 1
-                        continue
-                    
-                    if not translated_response:
-                        translation_logger.warning(f"[ID:{translation_id}] Üres válasz a(z) {idx+1}. elemnél")
-                        failed_items += 1
-                        continue
-                    
-                    translated_parts = translated_response.split(NODE_SEP)
-                    
-                    # 3. szakasz: Robusztus placeholder-alapú text node csere
-                    # Probléma: a NavigableString.replace_with() néha nem működik megbízhatóan
-                    # Megoldás: egyedi placeholder-ek használata a HTML stringben, regex cserével
-                    nodes_translated_here = 0
-                    if len(translated_parts) == len(text_nodes):
-                        # Hozzunk létre egyedi placeholder-eket minden text node-hoz
-                        import hashlib
-                        placeholders = []
-                        for i, (node, original) in enumerate(text_nodes):
-                            ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{i}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
-                            placeholders.append((node, original, ph, translated_parts[i].strip()))
+                        # Ollama API hívás egyetlen text node fordítására
+                        # Kontextus: few-shot + stílus + terminológia + előző fejezet + GLOSSZÁRIUM
+                        # A glosszárium betöltve, használjuk explicit utasításként
+                        glossary_hint = ""
+                        if glossary_terms:
+                            relevant = [f"{k} → {v}" for k, v in glossary_terms.items() if k in original.lower()]
+                            if relevant:
+                                glossary_hint = f"Glosszárium (használd ezeket a fordításokat): {', '.join(relevant[:5])}\n"
                         
-                        # Cseréljük ki a text node-okat placeholder-ekre a soup-ban
-                        for node, original, ph, translated in placeholders:
-                            try:
-                                node.replace_with(ph)
-                            except Exception:
-                                pass
+                        single_prompt = f"""{few_shot}{glossary_hint}{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szöveget magyarra.
+Csak a fordítást add vissza, semmi mást!
+
+{original[:800]}"""
                         
-                        # Generáljuk a HTML string-et
-                        html_str = str(soup)
-                        
-                        # Cseréljük a placeholder-eket a lefordított szövegre
-                        for node, original, ph, translated in placeholders:
-                            if translated and translated != original:
-                                html_str = html_str.replace(ph, translated, 1)
-                                nodes_translated_here += 1
+                        try:
+                            resp = requests.post(f"{ollama_host}/api/generate", json={
+                                'model': model,
+                                'prompt': single_prompt,
+                                'stream': False,
+                                'options': {
+                                    'num_predict': 1024,  # kevesebb token, mert egyesével fordítunk
+                                    'temperature': 0.2,
+                                    'repeat_penalty': 1.1,
+                                    'top_p': 0.9
+                                }
+                            }, timeout=None)
+                            
+                            if resp.status_code == 200:
+                                translated = resp.json().get('response', '').strip()
+                                if translated and translated != original:
+                                    # Placeholder-s csere
+                                    ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
+                                    try:
+                                        node.replace_with(ph)
+                                        placeholders.append((ph, translated, False))
+                                        nodes_translated_here += 1
+                                        total_nodes_translated += 1
+                                    except:
+                                        placeholders.append((ph, original, False))  # hiba esetén az eredeti
+                                else:
+                                    # Üres vagy azonos válasz – az eredeti marad
+                                    ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
+                                    try:
+                                        node.replace_with(ph)
+                                        placeholders.append((ph, original, False))
+                                    except:
+                                        pass
                             else:
-                                # Ha a fordítás üres vagy megegyezik, állítsuk vissza
-                                html_str = html_str.replace(ph, original, 1)
-                        
-                        total_nodes_translated += nodes_translated_here
+                                translation_logger.warning(f"[ID:{translation_id}] Ollama hiba (HTTP {resp.status_code}) node {node_idx+1}-nél")
+                        except Exception as node_err:
+                            translation_logger.warning(f"[ID:{translation_id}] Node fordítási hiba: {node_err}")
+                    
+                    # Cseréljük a placeholder-eket a fordított szövegre
+                    html_str = str(soup)
+                    for ph, text, is_cached in placeholders:
+                        html_str = html_str.replace(ph, text, 1)
+                    
+                    if nodes_translated_here > 0:
                         translated_count += 1
-                        translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}: {nodes_translated_here}/{len(text_nodes)} node placeholder-cserével lefordítva")
-                        
-                        # === GLOSSZÁRIUM ÉPÍTÉS (1. fejlesztés) ===
-                        # Automatikusan kinyerjük az angol→magyar szópárokat a fordításból
-                        try:
-                            import re as regex
-                            for i, (node, original) in enumerate(text_nodes):
-                                translated = translated_parts[i].strip()
-                                if not translated or translated == original:
-                                    continue
-                                # Csak akkor adjuk hozzá, ha van értelmes fordítás (nem ugyanaz)
-                                # Egyszerű heurisztika: ha a fordítás rövidebb és nem tartalmaz számokat
-                                source_lower = original.lower().strip()
-                                target_lower = translated.lower().strip()
-                                if len(source_lower) > 3 and len(target_lower) > 3 and source_lower != target_lower:
-                                    existing = GlossaryEntry.query.filter_by(
-                                        user_id=t.user_id, 
-                                        source_term=original[:200]
-                                    ).first()
-                                    if not existing:
-                                        entry = GlossaryEntry(
-                                            user_id=t.user_id,
-                                            source_term=original[:200],
-                                            target_term=translated[:200],
-                                            language_pair='en-hu',
-                                            source_count=1
-                                        )
-                                        db.session.add(entry)
-                                    else:
-                                        existing.source_count += 1
-                                        existing.target_term = translated[:200]  # frissítjük a legfrissebb fordítással
-                            db.session.commit()
-                        except Exception as gloss_err:
-                            pass  # a glosszárium építés nem kritikus, csendes hiba
-                        
-                        # === FORDÍTÁSI MEMÓRIA MENTÉS (4. fejlesztés) ===
-                        try:
-                            for tn_text in source_texts:
-                                saved = search_tm(tn_text, t.user_id)
-                                if not saved:
-                                    import hashlib
-                                    tm_hash = hashlib.sha256(tn_text.strip().encode()).hexdigest()
-                                    # Keressük meg a hozzá tartozó fordított szöveget
-                                    ti = source_texts.index(tn_text)
-                                    translated_tn = translated_parts[ti].strip() if ti < len(translated_parts) else ""
-                                    if translated_tn and translated_tn != tn_text:
-                                        tm_entry = TranslationMemory(
-                                            user_id=t.user_id,
-                                            source_text=tn_text[:1000],
-                                            translated_text=translated_tn[:1000],
-                                            source_hash=tm_hash
-                                        )
-                                        db.session.add(tm_entry)
-                            db.session.commit()
-                        except Exception as tm_err:
-                            pass  # TM mentés nem kritikus
-                        
-                        # === HUNSPELL HELYESÍRÁS ELLENŐRZÉS (3. fejlesztés) ===
-                        if hunspell_checker:
-                            try:
-                                for i, (node, original) in enumerate(text_nodes):
-                                    translated = translated_parts[i].strip()
-                                    if not translated or len(translated) < 5:
-                                        continue
-                                    # Csak a magyar szöveget ellenőrizzük (a fordítottat)
-                                    words = translated.split()
-                                    corrected_count = 0
-                                    for word in words:
-                                        clean_word = word.strip('.,;:!?()[]{}"\'').lower()
-                                        if len(clean_word) > 2 and not hunspell_checker.spell(clean_word):
-                                            suggestions = hunspell_checker.suggest(clean_word)
-                                            if suggestions:
-                                                # Csak akkor javítjuk, ha a javaslat egyértelmű (1 találat)
-                                                # Több javaslat esetén nem kockáztatjuk a téves javítást
-                                                pass  # automatikus javítás helyett csak naplózzuk
-                                # A Hunspell eredményt naplózzuk, de automatikusan nem javítunk
-                                # a téves pozitívok elkerülése érdekében
-                            except Exception as spell_err:
-                                pass  # helyesírás nem kritikus
-                        
-                        # === RÉSZLETES PROGRESSZ FRISSÍTÉS (5. fejlesztés) ===
-                        t.current_chapter = idx + 1
-                        t.nodes_translated = total_nodes_translated
-                        t.nodes_failed = failed_items
-                        # Szószám frissítés
-                        words_here = sum(len(tn.split()) for tn in source_texts)
-                        t.words_processed = (t.words_processed or 0) + words_here
-                    else:
-                        # Fallback: egyedi node-onkénti fordítás placeholder nélkül
-                        translation_logger.warning(f"[ID:{translation_id}] Batch darabszám eltérés: {len(translated_parts)} vs {len(text_nodes)}. Egyedi fordításra váltás...")
-                        fallback_success = 0
-                        # Gyűjtsük ki a text node-okat placeholder nélkül
+                    
+                    translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}: {nodes_translated_here}/{len(text_nodes)} node lefordítva (node-onkénti mód)")
+                    
+                    # === GLOSSZÁRIUM ÉPÍTÉS (1. fejlesztés) ===
+                    try:
                         for node, original in text_nodes:
-                            try:
-                                if len(original) < 5:
+                            # A fordítást a placeholder-ek listából keressük vissza
+                            translated = None
+                            for ph, txt, _ in placeholders:
+                                if node.strip()[:20] in original[:20]:
+                                    translated = txt
+                                    break
+                            if not translated or translated == original or len(original) < 3 or len(translated) < 3:
+                                continue
+                            source_lower = original.lower().strip()
+                            target_lower = translated.lower().strip()
+                            if source_lower != target_lower:
+                                existing = GlossaryEntry.query.filter_by(
+                                    user_id=t.user_id, 
+                                    source_term=original[:200]
+                                ).first()
+                                if not existing:
+                                    entry = GlossaryEntry(
+                                        user_id=t.user_id,
+                                        source_term=original[:200],
+                                        target_term=translated[:200],
+                                        language_pair='en-hu',
+                                        source_count=1
+                                    )
+                                    db.session.add(entry)
+                                else:
+                                    existing.source_count += 1
+                                    existing.target_term = translated[:200]
+                        db.session.commit()
+                    except Exception as gloss_err:
+                        pass
+                    
+                    # === FORDÍTÁSI MEMÓRIA MENTÉS (4. fejlesztés) ===
+                    try:
+                        for node, original in text_nodes:
+                            cached = search_tm(original, t.user_id)
+                            if not cached:
+                                # A fordítást a placeholder-ek listából keressük
+                                translated = None
+                                for ph, txt, _ in placeholders:
+                                    if node.strip()[:20] in original[:20]:
+                                        translated = txt
+                                        break
+                                if translated and translated != original:
+                                    import hashlib
+                                    tm_hash = hashlib.sha256(original.strip().encode()).hexdigest()
+                                    tm_entry = TranslationMemory(
+                                        user_id=t.user_id,
+                                        source_text=original[:1000],
+                                        translated_text=translated[:1000],
+                                        source_hash=tm_hash
+                                    )
+                                    db.session.add(tm_entry)
+                        db.session.commit()
+                    except Exception as tm_err:
+                        pass
+                    
+                    # === HUNSPELL HELYESÍRÁS ELLENŐRZÉS (3. fejlesztés) ===
+                    if hunspell_checker:
+                        try:
+                            for ph, translated, _ in placeholders:
+                                if not translated or len(translated) < 5:
                                     continue
-                                fr = requests.post(f"{ollama_host}/api/generate", json={
-                                    'model': model,
-                                    'prompt': f"Fordítsd le magyarra ezt az angol szöveget. CSAK a fordítást add vissza:\n\n{original}",
-                                    'stream': False
-                                }, timeout=60)
-                                if fr.status_code == 200:
-                                    tr = fr.json().get('response', '').strip()
-                                    if tr and tr != original:
-                                        # Placeholder-s cserével biztonságosan
-                                        import hashlib
-                                        ph = f"__FBPH_{hashlib.md5(f'fb_{idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:10]}__"
-                                        try:
-                                            node.replace_with(ph)
-                                            html_str = str(soup)
-                                            html_str = html_str.replace(ph, tr, 1)
-                                            fallback_success += 1
-                                            total_nodes_translated += 1
-                                        except Exception:
-                                            pass
-                            except Exception:
-                                pass
-                        translation_logger.info(f"[ID:{translation_id}] Fallback egyedi fordítás: {fallback_success}/{len(text_nodes)} node sikeres")
-                        if fallback_success > 0:
-                            translated_count += 1
-                        html_str = str(soup)  # használjuk a módosított soup-ot
+                                words = translated.split()
+                                for word in words:
+                                    clean_word = word.strip('.,;:!?()[]{}"\'').lower()
+                                    if len(clean_word) > 2 and not hunspell_checker.spell(clean_word):
+                                        suggestions = hunspell_checker.suggest(clean_word)
+                                        # Csak naplózás, automatikus javítás nélkül
+                        except Exception as spell_err:
+                            pass
+                    
+                    # === RÉSZLETES PROGRESSZ FRISSÍTÉS (5. fejlesztés) ===
+                    t.current_chapter = idx + 1
+                    t.nodes_translated = total_nodes_translated
+                    t.nodes_failed = failed_items
+                    words_here = sum(len(tn[1].split()) for tn in text_nodes if len(tn[1].split()) > 2)
+                    t.words_processed = (t.words_processed or 0) + words_here
                     
                     # Frissítsük az item tartalmát
                     item.set_content(html_str.encode('utf-8'))
@@ -1042,13 +1025,9 @@ FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a leford�
                     review_count += 1
                     
                     # Második menet prompt: az eredeti szöveget és a fordítást is beküldjük
-                    # Az eredeti szöveget a book-ból nyerjük ki újra
-                    original_text = ""
-                    try:
-                        orig_soup = BeautifulSoup(items[idx].get_body_content(), 'html.parser')
-                        original_text = orig_soup.get_text()[:1000].strip()
-                    except:
-                        original_text = ""
+                    # FONTOS: Az első menet után az items[idx] már lefordított szöveget tartalmaz,
+                    # ezért az original_texts listából vesszük az EREDETI angol szöveget!
+                    original_text = original_texts[idx] if idx < len(original_texts) else ""
                     
                     # A második menet promptja: ellenőrzés és javítás
                     review_prompt = f"""Ellenőrizd és javítsd az alábbi angolról magyarra fordítást.

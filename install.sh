@@ -1,7 +1,7 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.52
+# Verzió: 11.0.55
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.52"
+VERSION="11.0.55"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -40,10 +40,17 @@ TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
 CPU_CORES=$(nproc)
 FREE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 
-# Automatikus modell ajánlás
+# Automatikus modell ajánlás (hardver alapján)
+# 40 GB RAM: 32b modell (jobb minőség, de lassú CPU-n)
+# 32 GB RAM: 14b modell (jó minőség, elfogadható sebesség)
+# 16 GB RAM: 8b modell
+# 8 GB RAM: 7b modell
 if [ "$TOTAL_RAM" -ge 64 ]; then
     RECOMMENDED_MODEL="deepseek-r1:32b"
     MAX_WORKERS=4
+elif [ "$TOTAL_RAM" -ge 40 ]; then
+    RECOMMENDED_MODEL="deepseek-r1:32b"
+    MAX_WORKERS=2  # kevesebb szál, mert a 32b sok RAM-ot foglal
 elif [ "$TOTAL_RAM" -ge 32 ]; then
     RECOMMENDED_MODEL="deepseek-r1:14b"
     MAX_WORKERS=3
@@ -182,11 +189,15 @@ analyze_and_optimize() {
         OPTIMAL_OLLAMA_PARALLEL=1
     fi
     
-    # RAM optimalizálás
+    # RAM optimalizálás (40 GB esetén 32b modellhez elegendő memória)
     if [ "$TOTAL_RAM" -ge 64 ]; then
         OPTIMAL_MEMORY_LIMIT="48G"
         OPTIMAL_REDIS="1024mb"
         OPTIMAL_PG_BUFFERS="1GB"
+    elif [ "$TOTAL_RAM" -ge 40 ]; then
+        OPTIMAL_MEMORY_LIMIT="32G"
+        OPTIMAL_REDIS="512mb"
+        OPTIMAL_PG_BUFFERS="512MB"
     elif [ "$TOTAL_RAM" -ge 32 ]; then
         OPTIMAL_MEMORY_LIMIT="28G"
         OPTIMAL_REDIS="768mb"
@@ -265,7 +276,30 @@ perform_optimization_only() {
 # KONFIGURÁCIÓS VARÁZSLÓ
 # ============================================================
 configure_system() {
-    [ "$IS_UPDATE" = true ] && { log_info "Meglévő konfiguráció megtartása"; return; }
+    # Frissítés esetén is ellenőrizzük, hogy a hardver változott-e
+    # (pl. több RAM lett beszerelve, és érdemes nagyobb modellt használni)
+    if [ "$IS_UPDATE" = true ]; then
+        PREV_MODEL=$(grep SELECTED_MODEL .env 2>/dev/null | cut -d= -f2 || echo "")
+        PREV_MODEL="${PREV_MODEL:-$RECOMMENDED_MODEL}"
+        if [ "$PREV_MODEL" != "$RECOMMENDED_MODEL" ]; then
+            echo ""
+            log_warn "Hardver változás észlelve! ($TOTAL_RAM GB RAM)"
+            log_info "  Jelenlegi modell: $PREV_MODEL"
+            log_info "  Ajánlott modell:  $RECOMMENDED_MODEL"
+            echo ""
+            read -p "Szeretnél váltani az ajánlott modellre? (i/n) [i]: " switch_choice
+            if [[ "${switch_choice:-i}" =~ ^[Ii]$ ]]; then
+                SELECTED_MODEL="$RECOMMENDED_MODEL"
+                log_success "Modell frissítve: $SELECTED_MODEL"
+            else
+                SELECTED_MODEL="$PREV_MODEL"
+                log_info "Meglévő modell megtartva: $SELECTED_MODEL"
+            fi
+        else
+            log_info "Meglévő konfiguráció megtartása (a hardver nem változott jelentősen)"
+        fi
+        return
+    fi
     [ "${OPTIMIZE_ONLY:-false}" = true ] && return
     
     log_step "Konfigurációs varázsló"
