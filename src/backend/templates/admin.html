@@ -115,15 +115,36 @@ async function loadModels() {
         btn.addEventListener('click', async () => {
           const model = btn.dataset.model;
           btn.disabled = true;
-          btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-          const resp = await fetch('/api/models/switch', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({model: model})
-          });
-          const d = await resp.json();
-          if (d.success) location.reload();
-          else { alert(d.message || d.error); btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i>Váltás'; }
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Ellenőrzés...';
+          try {
+            const resp = await fetch('/api/models/switch', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({model: model})
+            });
+            const d = await resp.json();
+            if (d.success) {
+              if (d.status === 'downloading') {
+                // Modell letöltés folyamatban
+                alert('⏳ ' + d.message);
+                btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Letöltés alatt';
+                btn.classList.remove('btn-outline-light');
+                btn.classList.add('btn-outline-info');
+              } else if (d.status === 'switched') {
+                // Sikeres váltás – frissítjük a modell listát
+                document.getElementById('modelProgress').innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + d.message + '</span>';
+                loadModels(); // újratöltjük a listát a csillagok frissítéséhez
+              }
+            } else {
+              alert('❌ ' + (d.error || d.message || 'Ismeretlen hiba'));
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i>Váltás';
+            }
+          } catch(e) {
+            alert('Hálózati hiba: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-left-right me-1"></i>Váltás';
+          }
         });
       });
     } else {

@@ -622,13 +622,72 @@ def admin_users_delete(user_id):
 @login_required
 @admin_required
 def switch_model():
+    """Modell váltás – ellenőrzi az elérhetőséget, perzisztál az .env fájlba."""
     data = request.get_json()
     model_name = data.get('model')
     if not model_name: return jsonify({'error':'Modell név szükséges'}), 400
+    
+    # 1. Ellenőrizzük, hogy a modell elérhető-e az Ollama-ban
+    model_available = False
+    try:
+        resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=10)
+        if resp.status_code == 200:
+            models = resp.json().get('models', [])
+            model_available = any(m.get('name', '') == model_name for m in models)
+    except Exception:
+        pass
+    
+    if not model_available:
+        # Modell nincs letöltve – pull indítása háttérben
+        def pull_model(app_ref, model):
+            with app_ref.app_context():
+                try:
+                    requests.post(f"{app_ref.config['OLLAMA_HOST']}/api/pull", 
+                                 json={'name': model, 'stream': False}, timeout=7200)
+                except Exception as e:
+                    app_ref.logger.error(f"Modell letöltési hiba: {e}")
+        thread = threading.Thread(target=pull_model, args=(app, model_name))
+        thread.daemon = True; thread.start()
+        
+        log = OptimizationLog(model=model_name, action='pull_started', 
+                             details=json.dumps({'switched_by': current_user.email}), 
+                             created_at=datetime.utcnow())
+        db.session.add(log); db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'status': 'downloading',
+            'message': f'A(z) {model_name} modell letöltése elindult. Ez akár 30-60 percig is eltarthat. A letöltés után a modell automatikusan elérhető lesz.'
+        })
+    
+    # 2. Modell elérhető – váltás és perzisztálás
     app.config['DEFAULT_MODEL'] = model_name
-    log = OptimizationLog(model=model_name, action='switch', details=json.dumps({'switched_by':current_user.email}), created_at=datetime.utcnow())
+    
+    # .env fájl frissítése (ha elérhető)
+    try:
+        env_path = '/app/../.env'
+        import shutil
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                env_content = f.read()
+            import re as _re
+            env_content = _re.sub(r'^SELECTED_MODEL=.*$', f'SELECTED_MODEL={model_name}', env_content, flags=_re.MULTILINE)
+            with open(env_path, 'w') as f:
+                f.write(env_content)
+            app_logger.info(f"Modell perzisztálva .env-ben: {model_name} (user: {current_user.email})")
+    except Exception as e:
+        app_logger.warning(f".env frissítés nem sikerült: {e}")
+    
+    log = OptimizationLog(model=model_name, action='switch', 
+                         details=json.dumps({'switched_by': current_user.email}), 
+                         created_at=datetime.utcnow())
     db.session.add(log); db.session.commit()
-    return jsonify({'success':True,'message':f'Modell átváltva: {model_name}'})
+    
+    return jsonify({
+        'success': True, 
+        'status': 'switched',
+        'message': f'Modell átváltva: {model_name} (perzisztens – konténer újraindítás után is megmarad)'
+    })
 
 @app.route('/admin/update')
 @login_required
