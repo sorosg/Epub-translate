@@ -1,4 +1,3 @@
-```markdown
 # EPUB Fordító Rendszer v11.0
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
@@ -7,52 +6,69 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
-![PWA](https://img.shields.io/badge/PWA-ready-purple)
-![Update](https://img.shields.io/badge/auto--update-ready-success)
-![AI](https://img.shields.io/badge/AI-powered-orange)
-![Optimized](https://img.shields.io/badge/auto--optimized-brightgreen)
-![Monitor](https://img.shields.io/badge/resource-monitor-blue)
 
 ---
 
 ## 🎯 Rendszer Áttekintés
 
-Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** megoldás EPUB könyvek fordítására. A DeepSeek AI modelleket használja, amelyek a saját gépeden futnak - **nincs szükség API kulcsra, internetkapcsolatra (a modell letöltése után), vagy előfizetésre!**
+Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** megoldás EPUB könyvek fordítására angolról magyarra. A DeepSeek R1 AI modelleket használja az Ollama platformon keresztül, amelyek a saját gépeden futnak – **nincs szükség API kulcsra, internetkapcsolatra (a modell letöltése után), vagy előfizetésre!**
+
+### Tervezési alapelvek
+
+1. **Minőség a sebesség felett** – a rendszer kétmenetes fordítást végez (AI fordítás + minőségellenőrzés), a pontosság érdekében akár napokig is dolgozhat egy könyvön
+2. **GPU nélkül is működik** – a hardver követelmények a RAM-ot veszik alapul a modell kiválasztásához, erős videókártya nem szükséges
+3. **Közös könyvtár** – a feltöltött könyvekből deduplikált adatbázis épül, ami kontextusként szolgál a fordításokhoz
+4. **Öntanuló** – glosszárium, fordítási memória és stílusminták automatikusan épülnek
 
 ### 🌟 Legfontosabb Jellemzők
 
-- ✅ **100% Ingyenes** - Nincs rejtett költség, előfizetés vagy API díj
-- ✅ **Helyben Fut** - Minden adat a saját gépeden marad
-- ✅ **Offline Működés** - Internet csak a modell első letöltéséhez kell
-- ✅ **Öntanuló** - A fordítási memória és kontextus tanulás folyamatosan javul
-- ✅ **Önfrissítő** - Automatikus GitHub frissítések, egykattintásos frissítés
-- ✅ **Intelligens Optimalizáló** - Automatikusan hangolja a rendszert a kiválasztott modellhez
-- ✅ **Erőforrás Monitor** - Valós idejű CPU, RAM, lemez figyelés
-- ✅ **Smart Modellváltás** - Hardver alapú modell ajánlás
-- ✅ **AI Asszisztens** - Valós idejű fordítási segítség
-- ✅ **OAuth/SSO** - Google, GitHub, Microsoft bejelentkezés
-- ✅ **OCR + Hang** - Képfordítás és beszédfelismerés
-- ✅ **Gamification** - Achievement-ek, pontok, szintek, ranglisták
+- ✅ **100% Ingyenes** – Nincs rejtett költség, előfizetés vagy API díj
+- ✅ **Helyben Fut** – Minden adat a saját gépeden marad
+- ✅ **Kétmenetes fordítás** – AI fordítás + minőségellenőrzés a jobb minőségért
+- ✅ **Közös könyvtár** – Minden felhasználó látja az összes feltöltött könyvet (deduplikációval)
+- ✅ **Interaktív review** – Lefordított fejezetek böngészése és inline szerkesztése
+- ✅ **Email értesítések** – MailHog SMTP szerver a fordítás befejezésekor
+- ✅ **Önfrissítő** – GitHub frissítések ellenőrzése és telepítése
+- ✅ **Hardver alapú modell ajánlás** – RAM mérettől függően
 
 ---
 
-## 📋 Tartalomjegyzék
+## ⏱️ Fordítási Idő Becslések (CPU-only, GPU nélkül)
 
-1. [Rendszerkövetelmények](#-rendszerkövetelmények)
-2. [Gyors Telepítés](#-gyors-telepítés)
-3. [Frissítés Meglévő Telepítésről](#-frissítés-meglévő-telepítésről)
-4. [Újdonságok a v11.0-ban](#-újdonságok-a-v110-ban)
-5. [Intelligens Optimalizáló](#-intelligens-optimalizáló)
-6. [Erőforrás Monitor](#-erőforrás-monitor)
-7. [Smart Modellváltás](#-smart-modellváltás)
-8. [Modell Konfigurációk](#-modell-konfigurációk)
-9. [Architektúra](#-architektúra)
-10. [Konfiguráció](#-konfiguráció)
-11. [API Dokumentáció](#-api-dokumentáció)
-12. [Karbantartás](#-karbantartás)
-13. [Hibaelhárítás](#-hibaelhárítás)
-14. [GYIK](#-gyik)
-15. [Verzió Történet](#-verzió-történet)
+A rendszer **kétmenetes fordítást** végez (első menet: AI fordítás, második menet: minőségellenőrzés), ami megnöveli a feldolgozási időt, de jelentősen javítja a minőséget. A sebesség elsősorban a CPU teljesítményétől és a választott modelltől függ.
+
+### Átlagos fordítási idők egy 80 000 szavas könyvre
+
+| Modell | CPU (i3 8. gen, 4 mag) | CPU (i7/Ryzen 7, 8+ mag) | Minőség |
+|--------|------------------------|--------------------------|---------|
+| deepseek-r1:7b | 1–2 nap | 12–24 óra | ⭐⭐⭐ |
+| deepseek-r1:8b | 1,5–3 nap | 18–36 óra | ⭐⭐⭐ |
+| deepseek-r1:14b | **2,5–4 nap** | 1,5–2,5 nap | ⭐⭐⭐⭐ |
+| deepseek-r1:32b | 5–10 nap | 3–6 nap | ⭐⭐⭐⭐⭐ |
+
+### Miért ilyen hosszú?
+
+- **CPU-only futtatás**: GPU nélkül a deepseek-r1:14b ~1–3 tokent generál másodpercenként
+- **Kétmenetes**: minden szövegrészt kétszer dolgoz fel (fordítás + ellenőrzés), ~6 000–10 000 API hívás könyvenként
+- **Node-onkénti fordítás**: a megbízhatóság érdekében minden text node egyesével kerül fordításra (nem batch-ben)
+- Szövegrészenként 15–45 másodperc feldolgozási idő a szöveghossztól függően
+
+### Gyorsító tényezők
+
+- **TM cache (Translation Memory)**: a már lefordított mondatokat SHA256 hash alapján azonnal visszaadja – második könyvtől jelentős gyorsulás
+- **Glosszárium**: automatikusan épülő angol→magyar szópárak, terminológiai következetesség
+- **Minél több könyvet fordítasz, a cache annál hatékonyabb** – a rendszer tanul a korábbi fordításokból
+
+### Hardver ajánlás referencia időkkel
+
+| Processzor | RAM | Ajánlott modell | Várható idő (80K szó) |
+|-----------|-----|----------------|----------------------|
+| i3 8. gen (4 mag) | 16 GB | 8b | 1,5–3 nap |
+| i3 8. gen (4 mag) | 40 GB | **14b** ★ | **2,5–4 nap** |
+| i7/Ryzen 7 (8+ mag) | 32 GB | 14b | 1,5–2,5 nap |
+| i7/Ryzen 7 (8+ mag) | 64 GB | 32b | 3–6 nap |
+
+> **Megjegyzés**: Az időbecslések tájékoztató jellegűek és erősen függenek a könyv szövegsűrűségétől, a fejezetek számától és a CPU egyéb terheltségétől. A rendszer a **minőséget helyezi előtérbe a sebességgel szemben**.
 
 ---
 
@@ -70,18 +86,18 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 ### Szoftver
 
 - **Operációs Rendszer:** Ubuntu 22.04 LTS vagy újabb (64 bit)
-- **Docker:** 24.0+ 
+- **Docker:** 24.0+
 - **Docker Compose:** 2.20+
 
-### Automatikus Modell Ajánlás
+### Automatikus Modell Ajánlás (RAM alapú, GPU nélkül)
 
 | RAM | Ajánlott Modell | Minőség | Sebesség |
 |-----|----------------|---------|----------|
 | 8 GB | `deepseek-r1:1.5b` | ⭐⭐ | ⚡⚡⚡⚡⚡ |
 | 16 GB | `deepseek-r1:7b` | ⭐⭐⭐ | ⚡⚡⚡⚡ |
 | 32 GB | `deepseek-r1:14b` ★ | ⭐⭐⭐⭐ | ⚡⚡⚡ |
+| 40 GB | `deepseek-r1:32b` | ⭐⭐⭐⭐⭐ | ⚡⚡ |
 | 64 GB | `deepseek-r1:32b` | ⭐⭐⭐⭐⭐ | ⚡⚡ |
-| 128 GB+ | `deepseek-r1:70b` | ⭐⭐⭐⭐⭐ | ⚡ |
 
 ---
 
@@ -106,14 +122,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-Telepítési Opciók
-
-Opció Leírás Használat
-Friss telepítés Új rendszer telepítése Alapértelmezett
-Frissítés Meglévő verzió frissítése 1-es választás
-Csak optimalizálás Meglévő rendszer hangolása 3-as választás
-
-Telepítés Után
+### Telepítés után
 
 ```bash
 # Webes felület
@@ -129,444 +138,147 @@ Jelszó: Abrakadabra (változtasd meg!)
 
 ---
 
-🔄 Frissítés Meglévő Telepítésről
+## 🔄 Frissítés Meglévő Telepítésről
 
-Frissítés a Programból
+### Frissítés a Programból
 
-```
 1. Admin → Frissítés Kezelés
 2. "Frissítések ellenőrzése"
 3. "Telepítés"
-```
 
-Frissítés Parancssorból
+### Frissítés Parancssorból
 
 ```bash
-# 1. Telepítő script
+# Telepítő script
 ./install.sh
 # Válaszd: 1) Frissítés
 
-# 2. Gyorsfrissítő
+# VAGY gyorsfrissítő
 ./scripts/update.sh
-
-# 3. Csak optimalizálás (ha csak hangolni szeretnél)
-./install.sh
-# Válaszd: 3) Csak optimalizálás
 ```
 
 ---
 
-🆕 Újdonságok a v11.0-ban
+## 🆕 Funkciók
 
-🧠 Intelligens Optimalizáló
+### Fordítási funkciók
+- **Kétmenetes fordítás**: AI fordítás + minőségellenőrzés és javítás
+- **Glosszárium építés**: automatikus angol→magyar szópár kinyerés
+- **Fordítási memória (TM cache)**: SHA256 alapú gyorsítótárazás
+- **Hunspell helyesírás-ellenőrzés**: magyar nyelvi validáció
+- **Stílusinstrukció**: referencia (minta) könyvekből
+- **Terminológiai lista**: kiválasztott könyvtári könyvekből
 
-· Automatikus paraméter hangolás modellváltáskor
-· Memória, CPU, Redis, PostgreSQL automatikus konfigurálása
-· 6 előre definiált modell profil
-· Optimalizálási napló a változások követéséhez
+### Könyvtár funkciók (v11.0.59)
+- **Közös könyvtár**: minden felhasználó látja az összes feltöltött könyvet
+- **Deduplikáció**: cím+szerző alapú ellenőrzés feltöltéskor
+- **Felhasználónkénti kiválasztás**: mindenki saját maga jelölhet ki kontextus könyveket
+- **Jogosultságkezelés**: szerkesztés/törlés csak a feltöltő vagy admin számára
 
-📊 Erőforrás Monitor
+### Felhasználói funkciók
+- **Interaktív review felület**: lefordított fejezetek böngészése és inline szerkesztése
+- **Email értesítések**: fordítás befejezésekor (MailHog)
+- **Admin felület**: rendszerfigyelés, felhasználókezelés, modellváltás
+- **Részletes progressz követés**: fejezet, szószám, node szintű visszajelzés
 
-· Valós idejű CPU, RAM, lemez, swap figyelés
-· Hálózati forgalom monitorozása
-· API végpont a rendszer állapotához (/api/system/monitor)
-· Health check részletes rendszer információkkal
-
-🔄 Smart Modellváltás
-
-· Hardver alapú automatikus modell ajánlás
-· Egy kattintásos modellváltás optimalizálással
-· Nem használt modellek opcionális eltávolítása
-· Modell-specifikus erőforrás allokáció
-
-⚡ Automatikus Hardver Felismerés
-
-· Telepítéskor automatikusan észleli a rendszer erőforrásait
-· Optimális beállításokat javasol
-· Teljesítmény profil generálása
-· Folyamatos monitorozás és újrahangolás
+### Rendszer funkciók
+- **Hardver alapú optimalizálás**: RAM, CPU detektálás, auto-konfiguráció
+- **Önfrissítő**: GitHub API alapú verzióellenőrzés és frissítés
+- **DNS konfiguráció** (v11.0.60): backend konténer külső DNS feloldása a frissítésellenőrzéshez
 
 ---
 
-🧠 Intelligens Optimalizáló
-
-Hogyan Működik?
+## 🏗️ Architektúra
 
 ```
-1. Modell kiválasztása (vagy automatikus ajánlás)
-2. Optimalizáló elemzi a modell igényeit
-3. Automatikusan beállítja:
-   ├── Ollama memória limit
-   ├── Párhuzamos szálak száma
-   ├── Batch méret
-   ├── Redis cache méret
-   ├── PostgreSQL bufferek
-   └── Docker erőforrás limitek
-4. Újraindítja a szolgáltatásokat
-5. Ellenőrzi a beállításokat
+Böngésző (http://localhost:80)
+        │
+        ▼
+┌───────────────────┐
+│  Nginx (80/443)   │  Reverse Proxy + Statikus fájlok
+└───────┬───────────┘
+        │
+        ▼
+┌───────────────────┐     ┌──────────────┐
+│  Flask Backend    │────▶│  PostgreSQL   │
+│  (Gunicorn :5000) │     │  (Adatbázis)  │
+└───────┬───────────┘     └──────────────┘
+        │
+        │ HTTP API hívások
+        ▼
+┌───────────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Ollama (CPU)     │     │  Redis       │     │  MailHog     │
+│  deepseek-r1:14b  │     │  (Cache)     │     │  (SMTP:1025) │
+│  host.docker      │     │              │     │  (Web:8025)  │
+│  .internal:11434  │     │              │     │              │
+└───────────────────┘     └──────────────┘     └──────────────┘
 ```
 
-Optimalizálási Profilok
-
-Modell RAM Limit Szálak Batch Redis PostgreSQL
-1.5b 4G 4 8 128MB 128MB
-7b 12G 3 6 256MB 256MB
-8b 16G 3 5 512MB 512MB
-14b 24G 3 5 512MB 512MB
-32b 30G 1 2 256MB 256MB
-70b 60G 1 1 128MB 128MB
-
-API Használat
-
-```bash
-# Modell váltás optimalizálással
-curl -X POST http://localhost/api/models/switch \
-  -H "Content-Type: application/json" \
-  -d '{"model": "deepseek-r1:14b", "auto_optimize": true}'
-
-# Válasz:
-{
-    "success": true,
-    "message": "Modell átváltva: deepseek-r1:14b",
-    "optimization": {
-        "model": "deepseek-r1:14b",
-        "config": {
-            "max_workers": 3,
-            "batch_size": 5,
-            "memory_limit": "24G",
-            ...
-        },
-        "steps": [
-            {"step": "env", "success": true},
-            {"step": "redis", "success": true},
-            ...
-        ]
-    }
-}
-```
+Minden komponens Docker konténerben fut, a `translator-network` bridge hálózaton keresztül kommunikálnak.
 
 ---
 
-📊 Erőforrás Monitor
+## 🤖 Modell Konfigurációk
 
-Valós Idejű Monitorozás
-
-```bash
-# Rendszer állapot lekérése
-curl http://localhost/api/system/monitor
-
-# Válasz:
-{
-    "cpu": {
-        "percent": 45.2,
-        "cores": 8,
-        "frequency": 3200
-    },
-    "memory": {
-        "total_gb": 32.0,
-        "used_gb": 22.5,
-        "available_gb": 9.5,
-        "percent": 70.3
-    },
-    "disk": {
-        "total_gb": 500.0,
-        "free_gb": 350.0,
-        "percent": 30.0
-    },
-    "swap": {
-        "total_gb": 8.0,
-        "used_gb": 0.5,
-        "percent": 6.25
-    },
-    "network": {
-        "bytes_sent": 125000000,
-        "bytes_recv": 98000000
-    }
-}
-```
-
-Health Check (Részletes)
-
-```bash
-curl http://localhost/health
-
-# Válasz:
-{
-    "status": "healthy",
-    "version": "11.0.47",
-    "codename": "Smart Optimizer",
-    "release_date": "2026-07-16",
-    "model": "deepseek-r1:14b",
-    "memory": "70.3%",
-    "cpu": "45.2%"
-}
-```
-
-Automatikus Monitorozás
-
-A rendszer 30 percenként automatikusan naplózza az erőforrásokat:
-
-```bash
-# Monitor log megtekintése
-tail -f logs/resource_monitor.log
-
-# Kimenet:
-# 2026-07-16 14:30: CPU:45.2% RAM:22.5G/32.0G Disk:30%
-# 2026-07-16 15:00: CPU:52.1% RAM:24.1G/32.0G Disk:30%
-```
-
----
-
-🔄 Smart Modellváltás
-
-Automatikus Modell Ajánlás
-
-```bash
-# Rendszer alapján ajánlott modell
-curl http://localhost/api/models/recommend
-
-# Válasz:
-{
-    "recommended": "deepseek-r1:14b",
-    "current": "deepseek-r1:8b",
-    "should_switch": true,
-    "system_info": {
-        "total_ram_gb": 32.0,
-        "free_ram_gb": 12.5
-    }
-}
-```
-
-Modellváltás Folyamata
+### deepseek-r1:14b (Ajánlott 32-40GB RAM-hoz) ★
 
 ```
-1. Felhasználó kiválasztja az új modellt
-   VAGY
-   A rendszer ajánl egyet
-
-2. Optimalizáló ellenőrzi az erőforrásokat
-   ├── Van-e elég RAM?
-   ├── Van-e elég lemez?
-   └── Milyen a CPU terheltség?
-
-3. Automatikus beállítások alkalmazása
-   ├── Memória limitek
-   ├── Szálak száma
-   ├── Cache méretek
-   └── Adatbázis hangolás
-
-4. Modell letöltése (ha szükséges)
-5. Szolgáltatások újraindítása
-6. Működés ellenőrzése
-```
-
----
-
-🤖 Modell Konfigurációk
-
-Részletes Modell Profilok
-
-deepseek-r1:14b (Ajánlott 32GB RAM-hoz)
-
-```yaml
 Teljesítmény:
-  Sebesség: ⚡⚡⚡ (3-4 óra/könyv)
+  Sebesség: 2,5–4 nap/könyv (i3 8. gen CPU-n)
   Minőség: ⭐⭐⭐⭐ (85-92%)
   RAM: 18-22 GB
-  
+
 Optimalizálás:
-  max_workers: 3
-  batch_size: 5
-  memory_limit: 24G
-  num_parallel: 2
-  redis_maxmemory: 512mb
-  pg_buffers: 512MB
-  
+  memory_limit: 24G, max_workers: 3
+  batch_size: 5, num_parallel: 2
+
 Ajánlott:
-  - Irodalmi művekhez
-  - Fontos fordításokhoz
+  - Irodalmi művekhez, fontos fordításokhoz
   - 50 000 szó feletti könyvekhez
+  - Jó egyensúly minőség és sebesség között
 ```
 
-deepseek-r1:32b (64GB RAM-hoz)
+### deepseek-r1:32b (40-64GB RAM-hoz)
 
-```yaml
+```
 Teljesítmény:
-  Sebesség: ⚡⚡ (8-12 óra/könyv)
+  Sebesség: 5-10 nap/könyv (i3 8. gen CPU-n)
   Minőség: ⭐⭐⭐⭐⭐ (90-95%)
   RAM: 30-35 GB
-  
+
 Optimalizálás:
-  max_workers: 1
-  batch_size: 2
-  memory_limit: 30G
-  num_parallel: 1
-  redis_maxmemory: 256mb
-  pg_buffers: 256MB
-  
+  memory_limit: 30G, max_workers: 1
+  batch_size: 2, num_parallel: 1
+
 Ajánlott:
   - Maximális minőséghez
   - Irodalmi remekművekhez
-  - Kisebb könyvekhez (50 000 szó alatt)
+  - 40 GB+ RAM szükséges
 ```
 
-deepseek-r1:8b (16GB RAM-hoz)
+### deepseek-r1:8b (16GB RAM-hoz)
 
-```yaml
+```
 Teljesítmény:
-  Sebesség: ⚡⚡⚡⚡ (2-3 óra/könyv)
+  Sebesség: 1,5-3 nap/könyv (i3 8. gen CPU-n)
   Minőség: ⭐⭐⭐ (80-85%)
   RAM: 12-14 GB
-  
+
 Optimalizálás:
-  max_workers: 3
-  batch_size: 5
-  memory_limit: 16G
-  num_parallel: 2
-  redis_maxmemory: 512mb
-  pg_buffers: 512MB
-  
+  memory_limit: 16G, max_workers: 3
+  batch_size: 5, num_parallel: 2
+
 Ajánlott:
-  - Mindennapi használatra
-  - Gyors fordításokhoz
+  - Mindennapi használatra, gyorsabb fordításokhoz
   - 16GB RAM-mal rendelkező gépekhez
 ```
 
 ---
 
-🏗️ Architektúra
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Felhasználói Böngésző                      │
-│                    http://localhost:80                        │
-│                    📊 Monitor | 🧠 Optimize                   │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────┐
-│                      Nginx (80/443)                          │
-│              Reverse Proxy + Statikus Fájlok                 │
-│              Health Check: /health                           │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────┐
-│                  Flask Backend (5000)                        │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐    │
-│  │ Smart        │ │ Resource     │ │ Model            │    │
-│  │ Optimizer    │ │ Monitor      │ │ Manager          │    │
-│  │ (Auto-tune)  │ │ (Real-time)  │ │ (Switch+Optimize)│    │
-│  ├──────────────┤ ├──────────────┤ ├──────────────────┤    │
-│  │ Performance  │ │ System       │ │ AI Assistant     │    │
-│  │ Profiles     │ │ Health       │ │ + OCR + Voice    │    │
-│  └──────────────┘ └──────────────┘ └──────────────────┘    │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-┌───────▼──────┐   ┌────────▼────────┐   ┌─────▼──────┐
-│  PostgreSQL  │   │     Ollama       │   │   Redis    │
-│  (Auto-tuned │   │  DeepSeek AI    │   │ (Auto-tuned│
-│   buffers)   │   │  (Auto-memory)  │   │  maxmemory)│
-└──────────────┘   └─────────────────┘   └────────────┘
-```
-
----
-
-⚙️ Konfiguráció
-
-.env Fájl (v11.0)
-
-```env
-# Verzió
-VERSION=11.0.47
-CODENAME="Smart Optimizer"
-RELEASE_DATE=2026-07-16
-
-# Admin
-ADMIN_EMAIL=admin@epub-translator.local
-ADMIN_PASSWORD=your-secure-password
-
-# AI Modell (automatikusan ajánlva)
-SELECTED_MODEL=deepseek-r1:14b
-RECOMMENDED_MODEL=deepseek-r1:14b
-
-# Optimalizálás
-ENABLE_AUTO_OPTIMIZE=true       # Automatikus optimalizálás modellváltáskor
-ENABLE_RESOURCE_MONITOR=true    # Erőforrás figyelés
-ENABLE_SMART_SWITCH=true        # Intelligens modell ajánlás
-
-# Teljesítmény (automatikusan hangolva)
-MAX_WORKERS=3
-BATCH_SIZE=5
-OPTIMAL_MEMORY_LIMIT=24G
-OPTIMAL_REDIS=512mb
-OPTIMAL_PG_BUFFERS=512MB
-
-# Funkciók
-ENABLE_AI_ASSISTANT=true
-ENABLE_OAUTH=true
-ENABLE_OCR=true
-ENABLE_VOICE_INPUT=true
-ENABLE_GAMIFICATION=true
-ENABLE_COMMUNITY=true
-ENABLE_FINE_TUNING=true
-ENABLE_AUTO_COMPLETE=true
-
-# Auto-Update
-ENABLE_AUTO_UPDATE=true
-GITHUB_REPO=https://github.com/sorosg/Epub-translate.git
-GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-```
-
----
-
-🔌 API Dokumentáció
-
-Új v11.0 Végpontok
-
-Végpont Módszer Leírás
-/api/models/switch POST Modell váltás optimalizálással
-/api/models/recommend GET Hardver alapú modell ajánlás
-/api/models/optimization-status GET Optimalizálási állapot
-/api/models/optimize POST Jelenlegi modell optimalizálása
-/api/system/monitor GET Rendszer erőforrások
-/api/system/health GET Részletes health check
-
-Modellváltás Optimalizálással
+## 🔧 Karbantartás
 
 ```bash
-curl -X POST http://localhost/api/models/switch \
-  -H "Content-Type: application/json" \
-  -H "Cookie: session=..." \
-  -d '{
-    "model": "deepseek-r1:14b",
-    "auto_optimize": true,
-    "cleanup_unused": false
-  }'
-```
-
-Rendszer Monitor
-
-```bash
-curl http://localhost/api/system/monitor \
-  -H "Cookie: session=..."
-```
-
-Modell Ajánlás
-
-```bash
-curl http://localhost/api/models/recommend \
-  -H "Cookie: session=..."
-```
-
----
-
-🔧 Karbantartás
-
-Rendszeres Feladatok
-
-```bash
-# Státusz (részletes erőforrás információkkal)
+# Státusz ellenőrzése
 ./scripts/status.sh
 
 # Biztonsági mentés
@@ -575,208 +287,101 @@ Rendszeres Feladatok
 # Frissítés
 ./scripts/update.sh
 
-# Optimalizálás ellenőrzése
-./scripts/optimize.sh
-
-# Erőforrás monitor napló
+# Monitor napló
 tail -f logs/resource_monitor.log
 ```
 
-Optimalizálás Kézi Indítása
-
-```bash
-# Csak optimalizálás (nem frissít)
-./install.sh
-# Válaszd: 3) Csak optimalizálás
-
-# VAGY API-n keresztül
-curl -X POST http://localhost/api/models/optimize
-```
-
-Modell Karbantartás
+### Modell Karbantartás
 
 ```bash
 # Telepített modellek listázása
 docker exec -it epub-ollama ollama list
 
-# Modell törlése (tárhely felszabadítás)
-docker exec -it epub-ollama ollama rm deepseek-r1:1.5b
-
 # Új modell letöltése
 docker exec -it epub-ollama ollama pull deepseek-r1:14b
+
+# Modell törlése (tárhely felszabadítás)
+docker exec -it epub-ollama ollama rm deepseek-r1:1.5b
 ```
 
 ---
 
-🔍 Hibaelhárítás
+## 🔍 Hibaelhárítás
 
-Optimalizálási Problémák
+### Konténerek ellenőrzése
 
 ```bash
-# Optimalizálás állapotának ellenőrzése
-curl http://localhost/api/models/optimization-status
-
-# Kézi optimalizálás
-curl -X POST http://localhost/api/models/optimize
-
-# Optimalizálási napló megtekintése
-docker exec -it epub-backend python3 -c "
-from models import OptimizationLog
-for log in OptimizationLog.query.order_by(OptimizationLog.created_at.desc()).limit(5):
-    print(f'{log.created_at}: {log.model} - {log.action}')
-"
+docker compose ps
+docker compose logs backend
+docker compose logs ollama
 ```
 
-Memória Problémák
+### DNS / Frissítés ellenőrzési hiba
 
 ```bash
-# Rendszer monitor ellenőrzése
-curl http://localhost/api/system/monitor
+# Ellenőrizd, hogy a backend konténer eléri-e az internetet:
+docker exec epub-backend curl -s https://api.github.com | head -5
 
-# Ha kevés a memória, válts kisebb modellre:
-curl -X POST http://localhost/api/models/switch \
-  -d '{"model": "deepseek-r1:8b", "auto_optimize": true}'
-```
-
-Modellváltási Hibák
-
-```bash
-# Ellenőrizd, hogy a modell telepítve van-e
-docker exec -it epub-ollama ollama list
-
-# Ha nincs, töltsd le
-docker exec -it epub-ollama ollama pull deepseek-r1:14b
-
-# Próbáld újra a váltást
-curl -X POST http://localhost/api/models/switch \
-  -d '{"model": "deepseek-r1:14b", "auto_optimize": true}'
+# Ha nem, a docker-compose.yml-ben ellenőrizd a dns: bejegyzést:
+# dns:
+#   - 1.1.1.1
+#   - 8.8.8.8
 ```
 
 ---
 
-❓ GYIK
+## 📊 Verzió Történet
 
-Optimalizálás
+### v11.0.60 (2026-07-17)
+- 🔧 **DNS javítás**: backend konténer külső DNS feloldása (Cloudflare 1.1.1.1, Google 8.8.8.8) a frissítésellenőrzéshez és OpenLibrary API-hoz
+- 📖 **README.md frissítve**: fordítási idő becslések CPU-only hardverre
 
-K: Az optimalizálás automatikus?
-V: Igen! Modellváltáskor automatikusan megtörténik, de kézzel is indítható.
+### v11.0.59 (2026-07-17)
+- 📚 **Közös könyvtár**: minden felhasználó látja az összes feltöltött könyvet
+- 🚫 **Deduplikáció**: cím+szerző alapú ellenőrzés feltöltéskor
+- 👤 **UserBookPreference**: felhasználónkénti könyvbeállítások (kontextus kiválasztás)
+- 🔐 **Jogosultságkezelés**: szerkesztés/törlés csak a feltöltő vagy admin számára
 
-K: Testreszabhatom az optimalizálási beállításokat?
-V: Igen, a .env fájlban felülírhatod az automatikus értékeket.
+### v11.0.56 (2026-07-16)
+- 📝 **Interaktív review felület**: lefordított fejezetek böngészése és inline szerkesztése
+- 📧 **Email értesítések**: fordítás befejezésekor (MailHog)
 
-K: Milyen gyakran érdemes optimalizálni?
-V: Modellváltáskor automatikus, egyébként havonta egyszer ajánlott.
+### v11.0.55 (2026-07-16)
+- 🖥️ **Hardver alapú modell ajánlás javítása**: 40 GB RAM-hoz 32b modell
 
-Modellváltás
+### v11.0.54 (2026-07-16)
+- 🔧 **Node-onkénti fordítás**: megbízhatóbb, mint a batch mód
 
-K: Válthatok modellek között fordítás közben?
-V: Nem, a váltáshoz a fordításnak be kell fejeződnie.
+### v11.0.51 (2026-07-16)
+- ✅ **Kétmenetes fordítás**: első menet AI fordítás + második menet minőségellenőrzés
 
-K: Elvesznek a beállításaim modellváltáskor?
-V: Nem, a rendszer minden modellhez elmenti az optimális beállításokat.
+### v11.0.50 (2026-07-16)
+- 📖 **Glosszárium építés**: automatikus angol→magyar szópár kinyerés
+- 💾 **Fordítási memória**: TM cache a konzisztens fordításokhoz
+- 🔤 **Hunspell**: magyar helyesírás-ellenőrzés
+- 📊 **Részletes progressz követés**: fejezet, szószám, node szintű visszajelzés
 
-Erőforrás Monitor
+### v11.0.27 (2026-07-16) - "Smart Optimizer"
+- 🆕 Intelligens modell optimalizáló
+- 🆕 Valós idejű erőforrás monitor
+- 🆕 Smart modellváltás auto-optimize
+- 🆕 Hardver alapú auto-konfiguráció
 
-K: Terheli a rendszert a monitorozás?
-V: Minimális, kevesebb mint 1% CPU használat.
-
-K: Hol találom a monitor naplókat?
-V: logs/resource_monitor.log fájlban.
-
----
-
-📊 Verzió Történet
-
-v11.0.60 (2026-07-17)
-- 🔧 **DNS javítás**: backend konténer külső DNS feloldása a frissítésellenőrzéshez
-
-v11.0.59 (2026-07-17)
-- 📚 **Közös könyvtár**: minden felhasználó láthatja az összes feltöltött könyvet
-- 🚫 **Deduplikáció**: cím+szerző alapú ellenőrzés
-- 👤 **UserBookPreference**: felhasználónkénti könyvbeállítások
-
-v11.0.56 (2026-07-16)
-- 📝 **Interaktív review felület**: fejezetek böngészése és inline szerkesztése
-- 📧 **Email értesítések** (MailHog)
-
-v11.0.27 (2026-07-16) - "Smart Optimizer"
-
-· 🆕 Intelligens modell optimalizáló
-· 🆕 Valós idejű erőforrás monitor
-· 🆕 Smart modellváltás auto-optimize
-· 🆕 Hardver alapú auto-konfiguráció
-· 🆕 Teljesítmény profilok
-· 🆕 Optimalizálási napló
-· 🆕 Részletes health check
-
-v10.0.0 (2025-06-20) - "AI Studio"
-
-· AI Asszisztens, OAuth/SSO, OCR, Hang, Gamification, Közösség, Fine-tuning, Auto-Complete
-
-v9.1.0 (2025-03-15) - "Enhanced Studio"
-
-· Dark Mode, Billentyűparancsok, Dashboard 2.0, Többnyelvű, Integrációk
-
-v9.0.0 (2025-01-15) - "User Portal"
-
-· Felhasználói regisztráció, Belső email
-
-v8.0.0 (2024-12-01) - "Library Manager"
-
-· Drag & Drop könyvtárfeltöltés
-
-v7.0.0 (2024-09-15) - "Self-Evolving Translator"
-
-· GitHub Auto-Update, Öntanuló fordítási memória
-
-v1.0.0 - v6.0.0
-
-· Alaprendszer, Felhasználó kezelés, Párhuzamos fordítás, Hibrid SMTP, Könyv adatbázis, Kollaboráció
+### Korábbi verziók
+- v10.0.0: AI Asszisztens, OAuth/SSO, OCR, Hang, Gamification
+- v9.1.0: Dark Mode, Dashboard 2.0, Többnyelvű felület
+- v8.0.0: Drag & Drop könyvtárfeltöltés
+- v7.0.0: GitHub Auto-Update, Öntanuló fordítási memória
+- v1.0.0 - v6.0.0: Alaprendszer, Felhasználó kezelés, Párhuzamos fordítás
 
 ---
 
-🤝 Közreműködés
+## 📞 Támogatás
 
-```bash
-git clone https://github.com/sorosg/Epub-translate.git
-cd Epub-translate
-docker compose up -d
-```
-
-· Hibajelentés: https://github.com/sorosg/Epub-translate/issues
-· Feature Request: https://github.com/sorosg/Epub-translate/discussions
+- 📧 Email: sorosgergo@gmail.com
+- 🌐 GitHub: https://github.com/sorosg/Epub-translate
+- 🐛 Hibajelentés: https://github.com/sorosg/Epub-translate/issues
 
 ---
 
-📄 Licensz
-
-MIT License
-
----
-
-🙏 Köszönetnyilvánítás
-
-· DeepSeek - Nyílt forráskódú AI modellek
-· Ollama - Modell futtatás
-· Flask - Web keretrendszer
-· psutil - Rendszer monitorozás
-· Tesseract OCR - Szövegfelismerés
-· SpeechRecognition - Beszédfelismerés
-· Chart.js - Grafikonok
-· EbookLib - EPUB kezelés
-
----
-
-📞 Támogatás
-
-· 📧 Email: sorosgergo@gmail.com
-· 🌐 GitHub: https://github.com/sorosg/Epub-translate
-· 📚 Dokumentáció: https://github.com/sorosg/Epub-translate/wiki
-
----
-
-Készült ❤️-vel Magyarországon
-
-
-```
-```
+Készült ❤️-vel Magyarországon – v11.0.60
