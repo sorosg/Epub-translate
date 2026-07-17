@@ -1,7 +1,7 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.55
+# Verzió: 11.0.57
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-16
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -23,7 +23,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.55"
+VERSION="11.0.57"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-16"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -34,6 +34,7 @@ ADMIN_EMAIL="admin@epub-translator.local"
 ADMIN_PASSWORD="Abrakadabra"
 MAX_WORKERS=3
 DEFAULT_LANGUAGE="hu"
+DOMAIN_NAME=""  # külső domain HTTPS-hez (opcionális)
 
 # Rendszer erőforrások automatikus észlelése
 TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
@@ -132,7 +133,8 @@ detect_installation_mode() {
         echo "  1) Frissítés (adatok megőrzése) ⭐ Ajánlott"
         echo "  2) Újratelepítés (minden törlődik)"
         echo "  3) Csak optimalizálás (megtart mindent, csak hangol)"
-        echo "  4) Kilépés"
+        echo "  4) HTTPS/SSL beállítása (domain + Let's Encrypt tanúsítvány)"
+        echo "  5) Kilépés"
         read -p "Választás [1]: " mode
         mode=${mode:-1}
         
@@ -145,7 +147,8 @@ detect_installation_mode() {
                cp -r "$PROJECT_DIR" "$BACKUP_DIR" 2>/dev/null || true
                rm -rf "$PROJECT_DIR";;
             3) IS_UPDATE=true; OPTIMIZE_ONLY=true; load_existing_config;;
-            4) exit 0;;
+            4) configure_ssl; exit 0;;
+            5) exit 0;;
             *) IS_UPDATE=true; load_existing_config;;
         esac
     else
@@ -397,6 +400,137 @@ select_model() {
         6) SELECTED_MODEL="deepseek-r1:70b";;
         *) SELECTED_MODEL="${RECOMMENDED_MODEL}";;
     esac
+}
+
+# ============================================================
+# HTTPS/SSL KONFIGURÁLÁS (Let's Encrypt)
+# ============================================================
+configure_ssl() {
+    log_step "HTTPS/SSL beállítása Let's Encrypt tanúsítvánnyal"
+    
+    if [ ! -d "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/docker-compose.yml" ]; then
+        log_error "Nincs telepítve az EPUB Fordító a(z) $PROJECT_DIR könyvtárban!"
+        log_info "Először futtasd a telepítőt: ./install.sh"
+        exit 1
+    fi
+    
+    cd "$PROJECT_DIR"
+    
+    echo ""
+    log_info "A HTTPS-hez szükséged lesz egy domain névre, ami erre a gépre mutat."
+    log_info "A domain A rekordjának a te publikus IP címedre kell mutatnia."
+    echo ""
+    read -p "Add meg a domain nevet (pl. fordito.example.com): " DOMAIN_NAME
+    
+    if [ -z "$DOMAIN_NAME" ]; then
+        log_error "A domain név nem lehet üres!"
+        exit 1
+    fi
+    
+    # Ellenőrizzük, hogy a domain feloldható-e
+    log_info "Domain ellenőrzése: $DOMAIN_NAME"
+    if host "$DOMAIN_NAME" &>/dev/null; then
+        DOMAIN_IP=$(host "$DOMAIN_NAME" | awk '/has address/ {print $NF; exit}')
+        log_success "A domain ($DOMAIN_NAME) feloldható, IP: $DOMAIN_IP"
+    else
+        log_warn "A domain ($DOMAIN_NAME) nem feloldható DNS-ben!"
+        log_warn "Győződj meg róla, hogy a domain A rekordja a publikus IP címedre mutat!"
+        read -p "Folytatod így is? (i/n): " c
+        [[ $c =~ ^[Ii]$ ]] || exit 0
+    fi
+    
+    # Ellenőrizzük, hogy a 80-as port nyitva van-e kívülről
+    log_info "80-as port (HTTP) ellenőrzése..."
+    if curl -s --max-time 5 "http://$DOMAIN_NAME/.well-known/acme-challenge/test" > /dev/null 2>&1; then
+        log_success "A 80-as port elérhető kívülről"
+    else
+        log_warn "A 80-as port nem tűnik elérhetőnek kívülről (vagy a domain még nem erre a gépre mutat)"
+        log_info "A Let's Encrypt validációhoz a 80-as portnak nyitva kell lennie!"
+    fi
+    
+    # Könyvtárak létrehozása
+    mkdir -p nginx/ssl/live nginx/www
+    
+    # Nginx konfiguráció frissítése a domain-névvel
+    if [ -f nginx/nginx.conf ]; then
+        sed -i "s/server_name _;/server_name $DOMAIN_NAME;/g" nginx/nginx.conf
+        log_success "Nginx konfiguráció frissítve a domain névvel: $DOMAIN_NAME"
+    fi
+    
+    # Nginx újratöltése
+    $DOCKER compose restart nginx 2>/dev/null || true
+    
+    # Let's Encrypt tanúsítvány beszerzése (ha a certbot elérhető a host gépen)
+    if command -v certbot &>/dev/null; then
+        log_info "Certbot elérhető, tanúsítvány beszerzése..."
+        
+        # Állítsuk le ideiglenesen az nginx konténert (a certbot-nak kell a 80-as port)
+        $DOCKER compose stop nginx 2>/dev/null || true
+        
+        # Futtassuk a certbot-ot standalone módban
+        sudo certbot certonly --standalone \
+            --preferred-challenges http \
+            -d "$DOMAIN_NAME" \
+            --email "$ADMIN_EMAIL" \
+            --agree-tos \
+            --non-interactive \
+            --keep-until-expiring 2>/dev/null || {
+            log_warn "A certbot automatikus futtatása nem sikerült."
+            log_info "Próbáld ki ezt manuálisan:"
+            echo "  sudo certbot certonly --standalone -d $DOMAIN_NAME --email $ADMIN_EMAIL --agree-tos"
+            log_info "VAGY használd a következő Docker parancsot:"
+            echo "  sudo docker run -it --rm -v $PROJECT_DIR/nginx/ssl:/etc/letsencrypt -v $PROJECT_DIR/nginx/www:/var/www/certbot -p 80:80 certbot/certbot certonly --standalone -d $DOMAIN_NAME --email $ADMIN_EMAIL --agree-tos"
+        }
+        
+        # Indítsuk újra az nginx-et
+        $DOCKER compose start nginx 2>/dev/null || true
+        
+        # Ellenőrizzük, hogy a tanúsítványok létrejöttek-e
+        if [ -f nginx/ssl/live/fullchain.pem ] && [ -f nginx/ssl/live/privkey.pem ]; then
+            log_success "✅ SSL tanúsítvány sikeresen beszerezve!"
+            
+            # Cron job a megújításhoz (minden hónap 1-jén hajnali 3-kor)
+            if command -v crontab &>/dev/null; then
+                (crontab -l 2>/dev/null | grep -v "certbot renew"; echo "0 3 1 * * sudo certbot renew --quiet --post-hook 'cd $PROJECT_DIR && $DOCKER compose restart nginx'") | crontab - 2>/dev/null || true
+                log_success "Automatikus tanúsítvány megújítás beállítva (havonta)"
+            fi
+        else
+            log_warn "A tanúsítvány fájlok nem jöttek létre. A HTTPS nem fog működni."
+        fi
+    else
+        log_warn "A 'certbot' parancs nem elérhető a host gépen."
+        log_info "Telepítsd a certbot-ot:"
+        echo "  sudo apt install -y certbot"
+        log_info "Majd futtasd újra ezt a menüpontot."
+        echo ""
+        log_info "ALTERNATÍV MÓDSZER – Docker certbot:"
+        echo ""
+        echo "  # Állítsd le az nginx-et:"
+        echo "  sudo docker compose stop nginx"
+        echo ""
+        echo "  # Futtasd a certbot-ot:"
+        echo "  sudo docker run -it --rm \\"
+        echo "    -v $PROJECT_DIR/nginx/ssl:/etc/letsencrypt \\"
+        echo "    -v $PROJECT_DIR/nginx/www:/var/www/certbot \\"
+        echo "    -p 80:80 certbot/certbot certonly --standalone \\"
+        echo "    -d $DOMAIN_NAME \\"
+        echo "    --email $ADMIN_EMAIL --agree-tos"
+        echo ""
+        echo "  # Indítsd újra az nginx-et:"
+        echo "  sudo docker compose start nginx"
+    fi
+    
+    # Domain mentése az .env fájlba
+    if grep -q "^DOMAIN_NAME=" .env 2>/dev/null; then
+        sed -i "s/^DOMAIN_NAME=.*/DOMAIN_NAME=$DOMAIN_NAME/" .env
+    else
+        echo "DOMAIN_NAME=$DOMAIN_NAME" >> .env
+    fi
+    
+    log_success "SSL konfiguráció befejezve!"
+    echo ""
+    log_info "🌐 A weboldal mostantól elérhető HTTPS-en: https://$DOMAIN_NAME"
+    log_info "✉️ Email (MailHog): http://$DOMAIN_NAME:8025"
 }
 
 # ============================================================

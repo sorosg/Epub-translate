@@ -232,6 +232,93 @@ def delete_translation(translation_id):
     flash(_('Fordítás törölve'),'success')
     return redirect(url_for('dashboard'))
 
+# ---- REVIEW OLDAL (6. fejlesztés: Interaktív fordítás-javítási felület) ----
+@app.route('/review/<int:translation_id>')
+@login_required
+def review_translation(translation_id):
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        flash(_('Nincs jogosultságod'),'error'); return redirect(url_for('dashboard'))
+    if t.status != 'completed':
+        flash(_('Csak befejezett fordításokat lehet átnézni'),'error'); return redirect(url_for('dashboard'))
+    
+    # EPUB szöveg kiolvasása
+    from ebooklib import epub as epub_lib
+    from bs4 import BeautifulSoup
+    chapters = []
+    try:
+        output_path = os.path.join(app.config['OUTPUT_FOLDER'], t.output_filename)
+        if os.path.exists(output_path):
+            book = epub_lib.read_epub(output_path)
+            items = list(book.get_items_of_type(9))
+            for idx, item in enumerate(items):
+                soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+                text = soup.get_text().strip()
+                if text and len(text) > 30:
+                    chapters.append({
+                        'index': idx,
+                        'text': text,
+                        'length': len(text)
+                    })
+    except Exception as e:
+        flash(_(f'Nem sikerült beolvasni a fordítást: {str(e)[:100]}'),'error')
+    
+    return render_template('review.html', translation=t, chapters=chapters)
+
+@app.route('/api/review/save/<int:translation_id>', methods=['POST'])
+@login_required
+def review_save(translation_id):
+    """Egy fejezet szerkesztett szövegének mentése az EPUB-ba"""
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        return jsonify({'error':'Nincs jogosultságod'}), 403
+    
+    data = request.get_json()
+    chapter_idx = data.get('chapter_index')
+    edited_text = data.get('text', '').strip()
+    
+    if chapter_idx is None or not edited_text:
+        return jsonify({'error':'Hiányzó adatok'}), 400
+    
+    try:
+        from ebooklib import epub as epub_lib
+        from bs4 import BeautifulSoup, NavigableString
+        output_path = os.path.join(app.config['OUTPUT_FOLDER'], t.output_filename)
+        if not os.path.exists(output_path):
+            return jsonify({'error':'A fájl nem található'}), 404
+        
+        book = epub_lib.read_epub(output_path)
+        items = list(book.get_items_of_type(9))
+        
+        if chapter_idx >= len(items):
+            return jsonify({'error':'Érvénytelen fejezet index'}), 400
+        
+        item = items[chapter_idx]
+        soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+        
+        # A szerkesztett szöveg visszaírása az első text node-ba,
+        # a többit töröljük (hasonlóan a második menethez)
+        text_nodes = [n for n in soup.descendants if isinstance(n, NavigableString) and n.strip()]
+        if text_nodes:
+            for i, node in enumerate(text_nodes):
+                if i == 0:
+                    node.replace_with(edited_text)
+                else:
+                    node.replace_with('')
+        else:
+            # Ha nincs text node, cseréljük ki a teljes tartalmat
+            soup.clear()
+            soup.append(BeautifulSoup(f"<p>{edited_text}</p>", 'html.parser'))
+        
+        item.set_content(str(soup).encode('utf-8'))
+        epub_lib.write_epub(output_path, book)
+        
+        app_logger.info(f"Review mentés: translation #{translation_id}, chapter {chapter_idx} (user: {current_user.email})")
+        return jsonify({'success':True, 'message':f'Fejezet {chapter_idx+1} mentve'})
+    except Exception as e:
+        app_logger.error(f"Review mentési hiba: {_traceback.format_exc()}")
+        return jsonify({'error': str(e)[:200]}), 500
+
 # ---- KÖNYVTÁR ----
 @app.route('/library')
 @login_required
@@ -1114,6 +1201,41 @@ Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
             db.session.commit()
             translation_logger.info(f"[ID:{translation_id}] ✅ Fordítás sikeresen befejezve (kétmenetes): {output_filename} | Minőség: {t.quality_score}/100 | Javítások: {review_improvements}/{review_count}")
             app_logger.info(f"Fordítás kész: {t.original_filename} -> {output_filename} (user: {user_info}, {total_nodes_translated} node)")
+            
+            # === ÉRTESÍTÉS A FORDÍTÁS BEFEJEZÉSEKOR (7. fejlesztés) ===
+            # Email küldése a felhasználónak, hogy a fordítása elkészült
+            try:
+                from flask_mail import Mail, Message
+                mail = Mail(app_ref)
+                # Email küldése (a MailHog localhost:1025 SMTP szervert használja)
+                msg = Message(
+                    f"✅ Fordítás kész: {t.original_filename}",
+                    sender=app_ref.config.get('MAIL_DEFAULT_SENDER', 'epub-translator@localhost'),
+                    recipients=[user.email]
+                )
+                msg.body = f"""Kedves {user.first_name}!
+
+A(z) "{t.original_filename}" fordítása sikeresen befejeződött.
+
+📊 Részletek:
+  Fájl: {t.original_filename} → {output_filename}
+  Modell: {model}
+  Minőségi pontszám: {t.quality_score}/100
+  Lefordított node-ok: {total_nodes_translated}
+  Ellenőrzött elemek: {review_count}
+  Javítások: {review_improvements}
+
+📥 Letöltés: http://localhost/download/{t.id}
+📝 Átnézés és javítás: http://localhost/review/{t.id}
+
+Köszönjük, hogy az EPUB Fordítót használod!
+
+Üdv,
+EPUB Fordító"""
+                mail.send(msg)
+                translation_logger.info(f"[ID:{translation_id}] 📧 Értesítő email elküldve: {user.email}")
+            except Exception as mail_err:
+                translation_logger.warning(f"[ID:{translation_id}] Email értesítés nem sikerült: {mail_err}")
         except Exception as e:
             error_detail = _traceback.format_exc()
             t.status = 'failed'; t.progress = 0; t.output_filename = f"HIBA: {str(e)[:500]}"

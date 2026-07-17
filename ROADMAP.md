@@ -1,6 +1,6 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.52 – "Smart Optimizer"  
+**Verzió:** 11.0.56 – "Smart Optimizer"  
 **Utolsó frissítés:** 2026-07-17
 
 ---
@@ -21,6 +21,27 @@
 - [x] **Kijelölt könyvek visszajelzése** (v11.0.43) – badge a dashboardon
 - [x] **Részletes hibakezelés és logolás** (v11.0.34) – `/app/logs/app.log` + `translation.log`
 - [x] **Flask-Limiter optimalizálás** (v11.0.46) – 2000 req/óra, dashboard 30mp frissítés
+
+---
+
+## ✅ Újabban megvalósított fejlesztések (v11.0.50 – 11.0.56)
+
+### Batch darabszám eltérés javítása (v11.0.54)
+- Batch fordítás (több node egy API hívásban) **teljes eltávolítása** – a deepseek-r1 nem használja megbízhatóan a NODE_SEP szeparátort
+- **Node-onkénti fordítás**: minden text node egyesével kerül fordításra, TM cache-szel gyorsítva
+- Glosszárium explicit használata minden egyedi promptban (`glossary_hint`)
+- `num_predict` csökkentése 2048→1024 (rövidebb szövegek egyesével)
+
+### Hardver alapú modell ajánlás javítása (v11.0.55)
+- **40 GB RAM**: mostantól `deepseek-r1:32b` ajánlott (korábban hibásan 14b)
+- Új RAM kategória: ≥40 GB → 32G memória limit, MAX_WORKERS=2
+- **Frissítéskor hardver változás észlelése**: ha a RAM változott, a `configure_system()` felajánlja a modellváltást
+- Modellváltáskor automatikus `apply_optimization()` – modell-specifikus OLLAMA_MEMORY, OLLAMA_PARALLEL, BATCH_SIZE
+
+### Kétmenetes fordítás teljes implementáció (v11.0.51)
+- Első menet (5-90%) + Második menet minőségellenőrzés és javítás (91-99%)
+- Eredeti angol szövegek elmentése az első menet előtt
+- Minőségi pontszám számítás a javítások aránya alapján (75-99)
 
 ---
 
@@ -161,19 +182,21 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 
 ## 🟡 Középtávú fejlesztések – Közepes prioritás
 
-### 6. Interaktív fordítás-javítási felület
-**Cél:** A felhasználó manuálisan javíthassa a lefordított szöveget.
-- Webes felület a lefordított könyv böngészésére
-- Inline szerkesztés (click-to-edit)
-- Változtatások mentése a glosszáriumba
+### 6. Interaktív fordítás-javítási felület ✅ (v11.0.56)
+**Státusz:** KÉSZ
+- **`/review/<id>`**: Webes felület a lefordított könyv fejezetenkénti böngészésére
+- Inline szerkesztés: "Szerkesztés" gombra kattintva textarea jelenik meg
+- **`POST /api/review/save/<id>`**: Módosított fejezet visszaírása az EPUB-ba
+- Változtatások azonnal menthetők – az EPUB fájl frissül
 - **Használhatóság:** ⭐⭐⭐⭐⭐ (emberi korrektúra lehetősége)
 
-### 7. Értesítések a fordítás befejezésekor
-**Cél:** A felhasználó értesítést kapjon, amikor a fordítás elkészült.
-- Email értesítés (Flask-Mail, már részben implementálva)
-- Webhook (Discord, Slack)
-- Böngésző Notification API
-- Hangjelzés a webes felületen
+### 7. Értesítések a fordítás befejezésekor ✅ (v11.0.56)
+**Státusz:** KÉSZ
+- **Email értesítés** Flask-Mail-en keresztül (MailHog SMTP: localhost:1025)
+- A `translate_epub()` végén automatikusan emailt küld a felhasználónak
+- Az email tartalmazza: fájlnevet, modellt, minőségi pontszámot, linkeket (letöltés, review)
+- Böngésző Notification API: a dashboard oldal értesíthet a fordítás végén
+- **Használhatóság:** ⭐⭐⭐⭐ (nem kell folyamatosan figyelni a dashboardot)
 
 ### 8. Kontextus-érzékeny fordítás (szélesebb sliding window)
 **Cél:** A jelenlegi sliding window (előző fejezet 300 karakter) bővítése.
