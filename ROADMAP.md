@@ -70,6 +70,95 @@
 
 ---
 
+## 🔶 Opcionális fejlesztések – Hardverfüggő minőségjavítás
+
+### 16. Nagyobb modellre váltás (deepseek-r1:14b → 32b) – részletes útmutató
+
+**Státusz:** ⏳ TERVEZETT – a 14b modell tesztelése után döntés alapján
+
+**Cél:** Jelentős fordítási minőség javítása a nagyobb (32 milliárd paraméteres) deepseek-r1 modellre váltással.
+
+#### Miért jobb a 32b modell?
+- **Több paraméter (32B vs 14B)** = jobb nyelvtani megértés, gazdagabb szókincs, pontosabb fordítás
+- **Hosszabb kontextus ablak** = jobban érti a szövegkörnyezetet, kevesebb következetlenség
+- **Jobb ritka szavak és idiómák kezelése** = természetesebb magyar fordítás
+- **Minőségjavulás:** ⭐⭐⭐⭐⭐ (a legnagyobb elérhető minőség javulás)
+- **Hátrány:** Extrém lassú CPU-n (i3-on akár 3-5x lassabb, mint a 14b), ~20 GB modellméret
+
+#### Hardver követelmények 40 GB RAM-hoz
+| Erőforrás | 14b modell | 32b modell | Megjegyzés |
+|-----------|-----------|-----------|------------|
+| Modell méret | ~14 GB | ~20 GB | Letöltendő |
+| Ollama futási memória | ~22-28 GB | ~28-35 GB | Modell + overhead |
+| Maradék a többi konténernek | ~12-18 GB | ~5-12 GB | PostgreSQL, Redis, Nginx, Backend |
+| CPU igény | i3 8. gen elegendő | i3 8. gen elegendő, de lassú | GPU nélkül |
+| Fordítási idő (átlag könyv) | 1-3 nap | 3-10 nap | Erősen szövegmennyiség függő |
+
+#### Szükséges fájlmódosítások
+
+**1. `install.sh` – Új RAM kategória hozzáadása (≥40 GB → 32G limit)**
+```bash
+# analyze_and_optimize() függvényben, a RAM optimalizálás részhez:
+elif [ "$TOTAL_RAM" -ge 40 ]; then
+    OPTIMAL_MEMORY_LIMIT="32G"
+    OPTIMAL_REDIS="512mb"
+    OPTIMAL_PG_BUFFERS="512MB"
+```
+Módosítandó sor: a `>=32` ág ELÉ kell beszúrni, hogy a 40 GB-os gépek a nagyobb limitet kapják.
+
+**2. `docker-compose.yml` – Ollama konténer memória limit**
+```yaml
+# Az ollama szekcióban:
+deploy:
+  resources:
+    limits:
+      memory: ${OPTIMAL_MEMORY_LIMIT}  # ez automatikusan 32G lesz az .env-ből
+    reservations:
+      memory: 24G  # 20G-ról 24G-ra növelve
+```
+
+**3. `config.py` – Alapértelmezett memória limit**
+```python
+OPTIMAL_MEMORY_LIMIT = os.environ.get('OPTIMAL_MEMORY_LIMIT', '32G')
+```
+
+**4. `.env` – Környezeti változó frissítése**
+```bash
+OPTIMAL_MEMORY_LIMIT=32G
+SELECTED_MODEL=deepseek-r1:32b
+```
+
+**5. `backend/Dockerfile` – Gunicorn timeout növelése**
+```dockerfile
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "app:app", "--timeout", "14400", "--worker-class", "eventlet"]
+```
+A 32b modellnél egy-egy API hívás akár 1-2 órát is igénybe vehet, ezért a Gunicorn timeout-nak extrém magasnak kell lennie (14400 mp = 4 óra).
+
+**6. Modell letöltése**
+```bash
+docker exec epub-ollama ollama pull deepseek-r1:32b
+# Letöltési idő: 1-3 óra (internet sebességtől függően, ~20 GB)
+```
+
+**7. Admin felületen modell váltás**
+Az admin oldalon (`/admin`) lehet átváltani a 32b modellre, vagy a `.env` fájlban beállítani.
+
+#### A program kompatibilitása 32b modellel
+
+A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szükség kódolási változtatásra, mert:
+- A `translate_epub()` függvény a `Config.DEFAULT_MODEL`-t használja, ami dinamikusan állítható
+- A timeout már `None` (végtelen) – nem lesz timeout probléma
+- A kétmenetes fordítás ugyanúgy működik 32b-vel is (az első menet fordít, a második ellenőriz)
+- A glosszárium, TM cache, Hunspell mind modell-független
+
+#### Kockázatok és megfontolások
+- **Memória kimerülés:** Ha a rendszer swap-olni kezd, a fordítás gyakorlatilag leáll. Figyelni kell a RAM használatot (`htop`-pal)
+- **Több napos fordítási idő:** Egy átlagos regény fordítása 3-10 napig is eltarthat
+- **Áramkimaradás:** Nincs checkpoint mechanizmus – ha leáll a gép, a fordítás elölről kezdődik
+- **Ajánlás:** Először egy rövidebb könyvvel (50-100 oldal) tesztelni a 32b modellt
+
+---
+
 ## 🟡 Középtávú fejlesztések – Közepes prioritás
 
 ### 6. Interaktív fordítás-javítási felület
