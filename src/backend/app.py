@@ -703,8 +703,8 @@ Minták a kívánt stílushoz:
                         except Exception:
                             pass
                     
-                    # Ollama API hívás – optimalizált paraméterek + few-shot prompt
-                    source_chunk = combined_source[:500]
+                    # Ollama API hívás – optimalizált paraméterek + few-shot prompt, timeout nélkül
+                    source_chunk = combined_source[:800]
                     
                     # Few-shot fordítási példák a jobb minőségért
                     few_shot = """Fordítási példák (stílus és formátum referenciaként):
@@ -725,41 +725,29 @@ FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a leford�
 
 {source_chunk}"""
                     
-                    # Stream mód optimalizált paraméterekkel
+                    # Nincs timeout – a deepseek-r1 CPU-n nagyon lassú, az idő nem számít
                     translated_response = ""
                     try:
                         resp = requests.post(f"{ollama_host}/api/generate", json={
                             'model': model,
                             'prompt': prompt,
-                            'stream': True,
+                            'stream': False,
                             'options': {
-                                'num_predict': 1024,
+                                'num_predict': 2048,
                                 'temperature': 0.2,
                                 'repeat_penalty': 1.1,
                                 'top_p': 0.9
                             }
-                        }, timeout=(60, 3600), stream=True)
+                        }, timeout=None)
                         
                         if resp.status_code != 200:
                             translation_logger.warning(f"[ID:{translation_id}] Ollama hibás válasz (HTTP {resp.status_code}) a(z) {idx+1}. elemnél: {resp.text[:200]}")
                             failed_items += 1
                             continue
                         
-                        # Stream válasz feldolgozása (NDJSON sorok) – minden chunk response összefűzve
-                        translated_response = ""
-                        for line in resp.iter_lines(decode_unicode=True):
-                            if line:
-                                try:
-                                    chunk_data = json.loads(line)
-                                    # Minden chunk hozzáadása a válaszhoz
-                                    if 'response' in chunk_data and chunk_data['response']:
-                                        translated_response += chunk_data['response']
-                                    if chunk_data.get('done', False):
-                                        break
-                                except (json.JSONDecodeError, AttributeError):
-                                    pass
-                    except requests.exceptions.ReadTimeout:
-                        translation_logger.warning(f"[ID:{translation_id}] Stream timeout a(z) {idx+1}. elemnél, próbáljuk később...")
+                        translated_response = resp.json().get('response', '')
+                    except Exception as req_err:
+                        translation_logger.warning(f"[ID:{translation_id}] Ollama kérés hiba a(z) {idx+1}. elemnél: {req_err}")
                         failed_items += 1
                         continue
                     
