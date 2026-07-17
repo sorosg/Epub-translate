@@ -3,7 +3,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.27-blue)
+![Version](https://img.shields.io/badge/version-11.0.47-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -293,7 +293,7 @@ curl http://localhost/health
 # Válasz:
 {
     "status": "healthy",
-    "version": "11.0.27",
+    "version": "11.0.47",
     "codename": "Smart Optimizer",
     "release_date": "2026-07-16",
     "model": "deepseek-r1:14b",
@@ -478,7 +478,7 @@ Ajánlott:
 
 ```env
 # Verzió
-VERSION=11.0.27
+VERSION=11.0.47
 CODENAME="Smart Optimizer"
 RELEASE_DATE=2026-07-16
 
