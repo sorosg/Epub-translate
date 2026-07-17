@@ -1,6 +1,6 @@
 # 🏗️ EPUB Fordító – Architektúra Dokumentáció
 
-**Verzió:** 11.0.59 – "Smart Optimizer"  
+**Verzió:** 11.0.60 – "Smart Optimizer"  
 **Utolsó frissítés:** 2026-07-17  
 
 > Ez a dokumentum a rendszer teljes architektúráját írja le. Célja, hogy a Cline AI asszisztens kontextuskeretből való kiesése esetén is gyorsan áttekinthető legyen a kódbázis szerkezete, a főbb komponensek és azok kapcsolatai.
@@ -27,7 +27,7 @@ Az EPUB Fordító egy **Linux rendszeren futó, Docker-alapú ekönyv fordító 
 
 Az EPUB Fordító Flask backenddel, PostgreSQL adatbázissal, Nginx webszerverrel és számos segédszolgáltatással (Redis, MailHog) működik Docker konténerekben.
 
-### Főbb képességek (v11.0.59)
+### Főbb képességek (v11.0.60)
 - EPUB fájlok feltöltése és automatikus AI fordítása (kétmenetes: fordítás + minőségellenőrzés)
 - Felhasználókezelés (token alapú, admin/user szerepkörök)
 - Közös könyvtár deduplikációval – minden felhasználó látja az összes feltöltött könyvet
@@ -118,7 +118,7 @@ Közös könyvtárba feltöltött EPUB könyv.
 - `uploaded_at`
 - **Nincs** `is_selected` mező! (lásd UserBookPreference)
 
-### 3.4. UserBookPreference (ÚJ v11.0.59)
+### 3.4. UserBookPreference (ÚJ v11.0.60)
 Felhasználónkénti könyvbeállítások.
 - `id`, `user_id` → User, `book_id` → Book
 - `is_selected` – felhasználó által kiválasztva fordítási kontextushoz
@@ -302,7 +302,7 @@ Feltöltés
 
 ```
 epub-translator/
-├── install.sh                    # Telepítő/frissítő script (2300 sor, v11.0.59)
+├── install.sh                    # Telepítő/frissítő script (2300 sor, v11.0.60)
 ├── uninstall.sh                  # Eltávolító script
 ├── README.md                     # Felhasználói dokumentáció
 ├── USER_GUIDE.md                 # Részletes használati útmutató
@@ -446,7 +446,7 @@ Felhasználó B ──▶ library_list() ──▶ látja A könyvét is
 
 ## 12. Fejlesztési Megjegyzések
 
-### Adatbázis migráció v11.0.58 → v11.0.59
+### Adatbázis migráció v11.0.58 → v11.0.60
 ```sql
 -- A db.create_all() automatikusan létrehozza az új táblát
 -- Régi mező manuális törlése (opcionális):
@@ -469,4 +469,4 @@ Ha a Cline kontextus ablaka kiürül, ezeket a fájlokat olvasd be sorrendben:
 
 ---
 
-*Ez a dokumentum a projekttel együtt frissítendő. Utolsó módosítás: 2026-07-17 (v11.0.59)*
+*Ez a dokumentum a projekttel együtt frissítendő. Utolsó módosítás: 2026-07-17 (v11.0.60)*

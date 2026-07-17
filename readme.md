@@ -3,7 +3,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.47-blue)
+![Version](https://img.shields.io/badge/version-11.0.60-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)

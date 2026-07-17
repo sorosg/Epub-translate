@@ -25,6 +25,9 @@ services:
     container_name: epub-backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - epub_uploads:/app/uploads
       - epub_output:/app/output

@@ -1,11 +1,16 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.59 – "Smart Optimizer"  
+**Verzió:** 11.0.60 – "Smart Optimizer"  
 **Utolsó frissítés:** 2026-07-17  
 
 ---
 
-## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.59)
+## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.60)
+
+### DNS javítás – frissítésellenőrzés (v11.0.60)
+- [x] **Backend konténer DNS konfiguráció**: `dns: [1.1.1.1, 8.8.8.8]` hozzáadva a `docker-compose.yml`-ben
+- [x] A hiányzó DNS miatt a backend nem tudta elérni az `api.github.com`-ot (frissítésellenőrzés) és az OpenLibrary API-t
+- [x] A `dns:` direktíva csak külső címekhez használatos, a belső Docker konténernevek (`ollama`, `postgres`, `redis`) feloldását nem befolyásolja
 
 ### Közös könyvtár deduplikációval (v11.0.59)
 - [x] **Könyv modell átalakítása**: `is_selected` mező kivezetése a `Book` modellből, `uploader` reláció hozzáadása
