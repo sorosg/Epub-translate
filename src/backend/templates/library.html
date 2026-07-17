@@ -142,7 +142,13 @@ async function uploadBook() {
   fd.append('series_number', document.getElementById('bookSeriesNumber').value);
   const resp = await fetch('/api/library/upload', {method:'POST', credentials:'same-origin', body:fd});
   const data = await resp.json();
-  if (data.success) { cancelUpload(); loadBooks(); } else { alert(data.error); }
+  if (data.success) { 
+    cancelUpload(); loadBooks(); 
+  } else if (data.duplicate) {
+    alert('⚠️ ' + data.error + '\n\nEz a könyv már megtalálható a közös könyvtárban, nem szükséges újra feltölteni.');
+  } else { 
+    alert(data.error || 'Hiba történt a feltöltés során'); 
+  }
 }
 
 function cancelUpload() { currentFile = null; document.getElementById('uploadForm').style.display='none'; document.getElementById('searchResults').innerHTML=''; }
@@ -170,17 +176,23 @@ function renderBooks() {
   if (filtered.length === 0) {
     html = '<p class="text-muted text-center py-3">Nincsenek könyvek a könyvtárban. Húzz ide EPUB fájlokat a feltöltéshez!</p>';
   } else {
-    html = '<table class="table table-dark table-striped"><thead><tr><th>Cím</th><th>Szerző</th><th>Nyelv</th><th>Műfaj</th><th>Sorozat</th><th>Művelet</th></tr></thead><tbody>';
+      html = '<table class="table table-dark table-striped"><thead><tr><th>Cím</th><th>Szerző</th><th>Nyelv</th><th>Műfaj</th><th>Sorozat</th><th>Feltöltő</th><th>Kontextus</th><th>Művelet</th></tr></thead><tbody>';
     filtered.forEach(b => {
       const seriesStr = b.series ? (b.series + (b.series_number ? ' #'+b.series_number : '')) : '-';
+      const selectedBtn = b.is_selected 
+        ? `<button class="btn btn-sm btn-success" onclick="toggleBook(${b.id})" title="Kiválasztva fordításhoz">⭐</button>`
+        : `<button class="btn btn-sm btn-outline-secondary" onclick="toggleBook(${b.id})" title="Kiválasztás fordításhoz">☆</button>`;
+      let actionBtns = '';
+      if (b.is_owner) {
+        actionBtns = `
+          <button class="btn btn-sm btn-outline-warning" onclick="editBook(${b.id})">✏️</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteBook(${b.id})">🗑️</button>`;
+      }
       html += `<tr>
         <td>${b.title || '-'}</td><td>${b.author || '-'}</td><td>${b.language || '-'}</td><td>${b.genre || '-'}</td><td>${seriesStr}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-warning" onclick="editBook(${b.id})">✏️</button>
-          <form action="/api/library/delete/${b.id}" method="POST" style="display:inline" onsubmit="return confirm('Biztosan törlöd?')">
-            <button class="btn btn-sm btn-outline-danger">🗑️</button>
-          </form>
-        </td>
+        <td><small>${b.uploader_name || '-'}</small></td>
+        <td>${selectedBtn}</td>
+        <td>${actionBtns || '<small class="text-muted">-</small>'}</td>
       </tr>`;
     });
     html += '</tbody></table>';
@@ -190,7 +202,7 @@ function renderBooks() {
 
 async function editBook(id) {
   const b = allBooks.find(x => x.id === id);
-  if (!b) return;
+  if (!b || !b.is_owner) { alert('Nincs jogosultságod szerkeszteni ezt a könyvet!'); return; }
   const title = prompt('Cím:', b.title || '');
   if (title === null) return;
   const author = prompt('Szerző:', b.author || '');
@@ -206,8 +218,24 @@ async function editBook(id) {
   const fd = new FormData();
   fd.append('title', title); fd.append('author', author); fd.append('genre', genre);
   fd.append('series', series); fd.append('series_number', sn); fd.append('language', lang);
-  await fetch('/api/library/edit/'+id, {method:'POST', credentials:'same-origin', body:fd});
-  loadBooks();
+  const resp = await fetch('/api/library/edit/'+id, {method:'POST', credentials:'same-origin', body:fd});
+  const data = await resp.json();
+  if (data.error) { alert(data.error); } else { loadBooks(); }
+}
+
+async function deleteBook(id) {
+  const b = allBooks.find(x => x.id === id);
+  if (!b || !b.is_owner) { alert('Nincs jogosultságod törölni ezt a könyvet!'); return; }
+  if (!confirm('Biztosan törlöd ezt a könyvet? A művelet nem vonható vissza.')) return;
+  const resp = await fetch('/api/library/delete/'+id, {method:'POST', credentials:'same-origin'});
+  const data = await resp.json();
+  if (data.error) { alert(data.error); } else { loadBooks(); }
+}
+
+async function toggleBook(id) {
+  const resp = await fetch('/api/library/toggle/'+id, {method:'POST', credentials:'same-origin'});
+  const data = await resp.json();
+  if (data.error) { alert(data.error); } else { loadBooks(); }
 }
 
 window.addEventListener('load', () => loadBooks());

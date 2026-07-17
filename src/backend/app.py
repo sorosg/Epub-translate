@@ -6,7 +6,7 @@ from flask_babel import Babel, gettext as _
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
-from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory
+from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory, UserBookPreference
 from datetime import datetime
 from functools import wraps
 import os, json, psutil, requests, threading, uuid, shutil, logging, traceback as _traceback
@@ -131,8 +131,22 @@ def logout():
 def dashboard():
     translations = Translation.query.filter_by(user_id=current_user.id).order_by(Translation.created_at.desc()).all()
     ref_books = ReferenceBook.query.filter_by(user_id=current_user.id).order_by(ReferenceBook.created_at.desc()).all()
-    books = Book.query.filter_by(user_id=current_user.id).order_by(Book.uploaded_at.desc()).all()
-    return render_template('dashboard.html', user=current_user, translations=translations, ref_books=ref_books, books=books, Config=Config)
+    # Közös könyvtárból: saját könyvek + kiválasztottak
+    my_books = Book.query.filter_by(user_id=current_user.id).order_by(Book.uploaded_at.desc()).all()
+    # Felhasználó által kiválasztott könyvek (UserBookPreference)
+    selected_prefs = UserBookPreference.query.filter_by(user_id=current_user.id, is_selected=True).all()
+    selected_book_ids = [p.book_id for p in selected_prefs]
+    selected_books = Book.query.filter(Book.id.in_(selected_book_ids)).all() if selected_book_ids else []
+    # Összefésült lista (saját + kiválasztott), duplikáció nélkül
+    all_book_ids = set()
+    books = []
+    for b in my_books + selected_books:
+        if b.id not in all_book_ids:
+            all_book_ids.add(b.id)
+            books.append(b)
+    # Preferenciák dict
+    prefs = {p.book_id: p for p in UserBookPreference.query.filter_by(user_id=current_user.id).all()}
+    return render_template('dashboard.html', user=current_user, translations=translations, ref_books=ref_books, books=books, book_prefs=prefs, Config=Config)
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -153,10 +167,13 @@ def upload_epub():
     translation = Translation(user_id=current_user.id, original_filename=file.filename, output_filename=None, status='pending', progress=0, model_used=app.config['DEFAULT_MODEL'])
     db.session.add(translation)
     current_user.tokens -= 1
-    # A kiválasztott könyvtári könyveket hozzárendeljük a fordításhoz
-    selected_books = Book.query.filter_by(user_id=current_user.id, is_selected=True).all()
-    for b in selected_books:
-        b.is_selected = False
+    # A kiválasztott könyvtári könyveket (UserBookPreference) hozzárendeljük a fordításhoz
+    selected_prefs = UserBookPreference.query.filter_by(user_id=current_user.id, is_selected=True).all()
+    selected_book_ids = [p.book_id for p in selected_prefs]
+    selected_books = Book.query.filter(Book.id.in_(selected_book_ids)).all() if selected_book_ids else []
+    # Kiválasztás törlése
+    for p in selected_prefs:
+        p.is_selected = False
     db.session.commit()
     thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath, [b.file_path for b in selected_books]))
     thread.daemon = True
@@ -333,13 +350,32 @@ def library_upload():
     file = request.files['file']
     if not file.filename or not allowed_file(file.filename):
         return jsonify({'error':'Csak EPUB fájl tölthető fel'}), 400
+    
+    title = request.form.get('title','') or file.filename.rsplit('.',1)[0]
+    author = request.form.get('author','')
+    
+    # Deduplikáció ellenőrzés: cím + szerző alapján
+    if title and author:
+        existing = Book.query.filter(
+            db.func.lower(Book.title) == title.lower().strip(),
+            db.func.lower(Book.author) == author.lower().strip()
+        ).first()
+        if existing:
+            return jsonify({
+                'error': f'Ez a könyv már szerepel a könyvtárban! Feltöltő: {existing.uploader.username if existing.uploader else "ismeretlen"}',
+                'duplicate': True,
+                'existing_id': existing.id,
+                'existing_title': existing.title,
+                'existing_author': existing.author
+            }), 409
+    
     filename = f"lib_{uuid.uuid4().hex}_{secure_filename(file.filename)}"
     filepath = os.path.join(app.config['LIBRARY_FOLDER'], filename)
     file.save(filepath)
     book = Book(
         user_id=current_user.id, filename=file.filename, file_path=filepath,
-        title=request.form.get('title','') or file.filename.rsplit('.',1)[0],
-        author=request.form.get('author',''), language=request.form.get('language','en'),
+        title=title, author=author,
+        language=request.form.get('language','en'),
         genre=request.form.get('genre',''), series=request.form.get('series',''),
         series_number=int(request.form.get('series_number',0)) if request.form.get('series_number','').isdigit() else None
     )
@@ -349,15 +385,32 @@ def library_upload():
 @app.route('/api/library/list')
 @login_required
 def library_list():
-    books = Book.query.filter_by(user_id=current_user.id).order_by(Book.uploaded_at.desc()).all()
-    return jsonify({'books':[{ 'id':b.id,'title':b.title or '','author':b.author or '','language':b.language or '','genre':b.genre or '','series':b.series or '','series_number':b.series_number,'is_selected':b.is_selected,'uploaded_at':b.uploaded_at.isoformat() if b.uploaded_at else '','filename':b.filename } for b in books]})
+    # Közös könyvtár: minden könyv látható mindenki számára
+    books = Book.query.order_by(Book.uploaded_at.desc()).all()
+    # Felhasználónkénti preferenciák betöltése
+    prefs = {p.book_id: p for p in UserBookPreference.query.filter_by(user_id=current_user.id).all()}
+    return jsonify({'books':[{ 
+        'id':b.id,
+        'title':b.title or '',
+        'author':b.author or '',
+        'language':b.language or '',
+        'genre':b.genre or '',
+        'series':b.series or '',
+        'series_number':b.series_number,
+        'is_selected': prefs[b.id].is_selected if b.id in prefs else False,
+        'is_owner': b.user_id == current_user.id,
+        'uploader_name': b.uploader.username if b.uploader else 'Ismeretlen',
+        'uploaded_at':b.uploaded_at.isoformat() if b.uploaded_at else '',
+        'filename':b.filename
+    } for b in books]})
 
 @app.route('/api/library/edit/<int:book_id>', methods=['POST'])
 @login_required
 def library_edit(book_id):
     book = Book.query.get_or_404(book_id)
-    if book.user_id != current_user.id:
-        return jsonify({'error':'Nincs jogosultságod'}), 403
+    # Szerkesztés: csak a feltöltő vagy admin jogosult
+    if book.user_id != current_user.id and not current_user.is_admin:
+        return jsonify({'error':'Nincs jogosultságod a szerkesztéshez'}), 403
     book.title = request.form.get('title', book.title)
     book.author = request.form.get('author', book.author)
     book.language = request.form.get('language', book.language)
@@ -372,8 +425,11 @@ def library_edit(book_id):
 @login_required
 def library_delete(book_id):
     book = Book.query.get_or_404(book_id)
-    if book.user_id != current_user.id:
-        return jsonify({'error':'Nincs jogosultságod'}), 403
+    # Törlés: csak a feltöltő vagy admin jogosult
+    if book.user_id != current_user.id and not current_user.is_admin:
+        return jsonify({'error':'Nincs jogosultságod a törléshez'}), 403
+    # Töröljük a hozzá tartozó felhasználói preferenciákat is
+    UserBookPreference.query.filter_by(book_id=book_id).delete()
     if book.file_path and os.path.exists(book.file_path):
         os.remove(book.file_path)
     db.session.delete(book); db.session.commit()
@@ -382,12 +438,17 @@ def library_delete(book_id):
 @app.route('/api/library/toggle/<int:book_id>', methods=['POST'])
 @login_required
 def library_toggle(book_id):
+    """Könyv kiválasztása/visszavonása fordításhoz – felhasználónkénti preferencia."""
     book = Book.query.get_or_404(book_id)
-    if book.user_id != current_user.id:
-        return jsonify({'error':'Nincs jogosultságod'}), 403
-    book.is_selected = not book.is_selected
+    # Megnézzük, van-e már preferencia bejegyzés
+    pref = UserBookPreference.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    if pref:
+        pref.is_selected = not pref.is_selected
+    else:
+        pref = UserBookPreference(user_id=current_user.id, book_id=book_id, is_selected=True)
+        db.session.add(pref)
     db.session.commit()
-    return jsonify({'success':True,'is_selected':book.is_selected})
+    return jsonify({'success':True,'is_selected':pref.is_selected})
 
 @app.route('/api/library/fetch-metadata', methods=['POST'])
 @login_required
@@ -816,11 +877,15 @@ Minták a kívánt stílushoz:
             except Exception as style_err:
                 translation_logger.debug(f"[ID:{translation_id}] Stílusinstrukció nem elérhető: {style_err}")
             
-            # 2. Terminológia gyűjtése könyvtári könyvekből
+            # 2. Terminológia gyűjtése könyvtári könyvekből (a felhasználó által kiválasztottak)
             try:
-                library_books = Book.query.filter_by(user_id=t.user_id, is_selected=True).all()
-                if not library_books:
-                    library_books = Book.query.filter_by(user_id=t.user_id).limit(3).all()
+                # A felhasználó által kiválasztott könyvek az UserBookPreference-ből
+                selected_prefs = UserBookPreference.query.filter_by(user_id=t.user_id, is_selected=True).all()
+                selected_book_ids = [p.book_id for p in selected_prefs]
+                if selected_book_ids:
+                    library_books = Book.query.filter(Book.id.in_(selected_book_ids)).all()
+                else:
+                    library_books = Book.query.order_by(Book.uploaded_at.desc()).limit(3).all()
                 if library_books:
                     # Kontextus fájlok is lehetnek
                     all_book_paths = []

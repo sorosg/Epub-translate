@@ -110,8 +110,20 @@ class Book(db.Model):
     genre = db.Column(db.String(100))
     series = db.Column(db.String(255))
     series_number = db.Column(db.Integer)
-    is_selected = db.Column(db.Boolean, default=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Kapcsolat a feltöltő felhasználóhoz
+    uploader = db.relationship('User', backref='uploaded_books')
+
+class UserBookPreference(db.Model):
+    """Felhasználónkénti könyvbeállítások (pl. kiválasztás fordításhoz)."""
+    __tablename__ = 'user_book_preferences'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    is_selected = db.Column(db.Boolean, default=False)
+    notes = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'book_id', name='uq_user_book'),)
 
 class ReferenceBook(db.Model):
     __tablename__ = 'reference_books'

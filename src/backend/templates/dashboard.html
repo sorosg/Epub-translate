@@ -70,7 +70,7 @@
       <small class="text-secondary ms-3">
         <i class="bi bi-token me-1"></i>A fordítás 1 tokent használ fel
       </small>
-      {% set selected_count = books|selectattr('is_selected','equalto',True)|list|length %}
+      {% set selected_count = book_prefs.values()|selectattr('is_selected','equalto',True)|list|length if book_prefs else 0 %}
       {% if selected_count > 0 %}
       <div class="mt-2">
         <span class="badge bg-info-subtle text-info-emphasis">
@@ -149,7 +149,7 @@
         <div class="card bg-secondary bg-opacity-25 border-secondary h-100">
           <div class="card-body py-2 px-3">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="book_{{ b.id }}" {% if b.is_selected %}checked{% endif %} onchange="toggleBook({{ b.id }}, this.checked)">
+              <input class="form-check-input" type="checkbox" id="book_{{ b.id }}" {% if book_prefs and b.id in book_prefs and book_prefs[b.id].is_selected %}checked{% endif %} onchange="toggleBook({{ b.id }}, this.checked)">
               <label class="form-check-label" for="book_{{ b.id }}">
                 <strong>{{ b.title or b.filename }}</strong>
                 {% if b.author %}<br><small class="text-secondary">{{ b.author }}</small>{% endif %}

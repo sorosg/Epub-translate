@@ -1,11 +1,26 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.56 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-07-17
+**Verzió:** 11.0.59 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-07-17  
 
 ---
 
-## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.48)
+## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.59)
+
+### Közös könyvtár deduplikációval (v11.0.59)
+- [x] **Könyv modell átalakítása**: `is_selected` mező kivezetése a `Book` modellből, `uploader` reláció hozzáadása
+- [x] **UserBookPreference modell**: felhasználónkénti könyvbeállítások (kiválasztás, jegyzetek) külön táblában
+- [x] **Közös könyvtár API**: a `library_list` végpont már nem szűr `user_id`-ra – minden felhasználó látja az összes könyvet
+- [x] **Deduplikáció**: feltöltéskor cím+szerző alapú ellenőrzés, duplikátum esetén 409-es válasz a feltöltő nevével
+- [x] **Jogosultságkezelés**: szerkesztés/törlés csak a feltöltő vagy admin számára, a frontend csak a tulajdonosnak mutat gombokat
+- [x] **Felhasználónkénti kiválasztás**: `UserBookPreference.is_selected` – minden felhasználó saját maga jelölhet ki könyveket fordítási kontextushoz
+- [x] **Dashboard integráció**: saját + kiválasztott könyvek összefésült listája, `book_prefs` dict a template-ben
+
+### Vizuális fejlesztések a könyvtárban (v11.0.59)
+- [x] **Feltöltő neve** megjelenik a táblázatban
+- [x] **Kontextus oszlop** ⭐/☆ gombbal a gyors kiválasztáshoz
+- [x] **Deduplikációs figyelmeztetés** a frontenden: alert üzenet a felhasználónak
+
 
 ### Fordítási minőség
 - [x] **HTML struktúra megőrzése** (v11.0.34) – text node batch fordítás, HTML elemek megtartása
