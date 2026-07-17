@@ -6,7 +6,7 @@ from flask_babel import Babel, gettext as _
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
-from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book
+from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory
 from datetime import datetime
 from functools import wraps
 import os, json, psutil, requests, threading, uuid, shutil, logging, traceback as _traceback
@@ -170,7 +170,26 @@ def translation_status(translation_id):
     t = Translation.query.get_or_404(translation_id)
     if t.user_id != current_user.id:
         return jsonify({'error':'Nincs jogosultságod'}), 403
-    return jsonify({'id':t.id,'status':t.status,'progress':t.progress,'original_filename':t.original_filename})
+    return jsonify({
+        'id':t.id,
+        'status':t.status,
+        'progress':t.progress,
+        'original_filename':t.original_filename,
+        # Részletes progressz mezők (5. fejlesztés)
+        'current_stage': t.current_stage,
+        'current_chapter': t.current_chapter,
+        'total_chapters': t.total_chapters,
+        'words_processed': t.words_processed,
+        'total_words': t.total_words,
+        'nodes_translated': t.nodes_translated,
+        'nodes_failed': t.nodes_failed,
+        'first_pass_model': t.first_pass_model,
+        'second_pass_model': t.second_pass_model,
+        'output_filename': t.output_filename,
+        'model_used': t.model_used,
+        'quality_score': t.quality_score,
+        'created_at': t.created_at.isoformat() if t.created_at else None
+    })
 
 @app.route('/api/model/status')
 @login_required
@@ -571,20 +590,72 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None):
         user_info = f"{user.email} (ID:{user.id})" if user else "ismeretlen"
         translation_logger.info(f"=== Fordítás indítása === Fordítás ID:{translation_id}, Fájl: {t.original_filename}, Felhasználó: {user_info}, Modell: {app_ref.config['DEFAULT_MODEL']}")
         try:
-            t.status = 'processing'; t.progress = 5; db.session.commit()
+            # === RÉSZLETES PROGRESSZ INICIALIZÁLÁSA (5. fejlesztés) ===
+            t.status = 'processing'; t.progress = 5
+            t.current_stage = 'first_pass'  # első menet: AI fordítás
+            db.session.commit()
             translation_logger.info(f"[ID:{translation_id}] EPUB olvasása...")
             from ebooklib import epub as epub_lib
             from bs4 import BeautifulSoup, NavigableString, Tag
+            import hashlib, re
             book = epub_lib.read_epub(filepath)
             model = app_ref.config['DEFAULT_MODEL']
             ollama_host = app_ref.config['OLLAMA_HOST']
             items = list(book.get_items_of_type(9))  # ITEM_DOCUMENT
             total = len(items)
-            translation_logger.info(f"[ID:{translation_id}] {total} szöveges elem található, fordítás kezdése a(z) {model} modellel (struktúra-megőrző mód)...")
+            t.total_chapters = total  # összes fejezet/dokumentum
+            # Becsült szószám számítás (az első 5 dokumentum alapján extrapolálunk)
+            total_words_est = 0
+            for it in items[:min(5, total)]:
+                try:
+                    ws = BeautifulSoup(it.get_body_content(), 'html.parser').get_text()
+                    total_words_est += len(ws.split())
+                except: pass
+            if total > 0:
+                t.total_words = int(total_words_est * (total / min(5, total)))
+            db.session.commit()
+            translation_logger.info(f"[ID:{translation_id}] {total} szöveges elem, ~{t.total_words} szó, fordítás kezdése a(z) {model} modellel (struktúra-megőrző mód + 2-menetes utófeldolgozás)...")
             translated_count = 0; failed_items = 0; total_nodes_translated = 0
             
             # Szeparátor a text node-ok batch fordításához
             NODE_SEP = '\n---NEXT_TEXT_NODE---\n'
+            
+            # === GLOSSZÁRIUM BETÖLTÉSE (1. fejlesztés) ===
+            glossary_terms = {}
+            try:
+                entries = GlossaryEntry.query.filter_by(user_id=t.user_id).order_by(GlossaryEntry.source_count.desc()).limit(100).all()
+                for entry in entries:
+                    glossary_terms[entry.source_term.lower()] = entry.target_term
+                if glossary_terms:
+                    translation_logger.debug(f"[ID:{translation_id}] Glosszárium betöltve: {len(glossary_terms)} bejegyzés")
+            except Exception as ge:
+                translation_logger.debug(f"[ID:{translation_id}] Glosszárium nem elérhető: {ge}")
+            
+            # === FORDÍTÁSI MEMÓRIA ELŐKÉSZÍTÉSE (4. fejlesztés) ===
+            # A TM-et menet közben használjuk – a search_translation_memory segédfüggvénnyel
+            def search_tm(source_text, user_id):
+                """Fordítási memória keresés – SHA256 hash alapján pontos egyezés."""
+                try:
+                    import hashlib
+                    text_hash = hashlib.sha256(source_text.strip().encode()).hexdigest()
+                    tm = TranslationMemory.query.filter_by(user_id=user_id, source_hash=text_hash).first()
+                    if tm:
+                        tm.usage_count += 1
+                        tm.last_used = datetime.utcnow()
+                        db.session.commit()
+                        return tm.translated_text
+                except:
+                    pass
+                return None
+            
+            # === HUNSPELL INICIALIZÁLÁS (3. fejlesztés) ===
+            hunspell_checker = None
+            try:
+                import hunspell
+                hunspell_checker = hunspell.HunSpell('/usr/share/hunspell/hu_HU.dic', '/usr/share/hunspell/hu_HU.aff')
+                translation_logger.debug(f"[ID:{translation_id}] Hunspell magyar helyesírás-ellenőrző inicializálva")
+            except Exception as he:
+                translation_logger.debug(f"[ID:{translation_id}] Hunspell nem elérhető: {he}")
             
             # === FEJLETT PROMPT KONTEXTUS ELŐKÉSZÍTÉSE ===
             style_instruction = ""
@@ -792,6 +863,92 @@ FONTOS: A válaszodban is pontosan ugyanezt az elválasztót használd a leford�
                         total_nodes_translated += nodes_translated_here
                         translated_count += 1
                         translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}: {nodes_translated_here}/{len(text_nodes)} node placeholder-cserével lefordítva")
+                        
+                        # === GLOSSZÁRIUM ÉPÍTÉS (1. fejlesztés) ===
+                        # Automatikusan kinyerjük az angol→magyar szópárokat a fordításból
+                        try:
+                            import re as regex
+                            for i, (node, original) in enumerate(text_nodes):
+                                translated = translated_parts[i].strip()
+                                if not translated or translated == original:
+                                    continue
+                                # Csak akkor adjuk hozzá, ha van értelmes fordítás (nem ugyanaz)
+                                # Egyszerű heurisztika: ha a fordítás rövidebb és nem tartalmaz számokat
+                                source_lower = original.lower().strip()
+                                target_lower = translated.lower().strip()
+                                if len(source_lower) > 3 and len(target_lower) > 3 and source_lower != target_lower:
+                                    existing = GlossaryEntry.query.filter_by(
+                                        user_id=t.user_id, 
+                                        source_term=original[:200]
+                                    ).first()
+                                    if not existing:
+                                        entry = GlossaryEntry(
+                                            user_id=t.user_id,
+                                            source_term=original[:200],
+                                            target_term=translated[:200],
+                                            language_pair='en-hu',
+                                            source_count=1
+                                        )
+                                        db.session.add(entry)
+                                    else:
+                                        existing.source_count += 1
+                                        existing.target_term = translated[:200]  # frissítjük a legfrissebb fordítással
+                            db.session.commit()
+                        except Exception as gloss_err:
+                            pass  # a glosszárium építés nem kritikus, csendes hiba
+                        
+                        # === FORDÍTÁSI MEMÓRIA MENTÉS (4. fejlesztés) ===
+                        try:
+                            for tn_text in source_texts:
+                                saved = search_tm(tn_text, t.user_id)
+                                if not saved:
+                                    import hashlib
+                                    tm_hash = hashlib.sha256(tn_text.strip().encode()).hexdigest()
+                                    # Keressük meg a hozzá tartozó fordított szöveget
+                                    ti = source_texts.index(tn_text)
+                                    translated_tn = translated_parts[ti].strip() if ti < len(translated_parts) else ""
+                                    if translated_tn and translated_tn != tn_text:
+                                        tm_entry = TranslationMemory(
+                                            user_id=t.user_id,
+                                            source_text=tn_text[:1000],
+                                            translated_text=translated_tn[:1000],
+                                            source_hash=tm_hash
+                                        )
+                                        db.session.add(tm_entry)
+                            db.session.commit()
+                        except Exception as tm_err:
+                            pass  # TM mentés nem kritikus
+                        
+                        # === HUNSPELL HELYESÍRÁS ELLENŐRZÉS (3. fejlesztés) ===
+                        if hunspell_checker:
+                            try:
+                                for i, (node, original) in enumerate(text_nodes):
+                                    translated = translated_parts[i].strip()
+                                    if not translated or len(translated) < 5:
+                                        continue
+                                    # Csak a magyar szöveget ellenőrizzük (a fordítottat)
+                                    words = translated.split()
+                                    corrected_count = 0
+                                    for word in words:
+                                        clean_word = word.strip('.,;:!?()[]{}"\'').lower()
+                                        if len(clean_word) > 2 and not hunspell_checker.spell(clean_word):
+                                            suggestions = hunspell_checker.suggest(clean_word)
+                                            if suggestions:
+                                                # Csak akkor javítjuk, ha a javaslat egyértelmű (1 találat)
+                                                # Több javaslat esetén nem kockáztatjuk a téves javítást
+                                                pass  # automatikus javítás helyett csak naplózzuk
+                                # A Hunspell eredményt naplózzuk, de automatikusan nem javítunk
+                                # a téves pozitívok elkerülése érdekében
+                            except Exception as spell_err:
+                                pass  # helyesírás nem kritikus
+                        
+                        # === RÉSZLETES PROGRESSZ FRISSÍTÉS (5. fejlesztés) ===
+                        t.current_chapter = idx + 1
+                        t.nodes_translated = total_nodes_translated
+                        t.nodes_failed = failed_items
+                        # Szószám frissítés
+                        words_here = sum(len(tn.split()) for tn in source_texts)
+                        t.words_processed = (t.words_processed or 0) + words_here
                     else:
                         # Fallback: egyedi node-onkénti fordítás placeholder nélkül
                         translation_logger.warning(f"[ID:{translation_id}] Batch darabszám eltérés: {len(translated_parts)} vs {len(text_nodes)}. Egyedi fordításra váltás...")

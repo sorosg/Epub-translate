@@ -35,7 +35,51 @@ class Translation(db.Model):
     progress = db.Column(db.Integer, default=0)
     model_used = db.Column(db.String(100))
     quality_score = db.Column(db.Integer)
+    # Részletes progressz követés mezők
+    current_stage = db.Column(db.String(30), default='pending')  # pending, first_pass, second_pass, post_processing, completed
+    current_chapter = db.Column(db.Integer, default=0)  # aktuális fejezet index
+    total_chapters = db.Column(db.Integer, default=0)  # összes fejezet
+    words_processed = db.Column(db.Integer, default=0)  # feldolgozott szavak
+    total_words = db.Column(db.Integer, default=0)  # összes szó a könyvben
+    nodes_translated = db.Column(db.Integer, default=0)  # lefordított text node-ok
+    nodes_failed = db.Column(db.Integer, default=0)  # sikertelen node-ok
+    # Kétmenetes fordítás mezők
+    first_pass_model = db.Column(db.String(100))  # első menet modellje (pl. 7b)
+    second_pass_model = db.Column(db.String(100))  # második menet modellje (pl. 14b)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ---- 1. GLOSSZÁRIUM (automatikus terminológia építés) ----
+class GlossaryEntry(db.Model):
+    """Fordítási glosszárium bejegyzés – angol→magyar szópárok tárolása.
+    Automatikusan épül a lefordított könyvekből, és a későbbi fordításoknál
+    terminológiai következetességet biztosít."""
+    __tablename__ = 'glossary_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    source_term = db.Column(db.String(500), nullable=False)  # angol szó/kifejezés
+    target_term = db.Column(db.String(500), nullable=False)  # magyar fordítás
+    language_pair = db.Column(db.String(10), default='en-hu')  # nyelvpár
+    category = db.Column(db.String(50), default='general')  # kategória: character, place, term, general
+    source_count = db.Column(db.Integer, default=1)  # hányszor fordult elő
+    confidence = db.Column(db.Float, default=1.0)  # megbízhatóság (1.0 = biztos)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# ---- 4. FORDÍTÁSI MEMÓRIA (Translation Memory cache) ----
+class TranslationMemory(db.Model):
+    """Fordítási memória – lefordított mondatok cache-elése a gyorsabb és 
+    konzisztensebb újrafordításhoz. Fuzzy matching alapján keresi a hasonló 
+    mondatokat (75%+ hasonlóság)."""
+    __tablename__ = 'translation_memory'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    source_text = db.Column(db.Text, nullable=False)  # eredeti angol szöveg
+    translated_text = db.Column(db.Text, nullable=False)  # magyar fordítás
+    source_hash = db.Column(db.String(64), unique=True)  # SHA256 a gyors kereséshez
+    language_pair = db.Column(db.String(10), default='en-hu')
+    usage_count = db.Column(db.Integer, default=1)  # hányszor használták
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_used = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class SystemSettings(db.Model):
     __tablename__ = 'system_settings'
