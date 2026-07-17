@@ -1,11 +1,17 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.60 – "Smart Optimizer"  
+**Verzió:** 11.0.61 – "Smart Optimizer"  
 **Utolsó frissítés:** 2026-07-17  
 
 ---
 
-## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.60)
+## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.61)
+
+### Modellváltás perzisztencia + folyamatjelző (v11.0.61)
+- [x] **Perzisztens modellváltás**: az `.env` fájl SELECTED_MODEL sorának frissítése, konténer újraindítás után is megmarad
+- [x] **Modell elérhetőség ellenőrzés**: váltás előtt Ollama `/api/tags` ellenőrzés, hiányzó modell automatikus letöltése
+- [x] **Folyamatjelző az admin felületen**: spinner, státusz visszajelzés (letöltés vs. sikeres váltás)
+- [x] **OLLAMA_HOST konfiguráció**: config.py most környezeti változóból olvas (`os.environ.get`)
 
 ### DNS javítás – frissítésellenőrzés (v11.0.60)
 - [x] **Backend konténer DNS konfiguráció**: `dns: [1.1.1.1, 8.8.8.8]` hozzáadva a `docker-compose.yml`-ben

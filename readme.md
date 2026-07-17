@@ -2,7 +2,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.60-blue)
+![Version](https://img.shields.io/badge/version-11.0.61-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -184,7 +184,7 @@ Jelszó: Abrakadabra (változtasd meg!)
 ### Rendszer funkciók
 - **Hardver alapú optimalizálás**: RAM, CPU detektálás, auto-konfiguráció
 - **Önfrissítő**: GitHub API alapú verzióellenőrzés és frissítés
-- **DNS konfiguráció** (v11.0.60): backend konténer külső DNS feloldása a frissítésellenőrzéshez
+- **DNS konfiguráció** (v11.0.61): backend konténer külső DNS feloldása a frissítésellenőrzéshez
 
 ---
 
@@ -332,11 +332,17 @@ docker exec epub-backend curl -s https://api.github.com | head -5
 
 ## 📊 Verzió Történet
 
+### v11.0.61 (2026-07-17)
+- 🔄 **Perzisztens modellváltás**: .env fájl frissítése, konténer újraindítás után is megmarad
+- ✅ **Modell elérhetőség ellenőrzés**: váltás előtti Ollama /api/tags ellenőrzés, hiányzó modell auto-pull
+- ⏳ **Folyamatjelző az admin felületen**: spinner, státusz visszajelzés a modellváltáskor
+- 🔧 **OLLAMA_HOST**: config.py most környezeti változóból olvas
+
 ### v11.0.60 (2026-07-17)
-- 🔧 **DNS javítás**: backend konténer külső DNS feloldása (Cloudflare 1.1.1.1, Google 8.8.8.8) a frissítésellenőrzéshez és OpenLibrary API-hoz
+- 🔧 **DNS javítás**: backend konténer külső DNS feloldása a frissítésellenőrzéshez
 - 📖 **README.md frissítve**: fordítási idő becslések CPU-only hardverre
 
-### v11.0.59 (2026-07-17)
+### v11.0.59
 - 📚 **Közös könyvtár**: minden felhasználó látja az összes feltöltött könyvet
 - 🚫 **Deduplikáció**: cím+szerző alapú ellenőrzés feltöltéskor
 - 👤 **UserBookPreference**: felhasználónkénti könyvbeállítások (kontextus kiválasztás)
@@ -384,4 +390,4 @@ docker exec epub-backend curl -s https://api.github.com | head -5
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.60
+Készült ❤️-vel Magyarországon – v11.0.61
