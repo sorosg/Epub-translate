@@ -34,13 +34,15 @@
 - Meglévő bejegyzések `source_count` frissítése
 - **Minőségjavulás:** ⭐⭐⭐⭐ (terminológiai következetesség)
 
-### 2. Kétmenetes fordítás (hibrid modell) ⚠️ RÉSZLEGES (v11.0.50)
-**Státusz:** Alap implementáció kész, második menet finomhangolandó
-- `Translation` modell bővítve: `current_stage`, `first_pass_model`, `second_pass_model` mezők
-- Az első menet a jelenlegi `translate_epub()` – AI fordítás az összes dokumentumon
-- A második menet (Hunspell ellenőrzés + TM cache) az első menet után fut
-- **TODO:** Külön második menet API hívás nagyobb modellel (pl. 14b) az ellenőrzésre
-- **Minőségjavulás:** ⭐⭐⭐⭐⭐ (két modell együttes tudása)
+### 2. Kétmenetes fordítás (hibrid modell) ✅ (v11.0.51)
+**Státusz:** KÉSZ
+- **Első menet:** AI fordítás a jelenlegi `translate_epub()`-bal (struktúra-megőrző mód, fejlett prompt)
+- **Második menet:** Minőségellenőrzés és javítás – a modell megkapja az eredeti angol szöveget (referencia) és a lefordított magyar szöveget, ellenőrzi a nyelvtant, stílust, terminológiát
+- Eredeti szövegek elmentése az első menet előtt (`original_texts` lista)
+- `current_stage` követés: `first_pass` → `second_pass` → `post_processing` → `completed`
+- Minőségi pontszám számítás a javítások aránya alapján (75-99 pont)
+- `first_pass_model` és `second_pass_model` mezők tárolása
+- **Minőségjavulás:** ⭐⭐⭐⭐⭐ (két menetes ellenőrzés és javítás)
 
 ### 3. Magyar nyelvi utófeldolgozás ✅ (v11.0.50)
 **Státusz:** KÉSZ
