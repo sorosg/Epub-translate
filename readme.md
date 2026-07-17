@@ -687,6 +687,18 @@ V: logs/resource_monitor.log fájlban.
 
 📊 Verzió Történet
 
+v11.0.60 (2026-07-17)
+- 🔧 **DNS javítás**: backend konténer külső DNS feloldása a frissítésellenőrzéshez
+
+v11.0.59 (2026-07-17)
+- 📚 **Közös könyvtár**: minden felhasználó láthatja az összes feltöltött könyvet
+- 🚫 **Deduplikáció**: cím+szerző alapú ellenőrzés
+- 👤 **UserBookPreference**: felhasználónkénti könyvbeállítások
+
+v11.0.56 (2026-07-16)
+- 📝 **Interaktív review felület**: fejezetek böngészése és inline szerkesztése
+- 📧 **Email értesítések** (MailHog)
+
 v11.0.27 (2026-07-16) - "Smart Optimizer"
 
 · 🆕 Intelligens modell optimalizáló
