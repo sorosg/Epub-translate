@@ -1,14 +1,14 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.62
+# Verzió: 11.0.63
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-19
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
 #          intelligens modellváltás, valós idejű rendszerfigyelés,
 #          közös könyvtár deduplikációval, DNS javítás (frissítésellenőrzés),
 #          modellváltás perzisztencia (.env mentés) + folyamatjelző,
-#          hunspell build hiba javítása (libhunspell-dev)
+#          hunspell build hiba javítása (CLI subprocess), nginx HTTP javítás
 
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -26,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.62"
+VERSION="11.0.63"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-17"
 MIN_VERSION_FOR_UPDATE="9.0.0"
