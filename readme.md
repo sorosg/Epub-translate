@@ -2,7 +2,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.61-blue)
+![Version](https://img.shields.io/badge/version-11.0.62-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -165,11 +165,11 @@ Jelszó: Abrakadabra (változtasd meg!)
 - **Kétmenetes fordítás**: AI fordítás + minőségellenőrzés és javítás
 - **Glosszárium építés**: automatikus angol→magyar szópár kinyerés
 - **Fordítási memória (TM cache)**: SHA256 alapú gyorsítótárazás
-- **Hunspell helyesírás-ellenőrzés**: magyar nyelvi validáció
+- **Hunspell helyesírás-ellenőrzés**: magyar nyelvi validáció (v11.0.62: libhunspell-dev build fix)
 - **Stílusinstrukció**: referencia (minta) könyvekből
 - **Terminológiai lista**: kiválasztott könyvtári könyvekből
 
-### Könyvtár funkciók (v11.0.59)
+### Könyvtár funkciók
 - **Közös könyvtár**: minden felhasználó látja az összes feltöltött könyvet
 - **Deduplikáció**: cím+szerző alapú ellenőrzés feltöltéskor
 - **Felhasználónkénti kiválasztás**: mindenki saját maga jelölhet ki kontextus könyveket
@@ -184,7 +184,7 @@ Jelszó: Abrakadabra (változtasd meg!)
 ### Rendszer funkciók
 - **Hardver alapú optimalizálás**: RAM, CPU detektálás, auto-konfiguráció
 - **Önfrissítő**: GitHub API alapú verzióellenőrzés és frissítés
-- **DNS konfiguráció** (v11.0.61): backend konténer külső DNS feloldása a frissítésellenőrzéshez
+- **DNS konfiguráció**: backend konténer külső DNS feloldása a frissítésellenőrzéshez
 
 ---
 
@@ -209,8 +209,7 @@ Böngésző (http://localhost:80)
 ┌───────────────────┐     ┌──────────────┐     ┌──────────────┐
 │  Ollama (CPU)     │     │  Redis       │     │  MailHog     │
 │  deepseek-r1:14b  │     │  (Cache)     │     │  (SMTP:1025) │
-│  host.docker      │     │              │     │  (Web:8025)  │
-│  .internal:11434  │     │              │     │              │
+│  ollama:11434     │     │              │     │  (Web:8025)  │
 └───────────────────┘     └──────────────┘     └──────────────┘
 ```
 
@@ -236,41 +235,6 @@ Ajánlott:
   - Irodalmi művekhez, fontos fordításokhoz
   - 50 000 szó feletti könyvekhez
   - Jó egyensúly minőség és sebesség között
-```
-
-### deepseek-r1:32b (40-64GB RAM-hoz)
-
-```
-Teljesítmény:
-  Sebesség: 5-10 nap/könyv (i3 8. gen CPU-n)
-  Minőség: ⭐⭐⭐⭐⭐ (90-95%)
-  RAM: 30-35 GB
-
-Optimalizálás:
-  memory_limit: 30G, max_workers: 1
-  batch_size: 2, num_parallel: 1
-
-Ajánlott:
-  - Maximális minőséghez
-  - Irodalmi remekművekhez
-  - 40 GB+ RAM szükséges
-```
-
-### deepseek-r1:8b (16GB RAM-hoz)
-
-```
-Teljesítmény:
-  Sebesség: 1,5-3 nap/könyv (i3 8. gen CPU-n)
-  Minőség: ⭐⭐⭐ (80-85%)
-  RAM: 12-14 GB
-
-Optimalizálás:
-  memory_limit: 16G, max_workers: 3
-  batch_size: 5, num_parallel: 2
-
-Ajánlott:
-  - Mindennapi használatra, gyorsabb fordításokhoz
-  - 16GB RAM-mal rendelkező gépekhez
 ```
 
 ---
@@ -299,38 +263,14 @@ docker exec -it epub-ollama ollama list
 
 # Új modell letöltése
 docker exec -it epub-ollama ollama pull deepseek-r1:14b
-
-# Modell törlése (tárhely felszabadítás)
-docker exec -it epub-ollama ollama rm deepseek-r1:1.5b
-```
-
----
-
-## 🔍 Hibaelhárítás
-
-### Konténerek ellenőrzése
-
-```bash
-docker compose ps
-docker compose logs backend
-docker compose logs ollama
-```
-
-### DNS / Frissítés ellenőrzési hiba
-
-```bash
-# Ellenőrizd, hogy a backend konténer eléri-e az internetet:
-docker exec epub-backend curl -s https://api.github.com | head -5
-
-# Ha nem, a docker-compose.yml-ben ellenőrizd a dns: bejegyzést:
-# dns:
-#   - 1.1.1.1
-#   - 8.8.8.8
 ```
 
 ---
 
 ## 📊 Verzió Történet
+
+### v11.0.62 (2026-07-19)
+- 🔧 **Hunspell build javítás**: `libhunspell-dev` hozzáadva a Dockerfile-hoz, a `pip install hunspell` fordítási hiba javítva
 
 ### v11.0.61 (2026-07-17)
 - 🔄 **Perzisztens modellváltás**: .env fájl frissítése, konténer újraindítás után is megmarad
@@ -342,21 +282,14 @@ docker exec epub-backend curl -s https://api.github.com | head -5
 - 🔧 **DNS javítás**: backend konténer külső DNS feloldása a frissítésellenőrzéshez
 - 📖 **README.md frissítve**: fordítási idő becslések CPU-only hardverre
 
-### v11.0.59
+### v11.0.59 (2026-07-17)
 - 📚 **Közös könyvtár**: minden felhasználó látja az összes feltöltött könyvet
 - 🚫 **Deduplikáció**: cím+szerző alapú ellenőrzés feltöltéskor
 - 👤 **UserBookPreference**: felhasználónkénti könyvbeállítások (kontextus kiválasztás)
-- 🔐 **Jogosultságkezelés**: szerkesztés/törlés csak a feltöltő vagy admin számára
 
 ### v11.0.56 (2026-07-16)
 - 📝 **Interaktív review felület**: lefordított fejezetek böngészése és inline szerkesztése
 - 📧 **Email értesítések**: fordítás befejezésekor (MailHog)
-
-### v11.0.55 (2026-07-16)
-- 🖥️ **Hardver alapú modell ajánlás javítása**: 40 GB RAM-hoz 32b modell
-
-### v11.0.54 (2026-07-16)
-- 🔧 **Node-onkénti fordítás**: megbízhatóbb, mint a batch mód
 
 ### v11.0.51 (2026-07-16)
 - ✅ **Kétmenetes fordítás**: első menet AI fordítás + második menet minőségellenőrzés
@@ -365,20 +298,9 @@ docker exec epub-backend curl -s https://api.github.com | head -5
 - 📖 **Glosszárium építés**: automatikus angol→magyar szópár kinyerés
 - 💾 **Fordítási memória**: TM cache a konzisztens fordításokhoz
 - 🔤 **Hunspell**: magyar helyesírás-ellenőrzés
-- 📊 **Részletes progressz követés**: fejezet, szószám, node szintű visszajelzés
 
 ### v11.0.27 (2026-07-16) - "Smart Optimizer"
-- 🆕 Intelligens modell optimalizáló
-- 🆕 Valós idejű erőforrás monitor
-- 🆕 Smart modellváltás auto-optimize
-- 🆕 Hardver alapú auto-konfiguráció
-
-### Korábbi verziók
-- v10.0.0: AI Asszisztens, OAuth/SSO, OCR, Hang, Gamification
-- v9.1.0: Dark Mode, Dashboard 2.0, Többnyelvű felület
-- v8.0.0: Drag & Drop könyvtárfeltöltés
-- v7.0.0: GitHub Auto-Update, Öntanuló fordítási memória
-- v1.0.0 - v6.0.0: Alaprendszer, Felhasználó kezelés, Párhuzamos fordítás
+- 🆕 Intelligens modell optimalizáló, erőforrás monitor, smart modellváltás
 
 ---
 
@@ -390,4 +312,4 @@ docker exec epub-backend curl -s https://api.github.com | head -5
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.61
+Készült ❤️-vel Magyarországon – v11.0.62

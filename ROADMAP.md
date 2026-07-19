@@ -7,7 +7,7 @@
 
 ## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.61)
 
-### Modellváltás perzisztencia + folyamatjelző (v11.0.61)
+### Modellváltás perzisztencia + folyamatjelző (v11.0.62)
 - [x] **Perzisztens modellváltás**: az `.env` fájl SELECTED_MODEL sorának frissítése, konténer újraindítás után is megmarad
 - [x] **Modell elérhetőség ellenőrzés**: váltás előtt Ollama `/api/tags` ellenőrzés, hiányzó modell automatikus letöltése
 - [x] **Folyamatjelző az admin felületen**: spinner, státusz visszajelzés (letöltés vs. sikeres váltás)

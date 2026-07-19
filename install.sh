@@ -1,13 +1,14 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.61
+# Verzió: 11.0.62
 # Kódnév: "Smart Optimizer"
-# Dátum: 2026-07-17
+# Dátum: 2026-07-19
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
 #          intelligens modellváltás, valós idejű rendszerfigyelés,
 #          közös könyvtár deduplikációval, DNS javítás (frissítésellenőrzés),
-#          modellváltás perzisztencia (.env mentés) + folyamatjelző
+#          modellváltás perzisztencia (.env mentés) + folyamatjelző,
+#          hunspell build hiba javítása (libhunspell-dev)
 
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -25,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.61"
+VERSION="11.0.62"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-17"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -1045,7 +1046,7 @@ create_backend_files() {
     cat > backend/Dockerfile << 'BACKENDEOF'
 FROM python:3.10-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y gcc libxml2-dev libxslt-dev curl git tesseract-ocr espeak ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y gcc libxml2-dev libxslt-dev curl git tesseract-ocr espeak ffmpeg hunspell hunspell-hu libhunspell-dev && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
