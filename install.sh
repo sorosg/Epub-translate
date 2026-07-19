@@ -908,7 +908,7 @@ services:
       - ./optimization_profiles:/app/optimization_profiles
     environment:
       - DATABASE_URL=postgresql://epub_user:epub_password@postgres:5432/epub_translator
-      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_HOST=http://ollama:11434
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY}
       - SELECTED_MODEL=${SELECTED_MODEL}
@@ -933,7 +933,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    command: gunicorn -w 2 -b 0.0.0.0:5000 app:app --timeout 600 --worker-class eventlet
+    command: gunicorn -w 2 -b 0.0.0.0:5000 app:app --timeout 600
   postgres:
     image: postgres:15-alpine
     container_name: epub-postgres
