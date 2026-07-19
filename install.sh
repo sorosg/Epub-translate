@@ -8,8 +8,8 @@
 #          intelligens modellváltás, valós idejű rendszerfigyelés,
 #          közös könyvtár deduplikációval, DNS javítás (frissítésellenőrzés),
 #          modellváltás perzisztencia (.env mentés) + folyamatjelző,
-#          hunspell build hiba javítása (CLI subprocess), nginx HTTP javítás,
-#          dns direktíva törlése + OLLAMA_HOST javítás (konténer kommunikáció)
+#          hunspell CLI + nginx HTTP-only + DB migráció, konténer DNS javítás
+#          dns direktíva törölve + eventlet eltávolítva (konténer kommunikáció)
 
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -27,7 +27,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.64"
+VERSION="11.0.65"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-19"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -553,7 +553,7 @@ perform_update() {
     log_success "Mentés: $BACK"
     
     $DOCKER compose down 2>/dev/null || true
-    [ -d .git ] && { git fetch origin 2>/dev/null && git pull origin main 2>/dev/null || log_warn "Git pull nem sikerült"; }
+    [ -d .git ] && { git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null || log_warn "Git frissítés nem sikerült"; }
     
     create_all_files
     log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
@@ -893,10 +893,8 @@ services:
   backend:
     build: ./backend
     container_name: epub-backend
-    dns:
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - 1.1.1.1
     volumes:
       - epub_uploads:/app/uploads
       - epub_output:/app/output
