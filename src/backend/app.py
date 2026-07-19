@@ -1384,9 +1384,27 @@ EPUB Fordító"""
 def init_db():
     with app.app_context():
         db.create_all()
+        # Hiányzó oszlopok hozzáadása a users táblához (régebbi verziókból frissítve)
         try:
             for col, col_type in [('address','VARCHAR(255)'),('birth_date','VARCHAR(20)'),('tax_id','VARCHAR(50)'),('phone','VARCHAR(30)')]:
                 db.session.execute(db.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+        except Exception as e:
+            db.session.rollback()
+        
+        # Hiányzó oszlopok hozzáadása a translations táblához (v11.0.50+ mezők)
+        try:
+            for col, col_type in [
+                ('current_stage', 'VARCHAR(30) DEFAULT \'pending\''),
+                ('current_chapter', 'INTEGER DEFAULT 0'),
+                ('total_chapters', 'INTEGER DEFAULT 0'),
+                ('words_processed', 'INTEGER DEFAULT 0'),
+                ('total_words', 'INTEGER DEFAULT 0'),
+                ('nodes_translated', 'INTEGER DEFAULT 0'),
+                ('nodes_failed', 'INTEGER DEFAULT 0'),
+                ('first_pass_model', 'VARCHAR(100)'),
+                ('second_pass_model', 'VARCHAR(100)')
+            ]:
+                db.session.execute(db.text(f"ALTER TABLE translations ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             db.session.commit()
         except Exception as e: db.session.rollback()
         admin = User.query.filter_by(email=Config.ADMIN_EMAIL).first()
