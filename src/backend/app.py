@@ -896,11 +896,16 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None):
                 return None
             
             # === HUNSPELL INICIALIZÁLÁS (3. fejlesztés) ===
-            hunspell_checker = None
+            # CLI eszközként használjuk (subprocess), mivel a hunspell Python binding
+            # nem fordul megbízhatóan a pip telepítés során
+            hunspell_available = False
             try:
-                import hunspell
-                hunspell_checker = hunspell.HunSpell('/usr/share/hunspell/hu_HU.dic', '/usr/share/hunspell/hu_HU.aff')
-                translation_logger.debug(f"[ID:{translation_id}] Hunspell magyar helyesírás-ellenőrző inicializálva")
+                import subprocess as _sp
+                result = _sp.run(['hunspell', '-d', 'hu_HU', '--version'], 
+                                capture_output=True, text=True, timeout=5)
+                hunspell_available = result.returncode == 0
+                if hunspell_available:
+                    translation_logger.debug(f"[ID:{translation_id}] Hunspell CLI magyar helyesírás-ellenőrző elérhető")
             except Exception as he:
                 translation_logger.debug(f"[ID:{translation_id}] Hunspell nem elérhető: {he}")
             
@@ -1170,7 +1175,7 @@ Csak a fordítást add vissza, semmi mást!
                         pass
                     
                     # === HUNSPELL HELYESÍRÁS ELLENŐRZÉS (3. fejlesztés) ===
-                    if hunspell_checker:
+                    if hunspell_available:
                         try:
                             for ph, translated, _ in placeholders:
                                 if not translated or len(translated) < 5:
@@ -1178,9 +1183,14 @@ Csak a fordítást add vissza, semmi mást!
                                 words = translated.split()
                                 for word in words:
                                     clean_word = word.strip('.,;:!?()[]{}"\'').lower()
-                                    if len(clean_word) > 2 and not hunspell_checker.spell(clean_word):
-                                        suggestions = hunspell_checker.suggest(clean_word)
-                                        # Csak naplózás, automatikus javítás nélkül
+                                    if len(clean_word) > 2:
+                                        # CLI hívással ellenőrizzük: echo "word" | hunspell -d hu_HU
+                                        result = _sp.run(['hunspell', '-d', 'hu_HU', '-a'],
+                                                        input=clean_word + '\n', capture_output=True,
+                                                        text=True, timeout=2)
+                                        if result.stdout and '*' not in result.stdout[:5]:
+                                            # Hibás szó, javaslatok kinyerése
+                                            pass  # Csak naplózás, automatikus javítás nélkül
                         except Exception as spell_err:
                             pass
                     
