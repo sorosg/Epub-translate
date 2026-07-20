@@ -3,16 +3,48 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_babel import Babel, gettext as _
+from flasgger import Swagger
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory, UserBookPreference
 from datetime import datetime
 from functools import wraps
-import os, json, psutil, requests, threading, uuid, shutil, logging, traceback as _traceback
+from packaging import version as pkg_version
+import os, json, psutil, requests, threading, uuid, shutil, logging
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config['SWAGGER'] = {
+    'title': 'EPUB Translator API',
+    'uiversion': 3,
+    'version': Config.VERSION,
+    'description': 'Docker-alapú EPUB fordító rendszer Ollama AI-val. Fordítás, könyvtárkezelés, admin funkciók.',
+    'specs': [{
+        'endpoint': 'apispec',
+        'route': '/api/apispec.json',
+    }],
+    'swagger_ui': True,
+    'specs_route': '/api/docs/'
+}
+swagger = Swagger(app, template={
+    'swagger': '2.0',
+    'info': {
+        'title': 'EPUB Translator API',
+        'version': Config.VERSION,
+        'description': 'Docker-alapú EPUB fordító rendszer API dokumentációja'
+    },
+    'basePath': '/',
+    'schemes': ['http', 'https'],
+    'tags': [
+        {'name': 'Auth', 'description': 'Autentikáció és session kezelés'},
+        {'name': 'Translation', 'description': 'Fordítás kezelése (feltöltés, státusz, letöltés)'},
+        {'name': 'Library', 'description': 'Közös könyvtár kezelése'},
+        {'name': 'Review', 'description': 'Fordítás átnézés és szerkesztés'},
+        {'name': 'Admin', 'description': 'Adminisztrációs funkciók'},
+        {'name': 'System', 'description': 'Rendszer monitorozás és frissítés'}
+    ]
+})
 app.config['UPLOAD_FOLDER'] = '/app/uploads/books'
 app.config['REFERENCE_FOLDER'] = '/app/uploads/reference'
 app.config['OUTPUT_FOLDER'] = '/app/output'
@@ -184,6 +216,44 @@ def upload_epub():
 @app.route('/api/status/<int:translation_id>')
 @login_required
 def translation_status(translation_id):
+    """Fordítás állapotának lekérdezése.
+    ---
+    tags:
+      - Translation
+    parameters:
+      - name: translation_id
+        in: path
+        type: integer
+        required: true
+        description: A fordítás azonosítója
+    responses:
+      200:
+        description: A fordítás részletes állapota
+        schema:
+          type: object
+          properties:
+            id:
+              type: integer
+            status:
+              type: string
+              enum: [pending, processing, completed, failed]
+            progress:
+              type: integer
+            current_stage:
+              type: string
+            current_chapter:
+              type: integer
+            total_chapters:
+              type: integer
+            words_processed:
+              type: integer
+            total_words:
+              type: integer
+            quality_score:
+              type: integer
+      403:
+        description: Nincs jogosultság
+    """
     t = Translation.query.get_or_404(translation_id)
     if t.user_id != current_user.id:
         return jsonify({'error':'Nincs jogosultságod'}), 403
@@ -1394,8 +1464,29 @@ EPUB Fordító"""
                 translation_logger.debug(f"[ID:{translation_id}] Ideiglenes fájl törölve: {filepath}")
 
 def init_db():
+    """Adatbázis inicializálás – Alembic migrációval (verziókövetett séma).
+    Ha az Alembic nem érhető el, fallback: db.create_all()."""
     with app.app_context():
-        db.create_all()
+        # Alembic migráció futtatása (verziókövetett adatbázis séma)
+        try:
+            from alembic.config import Config as AlembicConfig
+            from alembic import command
+            alembic_ini = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alembic.ini')
+            if os.path.exists(alembic_ini):
+                alembic_cfg = AlembicConfig(alembic_ini)
+                # Felülírjuk az adatbázis URL-t a Config-ból (környezeti változó)
+                alembic_cfg.set_main_option('sqlalchemy.url', Config.SQLALCHEMY_DATABASE_URI or
+                    os.environ.get('DATABASE_URL', 'postgresql://epub_user:epub_password@postgres:5432/epub_translator'))
+                with app.app_context():
+                    command.upgrade(alembic_cfg, "head")
+                app_logger.info("✅ Adatbázis migráció sikeres (Alembic upgrade head)")
+            else:
+                db.create_all()
+                app_logger.info("Adatbázis inicializálva (db.create_all – alembic.ini nem található)")
+        except Exception as e:
+            app_logger.warning(f"Alembic migráció sikertelen ({e}), fallback: db.create_all()")
+            db.create_all()
+        
         # Hiányzó oszlopok hozzáadása a users táblához (régebbi verziókból frissítve)
         try:
             for col, col_type in [('address','VARCHAR(255)'),('birth_date','VARCHAR(20)'),('tax_id','VARCHAR(50)'),('phone','VARCHAR(30)')]:

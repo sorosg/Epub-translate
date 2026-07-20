@@ -1,7 +1,7 @@
 # 🏗️ EPUB Fordító – Architektúra Dokumentáció
 
-**Verzió:** 11.0.60 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-07-17  
+**Verzió:** 11.0.67 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-07-20  
 
 > Ez a dokumentum a rendszer teljes architektúráját írja le. Célja, hogy a Cline AI asszisztens kontextuskeretből való kiesése esetén is gyorsan áttekinthető legyen a kódbázis szerkezete, a főbb komponensek és azok kapcsolatai.
 
@@ -27,7 +27,7 @@ Az EPUB Fordító egy **Linux rendszeren futó, Docker-alapú ekönyv fordító 
 
 Az EPUB Fordító Flask backenddel, PostgreSQL adatbázissal, Nginx webszerverrel és számos segédszolgáltatással (Redis, MailHog) működik Docker konténerekben.
 
-### Főbb képességek (v11.0.62)
+### Főbb képességek (v11.0.67)
 - EPUB fájlok feltöltése és automatikus AI fordítása (kétmenetes: fordítás + minőségellenőrzés)
 - Felhasználókezelés (token alapú, admin/user szerepkörök)
 - Közös könyvtár deduplikációval – minden felhasználó látja az összes feltöltött könyvet
@@ -469,4 +469,4 @@ Ha a Cline kontextus ablaka kiürül, ezeket a fájlokat olvasd be sorrendben:
 
 ---
 
-*Ez a dokumentum a projekttel együtt frissítendő. Utolsó módosítás: 2026-07-17 (v11.0.62)*
+*Ez a dokumentum a projekttel együtt frissítendő. Utolsó módosítás: 2026-07-17 (v11.0.67)*
