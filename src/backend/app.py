@@ -1034,6 +1034,18 @@ Minták a kívánt stílushoz:
                     # Batch fordítás helyett minden text node-ot egyesével fordítunk,
                     # mert a deepseek-r1 nem használja megbízhatóan a NODE_SEP szeparátort.
                     # Ez több API hívást jelent, de a megbízhatóság garantált.
+                    
+                    # Few-shot fordítási példák a jobb minőségért – a modell ezek alapján tanulja a stílust
+                    few_shot = """Fordítási példák (stílus és formátum referenciaként):
+
+Angol: The quick brown fox jumps over the lazy dog.
+Magyar: A gyors barna róka átugorja a lusta kutyát.
+
+Angol: She walked through the garden, admiring the beautiful flowers that bloomed in the morning sun.
+Magyar: Átsétált a kerten, gyönyörködve a gyönyörű virágokban, amelyek a reggeli napfényben nyíltak.
+
+---
+"""
                     import hashlib
                     nodes_translated_here = 0
                     placeholders = []

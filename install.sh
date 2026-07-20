@@ -1,7 +1,7 @@
     #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.65
+# Verzió: 11.0.66
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-07-19
 # Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
@@ -27,7 +27,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.65"
+VERSION="11.0.66"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-07-19"
 MIN_VERSION_FOR_UPDATE="9.0.0"
