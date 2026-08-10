@@ -2,7 +2,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.68-blue)
+![Version](https://img.shields.io/badge/version-11.0.69-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -26,8 +26,12 @@ Az EPUB Fordító Rendszer egy **teljesen ingyenes, helyben futó, öntanuló** 
 - ✅ **Helyben Fut** – Minden adat a saját gépeden marad
 - ✅ **Kétmenetes fordítás** – AI fordítás + minőségellenőrzés a jobb minőségért
 - ✅ **Közös könyvtár** – Minden felhasználó látja az összes feltöltött könyvet (deduplikációval)
+- ✅ **Batch könyvtár feltöltés** – Több száz EPUB egyidejű behúzása, automatikus metaadat kinyerés
 - ✅ **Interaktív review** – Lefordított fejezetek böngészése és inline szerkesztése
 - ✅ **Email értesítések** – MailHog SMTP szerver a fordítás befejezésekor
+- ✅ **Sötét/világos téma** – Felhasználónként mentett preferencia
+- ✅ **Mobilbarát felület** – Sidebar navigáció, lebegő hamburger menü, alsó navigációs sáv
+- ✅ **PWA támogatás** – Telepíthető webalkalmazás, offline cache
 - ✅ **Önfrissítő** – GitHub frissítések ellenőrzése és telepítése
 - ✅ **Hardver alapú modell ajánlás** – RAM mérettől függően
 
@@ -269,6 +273,18 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ## 📊 Verzió Történet
 
+### v11.0.69 (2026-08-10) – "Smart Optimizer"
+- 🔤 **Szélesebb sliding window**: előző fejezet 800 karakter + következő fejezet 500 karakter
+- 📚 **Batch könyvtár feltöltés**: több száz EPUB egyidejű behúzása, automatikus metaadat kinyerés (cím, szerző, műfaj, sorozat)
+- 🎨 **Sötét/világos téma váltó**: felhasználónként mentve, CSS változók, GitHub-szerű világos dizájn
+- 📱 **Mobil optimalizálás**: sidebar navigáció, lebegő hamburger menü, alsó navigációs sáv
+- ⚡ **Dashboard élő frissítés**: 10 másodperces polling a fordítási állapotokhoz
+- 🖼️ **Könyvtár kártyás nézet**: táblázat ↔ kártya váltó gomb
+- 👤 **Profil oldal**: saját adatok szerkesztése, API kulcs kezelés, jelszó változtatás
+- 🔑 **API kulcs kezelés**: DeepSeek Pro API kulcs státusz és szerkesztő a dashboardon
+- 📦 **PWA támogatás**: manifest.json, service worker, SVG ikonok, offline cache
+- 🐛 **Hibajavítások**: users/dark_mode oszlop migráció, MailHog profiles, Ollama modell letöltés várakozás
+
 ### v11.0.62 (2026-07-19)
 - 🔧 **Hunspell build javítás**: `libhunspell-dev` hozzáadva a Dockerfile-hoz, a `pip install hunspell` fordítási hiba javítva
 
@@ -312,4 +328,4 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.68
+Készült ❤️-vel Magyarországon – v11.0.69
