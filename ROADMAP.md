@@ -1,7 +1,19 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
 **Verzió:** 11.0.70 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-10 (35 commit, számos hibajavítás és stabilizálás)  
+**Utolsó frissítés:** 2026-08-10 (43 commit)  
+
+### v11.0.70 újdonságok (2026-08-10):
+- 🔤 **#8 Szélesebb sliding window** – előző fejezet 800 + következő 500 karakter
+- 📚 **#9 Batch könyvtár feltöltés** – több száz EPUB, automatikus metaadat kinyerés (cím, szerző, műfaj, sorozat)
+- 🎨 **#10 Sötét/világos téma váltó** – CSS változók, felhasználónként mentve
+- 📱 **Sidebar navigáció** – bal oldali fix sidebar + mobil hamburger menü + alsó navigációs sáv
+- 📦 **PWA támogatás** – manifest.json, service worker, SVG ikonok, offline cache
+- 💡 **Könyvajánló** – kapcsolódó könyvek ajánlása sorozat/szerző/műfaj alapján
+- ⚡ **Dashboard élő frissítés** – 10mp polling, fordítási állapot követés
+- 👤 **Profil oldal** – saját adatok, API kulcs, jelszó változtatás
+- 🖼️ **Könyvtár kártyás nézet** – táblázat ↔ kártya váltó gomb
+- 🐛 **Számos hibajavítás** – 500 hiba (users oszlopok), MailHog profiles, Ollama deploy/reservations, port foglaltság (retry + auto 8080), install.sh shebang, heredoc → git clone, SECRET_KEY, cp -a teljes másolás
 
 ---
 

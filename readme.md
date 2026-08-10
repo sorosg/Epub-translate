@@ -330,4 +330,85 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ---
 
+## 🛠️ Fejlesztői útmutató
+
+### Gyors kezdés fejlesztéshez
+
+```bash
+# 1. Repó klónozása
+git clone https://github.com/sorosg/Epub-translate.git
+cd Epub-translate
+
+# 2. Fejlesztői mód (nem Docker, közvetlen Python)
+cd src/backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Környezeti változók beállítása
+export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
+export OLLAMA_HOST=http://localhost:11434
+export SECRET_KEY=dev-secret-key
+export VERSION=11.0.70
+
+# 4. Adatbázis inicializálás
+python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')"
+
+# 5. Szerver indítása
+python3 app.py
+# Web: http://localhost:5000
+# Admin: admin@epub-translator.local / Abrakadabra
+```
+
+### Projekt struktúra (főbb fájlok)
+
+| Fájl | Leírás |
+|------|--------|
+| `install.sh` | **Telepítő/frissítő script** – ez generálja a telepítést. Ha módosítasz bármilyen forrásfájlt, a telepítőt is frissíteni kell (a `_create_files_from_script()` függvényben a heredoc-ok) |
+| `src/backend/app.py` | **Flask backend** – API végpontok, fordítási logika (`translate_epub`), `init_db()` |
+| `src/backend/models.py` | **Adatbázis modellek** – User, Translation, Book, GlossaryEntry, TranslationMemory, UserBookPreference |
+| `src/backend/config.py` | **Konfiguráció** – VERSION, környezeti változók, alapértelmezések |
+| `src/backend/templates/` | **HTML template-ek** – Jinja2 alapú, Bootstrap 5.3 + Inter font |
+| `src/backend/templates/base.html` | **Alap layout** – sidebar, téma váltó, PWA meta tagek, responsive CSS |
+| `src/backend/templates/dashboard.html` | **Vezérlőpult** – fordítások listája, élő frissítés, EPUB feltöltés, könyvajánló |
+| `src/backend/templates/library.html` | **Könyvtár** – batch feltöltő (drag & drop), kártya/táblázat nézet, szűrők |
+| `src/docker-compose.yml` | **Docker szolgáltatások** – nginx, backend, postgres, ollama, redis, mailhog |
+| `src/nginx/nginx.conf` | **Nginx konfiguráció** – reverse proxy, statikus fájlok |
+| `src/ollama/` | **Ollama konténer** – Dockerfile + healthcheck.sh |
+| `ROADMAP.md` | **Fejlesztési útiterv** – kész, folyamatban lévő és tervezett fejlesztések |
+| `README.md` | **Felhasználói dokumentáció** – ez a fájl |
+
+### Fejlesztési munkafolyamat
+
+1. **Forráskód módosítása** – a `src/` könyvtárban dolgozz
+2. **Tesztelés** – futtasd a Flask szervert közvetlenül (`python3 app.py`)
+3. **Verziószám növelése** – minden módosítás után:
+   - `install.sh`: `VERSION="x.y.z"`
+   - `src/backend/config.py`: `VERSION = os.environ.get('VERSION', 'x.y.z')`
+   - `README.md`: badge + lábléc
+   - `ROADMAP.md`: verzió és státusz frissítése
+4. **Commit és push** – `git add -A && git commit -m "vX.Y.Z: leírás" && git push origin main`
+5. **Telepítő frissítése** – ha új fájlokat adtál hozzá, ellenőrizd, hogy az `install.sh` `create_all_files()` függvénye másolja-e őket
+
+### Fontos tudnivalók
+
+- **A telepítő (install.sh) `_create_files_from_script()` függvénye** tartalmazza a fájlok heredoc generálását – ha új Python/HTML fájlt adsz hozzá, itt is fel kell venni!
+- **Az install.sh mostantól git clone-t használ**, ha a `src/` mappa nem elérhető (wget-tel letöltve). A heredoc generálás csak fallback.
+- **A `cp` parancsoknál nincs `2>/dev/null`** – ha egy fájl nem másolódik, a telepítő hibával leáll
+- **A `set -euo pipefail` aktív** – minden hiba azonnali kilépést okoz
+- **Mobil nézet**: a sidebar 1024px alatt elrejtve, lebegő hamburger gomb + alsó navigációs sáv
+- **Téma váltó**: `User.dark_mode` mező az adatbázisban, CSS változók (`data-bs-theme`)
+
+### Gyakori hibák és megoldások
+
+| Hiba | Ok | Megoldás |
+|------|----|---------|
+| `SECRET_KEY: unbound variable` | A változó nincs definiálva a `create_env_file()` előtt | `SECRET_KEY` generálás a függvény elején |
+| `address already in use` (80-as port) | Host webszerver foglalja a portot | `systemctl mask nginx/apache2` + automatikus 8080-ra váltás |
+| `Minimum memory limit` | `reservations.memory` > `limits.memory` | `reservations` törölve a docker-compose.yml-ből |
+| 500 Internal Server Error | Hiányzó adatbázis oszlop | `init_db()` ALTER TABLE ADD COLUMN IF NOT EXISTS |
+| TemplateNotFound | Új template fájl nincs az install.sh-ban | Hozzáadni a `create_all_files()` cp parancsaihoz |
+
+---
+
 Készült ❤️-vel Magyarországon – v11.0.70

@@ -709,11 +709,10 @@ perform_fresh_install() {
     fi
     set -e
     
-    $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
-    
-    # Ellenőrizzük, hogy a build sikeres volt-e
-    if ! $DOCKER compose ps --services 2>/dev/null | grep -q backend; then
-        log_error "A build nem sikerült. Ellenőrizd a hibákat fent."
+    log_info "Docker image-ek építése --no-cache móddal..."
+    if ! $DOCKER compose build --no-cache; then
+        log_error "A Docker build nem sikerült! Ellenőrizd a fenti hibaüzeneteket."
+        log_error "Lehetséges okok: hiányzó fájlok a backend/ könyvtárban, Docker daemon probléma, lemezterület"
         return 1
     fi
     
