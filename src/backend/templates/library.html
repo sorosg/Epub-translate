@@ -46,19 +46,19 @@
 <div class="card mb-3">
   <div class="card-body">
     <div class="row g-2">
-      <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="filterTitle" placeholder="Cím szűrés" oninput="renderBooks()"></div>
-      <div class="col-md-2"><input type="text" class="form-control form-control-sm" id="filterAuthor" placeholder="Szerző szűrés" oninput="renderBooks()"></div>
-      <div class="col-md-2">
+      <div class="col-6 col-md-3"><input type="text" class="form-control form-control-sm" id="filterTitle" placeholder="Cím szűrés" oninput="renderBooks()"></div>
+      <div class="col-6 col-md-2"><input type="text" class="form-control form-control-sm" id="filterAuthor" placeholder="Szerző szűrés" oninput="renderBooks()"></div>
+      <div class="col-6 col-md-2">
         <select class="form-select form-select-sm" id="filterGenre" onchange="renderBooks()">
           <option value="">Minden műfaj</option><option value="sci-fi">Sci-Fi</option><option value="fantasy">Fantasy</option><option value="adventure">Kaland</option><option value="mystery">Krimi</option><option value="romance">Romantikus</option><option value="horror">Horror</option><option value="historical">Történelmi</option><option value="biography">Életrajz</option><option value="science">Tudományos</option><option value="other">Egyéb</option>
         </select>
       </div>
-      <div class="col-md-2">
+      <div class="col-6 col-md-2">
         <select class="form-select form-select-sm" id="filterLanguage" onchange="renderBooks()">
           <option value="">Minden nyelv</option><option value="en">Angol</option><option value="hu">Magyar</option><option value="de">Német</option><option value="fr">Francia</option><option value="es">Spanyol</option>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3">
         <button class="btn btn-sm btn-outline-info" onclick="loadBooks()"><i class="bi bi-arrow-repeat me-1"></i>Frissítés</button>
         <!-- Nézetváltó -->
         <button class="btn btn-sm btn-outline-light ms-1" id="btnViewToggle" onclick="toggleBookView()" title="Váltás táblázat / kártya nézet">
