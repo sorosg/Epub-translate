@@ -107,13 +107,15 @@ A rendszer **kétmenetes fordítást** végez (első menet: AI fordítás, máso
 
 ## 🚀 Gyors Telepítés
 
-### Egy paranccsal:
+### Egy paranccsal (ajánlott):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/sorosg/Epub-translate/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/sorosg/Epub-translate/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh
 ```
 
-Vagy lépésről lépésre:
+> **Fontos:** Mindenképpen az egész sort másold ki, a `&&` jelekkel együtt! Ha a `curl ... | bash` parancs nem működik (csak kiírja a fájl tartalmát), használd a fenti sort.
+
+### Vagy lépésről lépésre:
 
 ```bash
 # 1. Töltsd le a telepítőt
@@ -122,8 +124,8 @@ wget https://raw.githubusercontent.com/sorosg/Epub-translate/main/install.sh
 # 2. Tedd futtathatóvá
 chmod +x install.sh
 
-# 3. Indítsd el (a rendszer automatikusan felismeri a hardvert)
-./install.sh
+# 3. Indítsd el
+bash install.sh
 ```
 
 ### Telepítés után

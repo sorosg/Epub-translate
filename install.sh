@@ -1,4 +1,4 @@
-    #!/bin/bash
+#!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
 # Verzió: 11.0.69
