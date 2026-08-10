@@ -561,10 +561,6 @@ perform_update() {
     $DOCKER compose build --no-cache backend 2>/dev/null || $DOCKER compose build backend
     log_info "Többi konténer építése..."
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
-    # Biztonsági törlés: eltávolítjuk a deploy/reservations részt,
-    # ami 'Minimum memory limit < reservation limit' hibát okozhat
-    sed -i '/^ *deploy:/,+3d' docker-compose.yml 2>/dev/null || true
-    sed -i '/reservations:/d' docker-compose.yml 2>/dev/null || true
     $DOCKER compose up -d
     sleep 15
     
@@ -909,7 +905,7 @@ ENVEOF
 }
 
 create_docker_compose() {
-    cat > docker-compose.yml << 'DOCKEREOF'
+    cat > docker-compose.yml << DOCKEREOF
 services:
   nginx:
     image: nginx:alpine
