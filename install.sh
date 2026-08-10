@@ -1002,7 +1002,7 @@ services:
         limits:
           memory: ${OPTIMAL_MEMORY_LIMIT}
         reservations:
-          memory: 16G
+          memory: 8G
     healthcheck:
       test: ["CMD", "/healthcheck.sh"]
       interval: 10s
