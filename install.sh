@@ -558,9 +558,15 @@ perform_update() {
     
     create_all_files
     log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
-    $DOCKER compose build --no-cache backend 2>/dev/null || $DOCKER compose build backend
+    if ! DOCKER_BUILDKIT=0 $DOCKER compose build --no-cache backend; then
+        log_warn "Backend --no-cache build hiba, próba cache-elt build-del..."
+        $DOCKER compose build backend
+    fi
     log_info "Többi konténer építése..."
-    $DOCKER compose build --no-cache 2>/dev/null || $DOCKER compose build 2>/dev/null
+    if ! DOCKER_BUILDKIT=0 $DOCKER compose build --no-cache; then
+        log_warn "Teljes --no-cache build hiba, próba cache-elt build-del..."
+        $DOCKER compose build
+    fi
     
     # Konténerek indítása (retry port foglaltság esetén)
     log_info "Konténerek indítása..."

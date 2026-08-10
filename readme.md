@@ -332,29 +332,81 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ## 🛠️ Fejlesztői útmutató
 
-### Gyors kezdés fejlesztéshez
+### ⚡ Folytatás új ablakban (CTRL+N, másold be az egészet)
 
 ```bash
-# 1. Repó klónozása
-git clone https://github.com/sorosg/Epub-translate.git
-cd Epub-translate
+# === EPUB FORDÍTÓ FEJLESZTŐI KÖRNYEZET GYORSINDÍTÁS ===
+# Másold be ezt az egész blokkot egy új terminál ablakba!
 
-# 2. Fejlesztői mód (nem Docker, közvetlen Python)
+cd ~/Desktop/Epub-translate
+
+# Fájlok ellenőrzése (ha nincs itt a projekt, klónozd):
+# git clone https://github.com/sorosg/Epub-translate.git ~/Desktop/Epub-translate
+
+# Backend indítása fejlesztői módban
 cd src/backend
-python3 -m venv venv
+python3 -m venv venv 2>/dev/null || true
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -q -r requirements.txt 2>/dev/null || true
 
-# 3. Környezeti változók beállítása
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
 export VERSION=11.0.70
 
-# 4. Adatbázis inicializálás
+python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('✅ DB OK')" 2>/dev/null || echo "⚠️ DB nem elérhető (Docker konténerek futnak?)"
+
+echo ""
+echo "🌐 Backend: http://localhost:5000"
+echo "👤 Admin: admin@epub-translator.local / Abrakadabra"
+echo "📁 Projekt: ~/Desktop/Epub-translate"
+echo ""
+
+python3 app.py
+```
+
+### Fájlok pontos elérési útja (macOS)
+
+| Fájl | Teljes elérési út | Leírás |
+|------|-------------------|--------|
+| **Projekt gyökér** | `~/Desktop/Epub-translate/` | A projekt főkönyvtára |
+| **Telepítő** | `~/Desktop/Epub-translate/install.sh` | Telepítő/frissítő script |
+| **Flask backend** | `~/Desktop/Epub-translate/src/backend/app.py` | API végpontok, fordítási logika |
+| **Adatbázis modellek** | `~/Desktop/Epub-translate/src/backend/models.py` | User, Translation, Book, stb. |
+| **Konfiguráció** | `~/Desktop/Epub-translate/src/backend/config.py` | Környezeti változók, VERSION |
+| **Base layout** | `~/Desktop/Epub-translate/src/backend/templates/base.html` | Sidebar, téma váltó, PWA, CSS |
+| **Dashboard** | `~/Desktop/Epub-translate/src/backend/templates/dashboard.html` | Vezérlőpult, könyvajánló |
+| **Könyvtár** | `~/Desktop/Epub-translate/src/backend/templates/library.html` | Batch feltöltő, kártya/táblázat |
+| **Profil** | `~/Desktop/Epub-translate/src/backend/templates/profile.html` | Felhasználói profil szerkesztő |
+| **Felhasználók** | `~/Desktop/Epub-translate/src/backend/templates/users.html` | Admin felhasználókezelő |
+| **Docker Compose** | `~/Desktop/Epub-translate/src/docker-compose.yml` | Konténer definíciók |
+| **Nginx config** | `~/Desktop/Epub-translate/src/nginx/nginx.conf` | Reverse proxy |
+| **Dokumentáció** | `~/Desktop/Epub-translate/README.md` | Ez a fájl |
+| **Fejlesztési útiterv** | `~/Desktop/Epub-translate/ROADMAP.md` | Kész/tervezett fejlesztések |
+
+### Fejlesztői mód (részletesen)
+
+```bash
+# 1. Repó klónozása (ha még nincs meg)
+git clone https://github.com/sorosg/Epub-translate.git ~/Desktop/Epub-translate
+cd ~/Desktop/Epub-translate
+
+# 2. Backend indítása (Python virtualenv)
+cd src/backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Környezeti változók
+export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
+export OLLAMA_HOST=http://localhost:11434
+export SECRET_KEY=dev-secret-key
+export VERSION=11.0.70
+
+# 4. Adatbázis inicializálás (Docker-ben futó PostgreSQL-hez)
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')"
 
-# 5. Szerver indítása
+# 5. Flask szerver indítása
 python3 app.py
 # Web: http://localhost:5000
 # Admin: admin@epub-translator.local / Abrakadabra
