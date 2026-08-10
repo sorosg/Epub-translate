@@ -843,23 +843,21 @@ create_all_files() {
     log_info "Fájlok másolása a forrás könyvtárból..."
     SRC_DIR="${SCRIPT_DIR}/src"
     
-    # Ha a src könyvtár nem létezik (wget-tel letöltött install.sh), klónozzuk a repót
+    # Ha az src/ mappa nem létezik (wget-tel letöltött install.sh esetén),
+    # git clone-nal letöltjük a legfrissebb verziót a GitHub-ról.
+    # Internetkapcsolat szükséges – az elavult heredoc generálás NEM megbízható!
     if [ ! -d "$SRC_DIR" ]; then
-        log_info "Önálló mód: a src/ könyvtár nem része a letöltött scriptnek..."
-        
-        # Git repo klónozása (--depth 1 = csak a legfrissebb verzió, gyors)
         TEMP_REPO="/tmp/epub-translate-$$"
-        log_info "GitHub repó klónozása a legfrissebb fájlokért..."
-        if git clone --depth 1 https://github.com/sorosg/Epub-translate.git "$TEMP_REPO" 2>/dev/null; then
-            log_success "Repó klónozva, forrásfájlok másolása..."
-            SRC_DIR="$TEMP_REPO/src"
-        else
-            log_warn "GitHub nem érhető el (internetkapcsolat?), fallback: beépített fájlok generálása"
-            log_warn "FIGYELEM: Az internet nélkül generált fájlok alapfunkciós verziót telepítenek!"
-            log_warn "A teljes funkcionalitáshoz internetkapcsolat szükséges a telepítéskor."
-            _create_files_from_script
-            return
+        log_info "GitHub repó klónozása a legfrissebb fájlokért (--depth 1)..."
+        if ! git clone --depth 1 https://github.com/sorosg/Epub-translate.git "$TEMP_REPO"; then
+            log_error "NEM sikerült letölteni a repót a GitHub-ról!"
+            log_error "Ellenőrizd az internetkapcsolatot, vagy töltsd le manuálisan:"
+            log_error "  git clone https://github.com/sorosg/Epub-translate.git"
+            log_error "majd futtasd az src/ mappából: bash install.sh"
+            exit 1
         fi
+        log_success "Repó klónozva, legfrissebb forrásfájlok másolása..."
+        SRC_DIR="$TEMP_REPO/src"
     fi
     
     # docker-compose.yml másolása
