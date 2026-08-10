@@ -1,0 +1,112 @@
+{% extends "base.html" %}{% block title %}Profilom{% endblock %}{% block content %}
+<h2><i class="bi bi-person-circle me-2"></i>Profilom</h2>
+
+<!-- Token és statisztika kártyák -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-primary bg-opacity-10 text-center h-100">
+      <div class="stat-icon">💰</div>
+      <div class="stat-value">{{ user.tokens }}</div>
+      <div class="stat-label">Token</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-success bg-opacity-10 text-center h-100">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-value">{{ user.points }}</div>
+      <div class="stat-label">Pontok</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-warning bg-opacity-10 text-center h-100">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-value">{{ user.level }}</div>
+      <div class="stat-label">Szint</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card bg-info bg-opacity-10 text-center h-100">
+      <div class="stat-icon">🔑</div>
+      <div class="stat-value">{% if user.deepseek_api_key %}✅{% else %}❌{% endif %}</div>
+      <div class="stat-label">API kulcs</div>
+    </div>
+  </div>
+</div>
+
+<!-- Profil adatok szerkesztése -->
+<div class="card">
+  <div class="card-header"><h5><i class="bi bi-pencil-square me-2"></i>Személyes adatok</h5></div>
+  <div class="card-body">
+    <form method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Vezetéknév</label>
+          <input type="text" class="form-control" name="last_name" value="{{ user.last_name or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Keresztnév</label>
+          <input type="text" class="form-control" name="first_name" value="{{ user.first_name or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email cím</label>
+          <input type="email" class="form-control" name="email" required value="{{ user.email }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Telefonszám</label>
+          <input type="text" class="form-control" name="phone" value="{{ user.phone or '' }}">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Cím</label>
+          <input type="text" class="form-control" name="address" value="{{ user.address or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Születési dátum</label>
+          <input type="text" class="form-control" name="birth_date" placeholder="ÉÉÉÉ-HH-NN" value="{{ user.birth_date or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Adószám</label>
+          <input type="text" class="form-control" name="tax_id" value="{{ user.tax_id or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tokenek <small class="text-muted">(csak admin módosíthatja)</small></label>
+          <input type="text" class="form-control" value="{{ user.tokens }}" disabled>
+        </div>
+      </div>
+      <hr class="my-3">
+      <h6><i class="bi bi-key me-1"></i>DeepSeek API kulcs</h6>
+      <div class="row g-3">
+        <div class="col-md-8">
+          <input type="password" class="form-control" id="apiKey" name="deepseek_api_key" placeholder="sk-..." value="{% if user.deepseek_api_key %}***{{ user.deepseek_api_key[-4:] }}{% endif %}">
+          <small class="text-secondary">A kulcs titkosítva tárolódik. <a href="https://platform.deepseek.com/api_keys" target="_blank">Kulcs beszerzése</a></small>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="button" class="btn btn-outline-info btn-sm me-2" onclick="toggleApiKeyVisibility()"><i class="bi bi-eye me-1"></i>Mutat</button>
+        </div>
+      </div>
+      <hr class="my-3">
+      <h6><i class="bi bi-shield-lock me-1"></i>Jelszó változtatás</h6>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Új jelszó <small class="text-muted">(ha üres, nem változik)</small></label>
+          <input type="password" class="form-control" name="password" placeholder="Új jelszó">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Jelszó megerősítése</label>
+          <input type="password" class="form-control" name="password_confirm" placeholder="Jelszó még egyszer">
+        </div>
+      </div>
+      <div class="mt-4">
+        <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>Mentés</button>
+        <a href="/dashboard" class="btn btn-secondary">Mégse</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('apiKey');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}

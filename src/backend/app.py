@@ -797,6 +797,43 @@ def api_models_pull():
     thread.daemon = True; thread.start()
     return jsonify({'success':True,'message':f'Modell letöltés elindítva: {model_name}'})
 
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    """Felhasználó saját profiljának megtekintése és szerkesztése.
+    A felhasználó módosíthatja a személyes adatait, API kulcsát és jelszavát.
+    Tokeneket csak az admin módosíthat (admin/users oldalon)."""
+    if request.method == 'POST':
+        # Személyes adatok frissítése
+        current_user.first_name = request.form.get('first_name', '').strip()
+        current_user.last_name = request.form.get('last_name', '').strip()
+        current_user.email = request.form.get('email', '').strip()
+        current_user.phone = request.form.get('phone', '').strip()
+        current_user.address = request.form.get('address', '').strip()
+        current_user.birth_date = request.form.get('birth_date', '').strip()
+        current_user.tax_id = request.form.get('tax_id', '').strip()
+        
+        # API kulcs frissítése (ha nem a *** érték jön, akkor új kulcs)
+        api_key = request.form.get('deepseek_api_key', '').strip()
+        if api_key and not api_key.startswith('***'):
+            current_user.deepseek_api_key = api_key
+        
+        # Jelszó frissítése (ha meg van adva és egyezik)
+        password = request.form.get('password', '').strip()
+        password_confirm = request.form.get('password_confirm', '').strip()
+        if password:
+            if password != password_confirm:
+                flash(_('A jelszavak nem egyeznek!'), 'error')
+                return render_template('profile.html', user=current_user)
+            current_user.password_hash = generate_password_hash(password)
+            flash(_('Jelszó sikeresen megváltoztatva!'), 'success')
+        
+        db.session.commit()
+        flash(_('Profil adatok mentve!'), 'success')
+        return redirect(url_for('profile'))
+    
+    return render_template('profile.html', user=current_user)
+
 @app.route('/api/user/settings', methods=['POST'])
 @login_required
 def user_settings():

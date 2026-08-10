@@ -290,6 +290,7 @@ body {
         {% if current_user.is_authenticated %}
           <a class="nav-link" href="/dashboard"><i class="bi bi-speedometer2 me-1"></i>Vezérlőpult</a>
           <a class="nav-link" href="/library"><i class="bi bi-collection me-1"></i>Könyvtár</a>
+          <a class="nav-link" href="/profile"><i class="bi bi-person-circle me-1"></i>Profil</a>
           {% if current_user.is_admin %}
             <span class="navbar-text mx-2 text-secondary">|</span>
             <a class="nav-link" href="/admin"><i class="bi bi-gear me-1"></i>Admin</a>
