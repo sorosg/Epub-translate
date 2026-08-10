@@ -199,15 +199,38 @@ def upload_epub():
     translation = Translation(user_id=current_user.id, original_filename=file.filename, output_filename=None, status='pending', progress=0, model_used=app.config['DEFAULT_MODEL'])
     db.session.add(translation)
     current_user.tokens -= 1
-    # A kiválasztott könyvtári könyveket (UserBookPreference) hozzárendeljük a fordításhoz
+    # A kiválasztott könyvtári könyveket hozzárendeljük a fordításhoz
+    # 1. A dashboard-ból érkező reference_ids[] (könyvajánló alapján)
+    # 2. A korábban kiválasztott UserBookPreference bejegyzések
+    reference_ids = request.form.getlist('reference_ids[]')
+    all_selected_books = []
+    
+    if reference_ids:
+        # A dashboard-ból érkező referencia könyvek
+        ref_books = Book.query.filter(Book.id.in_([int(rid) for rid in reference_ids if rid.isdigit()])).all()
+        all_selected_books.extend(ref_books)
+        # UserBookPreference bejegyzések létrehozása/frissítése a kiválasztott könyvekhez
+        for rb in ref_books:
+            pref = UserBookPreference.query.filter_by(user_id=current_user.id, book_id=rb.id).first()
+            if pref:
+                pref.is_selected = True
+            else:
+                pref = UserBookPreference(user_id=current_user.id, book_id=rb.id, is_selected=True)
+                db.session.add(pref)
+        app_logger.info(f"Fordítás #{translation.id}: {len(ref_books)} referencia könyv a dashboard ajánlóból")
+    
+    # Korábban kiválasztott könyvek (UserBookPreference) hozzáadása
     selected_prefs = UserBookPreference.query.filter_by(user_id=current_user.id, is_selected=True).all()
-    selected_book_ids = [p.book_id for p in selected_prefs]
-    selected_books = Book.query.filter(Book.id.in_(selected_book_ids)).all() if selected_book_ids else []
+    for p in selected_prefs:
+        book = Book.query.get(p.book_id)
+        if book and book not in all_selected_books:
+            all_selected_books.append(book)
+    
     # Kiválasztás törlése
     for p in selected_prefs:
         p.is_selected = False
     db.session.commit()
-    thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath, [b.file_path for b in selected_books]))
+    thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath, [b.file_path for b in all_selected_books]))
     thread.daemon = True
     thread.start()
     flash(_('Fájl feltöltve, fordítás folyamatban...'),'success')
@@ -746,6 +769,83 @@ def library_batch_upload():
     
     app_logger.info(f"Batch feltöltés: {summary} (user: {current_user.email})")
     return jsonify({'success': True, 'results': results, 'summary': summary})
+
+@app.route('/api/library/recommend', methods=['POST'])
+@login_required
+def library_recommend():
+    """Kapcsolódó könyvek ajánlása a könyvtárból a feltöltött könyv metaadatai alapján.
+    Prioritási sorrend: 1) azonos sorozat, 2) azonos szerző, 3) hasonló műfaj.
+    ---
+    tags:
+      - Library
+    """
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    author = (data.get('author') or '').strip()
+    genre = (data.get('genre') or '').strip().lower()
+    series = (data.get('series') or '').strip()
+    
+    if not title and not author:
+        return jsonify({'recommendations': [], 'message': 'Nincs elég adat az ajánláshoz'})
+    
+    recommendations = []
+    seen_ids = set()
+    
+    # 1. Azonos sorozat más részei (legrelevánsabb)
+    if series:
+        series_books = Book.query.filter(
+            db.func.lower(Book.series) == series.lower()
+        ).order_by(Book.series_number).limit(10).all()
+        for b in series_books:
+            if b.id not in seen_ids:
+                recommendations.append({
+                    'id': b.id, 'title': b.title or '', 'author': b.author or '',
+                    'language': b.language or '', 'genre': b.genre or '',
+                    'series': b.series or '', 'series_number': b.series_number,
+                    'reason': 'series'
+                })
+                seen_ids.add(b.id)
+    
+    # 2. Azonos szerző más könyvei
+    if author:
+        author_books = Book.query.filter(
+            db.func.lower(Book.author) == author.lower()
+        ).order_by(Book.uploaded_at.desc()).limit(10).all()
+        for b in author_books:
+            if b.id not in seen_ids:
+                recommendations.append({
+                    'id': b.id, 'title': b.title or '', 'author': b.author or '',
+                    'language': b.language or '', 'genre': b.genre or '',
+                    'series': b.series or '', 'series_number': b.series_number,
+                    'reason': 'author'
+                })
+                seen_ids.add(b.id)
+    
+    # 3. Hasonló műfajú könyvek
+    if genre:
+        genre_parts = [g.strip() for g in genre.split(',') if g.strip()]
+        for g in genre_parts[:3]:  # max 3 műfaj
+            genre_books = Book.query.filter(
+                db.func.lower(Book.genre).contains(g.lower())
+            ).order_by(Book.uploaded_at.desc()).limit(5).all()
+            for b in genre_books:
+                if b.id not in seen_ids:
+                    recommendations.append({
+                        'id': b.id, 'title': b.title or '', 'author': b.author or '',
+                        'language': b.language or '', 'genre': b.genre or '',
+                        'series': b.series or '', 'series_number': b.series_number,
+                        'reason': 'genre'
+                    })
+                    seen_ids.add(b.id)
+    
+    # Limit: maximum 20 ajánlás
+    recommendations = recommendations[:20]
+    
+    app_logger.info(f"Könyv ajánlás: '{title}' by '{author}' -> {len(recommendations)} találat")
+    return jsonify({
+        'recommendations': recommendations,
+        'count': len(recommendations)
+    })
 
 @app.route('/api/library/fetch-metadata', methods=['POST'])
 @login_required

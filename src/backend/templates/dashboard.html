@@ -1,20 +1,15 @@
 {% extends "base.html" %}{% block title %}Vezérlőpult{% endblock %}{% block content %}
 
-<!-- Üdvözlő szekció -->
+<!-- Üdvözlő szekció + élő badge -->
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
   <div>
     <h2 class="mb-1">Üdv, {{ user.first_name }}! <span class="wave">👋</span></h2>
     <p class="text-secondary mb-0"><i class="bi bi-calendar3 me-1"></i>{{ config.CODENAME if config else 'Smart Optimizer' }} · v{{ config.VERSION if config else '11.0' }}</p>
   </div>
   <div class="d-flex gap-2 mt-2 mt-md-0">
-    <span class="badge bg-secondary-subtle text-light p-2">
-      <i class="bi bi-coin me-1"></i><span id="liveTokens">{{ user.tokens }}</span> token
-    </span>
-    <span class="badge bg-success-subtle text-success-emphasis p-2">
-      <i class="bi bi-star-fill me-1"></i>{{ user.level }}. szint · {{ user.points }} pont
-    </span>
-    <!-- Élő kapcsolat jelző -->
-    <span class="badge bg-success-subtle text-success-emphasis p-2" id="liveBadge" title="Élő frissítés aktív">
+    <span class="badge bg-secondary-subtle text-light p-2"><i class="bi bi-coin me-1"></i><span id="liveTokens">{{ user.tokens }}</span> token</span>
+    <span class="badge bg-success-subtle text-success-emphasis p-2"><i class="bi bi-star-fill me-1"></i>{{ user.level }}. szint · {{ user.points }} pont</span>
+    <span class="badge bg-success-subtle text-success-emphasis p-2" id="liveBadge" title="Élő frissítés aktív" style="cursor:pointer" onclick="toggleLiveUpdates()">
       <i class="bi bi-broadcast me-1"></i>Élő
     </span>
   </div>
@@ -22,34 +17,10 @@
 
 <!-- Statisztika kártyák -->
 <div class="row g-3 mb-4">
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-primary bg-opacity-10 text-center h-100">
-      <div class="stat-icon">💰</div>
-      <div class="stat-value" id="statTokens">{{ user.tokens }}</div>
-      <div class="stat-label">Token</div>
-    </div>
-  </div>
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-success bg-opacity-10 text-center h-100">
-      <div class="stat-icon">🏆</div>
-      <div class="stat-value">{{ user.points }}</div>
-      <div class="stat-label">Pontok</div>
-    </div>
-  </div>
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-warning bg-opacity-10 text-center h-100">
-      <div class="stat-icon">⭐</div>
-      <div class="stat-value">{{ user.level }}</div>
-      <div class="stat-label">Szint</div>
-    </div>
-  </div>
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-info bg-opacity-10 text-center h-100">
-      <div class="stat-icon">📚</div>
-      <div class="stat-value" id="statTranslations">{{ translations|length }}</div>
-      <div class="stat-label">Fordítás</div>
-    </div>
-  </div>
+  <div class="col-md-3 col-6"><div class="stat-card bg-primary bg-opacity-10 text-center h-100"><div class="stat-icon">💰</div><div class="stat-value" id="statTokens">{{ user.tokens }}</div><div class="stat-label">Token</div></div></div>
+  <div class="col-md-3 col-6"><div class="stat-card bg-success bg-opacity-10 text-center h-100"><div class="stat-icon">🏆</div><div class="stat-value">{{ user.points }}</div><div class="stat-label">Pontok</div></div></div>
+  <div class="col-md-3 col-6"><div class="stat-card bg-warning bg-opacity-10 text-center h-100"><div class="stat-icon">⭐</div><div class="stat-value">{{ user.level }}</div><div class="stat-label">Szint</div></div></div>
+  <div class="col-md-3 col-6"><div class="stat-card bg-info bg-opacity-10 text-center h-100"><div class="stat-icon">📚</div><div class="stat-value" id="statTranslations">{{ translations|length }}</div><div class="stat-label">Fordítás</div></div></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -65,7 +36,7 @@
     <div class="row g-3" id="translationCards">
     {% for t in translations %}
       <div class="col-lg-6 translation-card" data-id="{{ t.id }}" data-status="{{ t.status }}" data-progress="{{ t.progress }}" data-stage="{{ t.current_stage or '' }}">
-        <div class="card h-100 border-0 shadow-sm" style="background:linear-gradient(135deg, rgba(28,35,51,0.95), rgba(22,27,34,0.95)); border:1px solid var(--border-color) !important; border-radius:14px;">
+        <div class="card h-100 border-0 shadow-sm" style="background:linear-gradient(135deg, rgba(28,35,51,0.95), rgba(22,27,34,0.95)); border:1px solid var(--border-color)!important; border-radius:14px;">
           <div class="card-body d-flex flex-column">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div class="flex-grow-1 me-2" style="min-width:0;">
@@ -73,54 +44,33 @@
                 <small class="text-secondary"><i class="bi bi-cpu me-1"></i>{{ t.model_used }}</small>
               </div>
               <div class="flex-shrink-0">
-                {% if t.status == 'pending' %}
-                  <span class="badge bg-secondary-subtle text-secondary-emphasis fs-6"><i class="bi bi-hourglass-split me-1"></i>Várakozik</span>
-                {% elif t.status == 'processing' %}
-                  <span class="badge bg-warning-subtle text-warning-emphasis fs-6"><i class="bi bi-arrow-repeat me-1"></i>Folyamatban</span>
-                {% elif t.status == 'completed' %}
-                  <span class="badge bg-success-subtle text-success-emphasis fs-6"><i class="bi bi-check-circle me-1"></i>Kész</span>
-                {% elif t.status == 'failed' %}
-                  <span class="badge bg-danger-subtle text-danger-emphasis fs-6"><i class="bi bi-x-circle me-1"></i>Hiba</span>
-                {% endif %}
+                {% if t.status == 'pending' %}<span class="badge bg-secondary-subtle text-secondary-emphasis fs-6"><i class="bi bi-hourglass-split me-1"></i>Várakozik</span>
+                {% elif t.status == 'processing' %}<span class="badge bg-warning-subtle text-warning-emphasis fs-6"><i class="bi bi-arrow-repeat me-1"></i>Folyamatban</span>
+                {% elif t.status == 'completed' %}<span class="badge bg-success-subtle text-success-emphasis fs-6"><i class="bi bi-check-circle me-1"></i>Kész</span>
+                {% elif t.status == 'failed' %}<span class="badge bg-danger-subtle text-danger-emphasis fs-6"><i class="bi bi-x-circle me-1"></i>Hiba</span>{% endif %}
               </div>
             </div>
-            
             {% if t.status == 'processing' %}
             <div class="progress mb-2" style="height:8px; border-radius:4px;">
               {% set stage_pct = 5 if t.current_stage == 'first_pass' else (91 if t.current_stage == 'second_pass' else 99 if t.current_stage == 'post_processing' else t.progress) %}
-              <div class="progress-bar progress-bar-striped progress-bar-animated bg-gradient" 
-                   style="width:{{ stage_pct }}%; background:linear-gradient(90deg, var(--accent-blue), var(--accent-purple));">
-              </div>
+              <div class="progress-bar progress-bar-striped progress-bar-animated bg-gradient" style="width:{{ stage_pct }}%; background:linear-gradient(90deg, var(--accent-blue), var(--accent-purple));"></div>
             </div>
             <small class="text-secondary mb-2">
-              {% if t.current_stage == 'first_pass' %}🧠 Első menet (AI fordítás)
-              {% elif t.current_stage == 'second_pass' %}🔍 Második menet (minőségellenőrzés)
-              {% elif t.current_stage == 'post_processing' %}📦 Utófeldolgozás
-              {% else %}Fordítás alatt...{% endif %}
-              {% if t.current_chapter and t.total_chapters %}
-                · {{ t.current_chapter }}/{{ t.total_chapters }} fejezet
-              {% endif %}
+              {% if t.current_stage == 'first_pass' %}🧠 Első menet (AI fordítás){% elif t.current_stage == 'second_pass' %}🔍 Második menet (minőségellenőrzés){% elif t.current_stage == 'post_processing' %}📦 Utófeldolgozás{% else %}Fordítás alatt...{% endif %}
+              {% if t.current_chapter and t.total_chapters %}· {{ t.current_chapter }}/{{ t.total_chapters }} fejezet{% endif %}
             </small>
             {% endif %}
-            
             {% if t.status == 'completed' %}
             <div class="d-flex gap-2 align-items-center mb-2">
-              {% if t.quality_score %}
-              <span class="badge bg-info-subtle text-info-emphasis"><i class="bi bi-star-fill me-1"></i>{{ t.quality_score }}/100</span>
-              {% endif %}
+              {% if t.quality_score %}<span class="badge bg-info-subtle text-info-emphasis"><i class="bi bi-star-fill me-1"></i>{{ t.quality_score }}/100</span>{% endif %}
             </div>
             <a href="/review/{{ t.id }}" class="text-decoration-none small mb-2"><i class="bi bi-pencil-square me-1"></i>Átnézés és javítás</a>
             {% endif %}
-            
             <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top border-secondary">
               <small class="text-secondary"><i class="bi bi-clock me-1"></i>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
               <div class="d-flex gap-1">
-                {% if t.status == 'completed' %}
-                <a href="/download/{{ t.id }}" class="btn btn-sm btn-success"><i class="bi bi-download me-1"></i>Letöltés</a>
-                {% endif %}
-                <form action="/delete/{{ t.id }}" method="POST" style="display:inline">
-                  <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Biztosan törlöd?')"><i class="bi bi-trash"></i></button>
-                </form>
+                {% if t.status == 'completed' %}<a href="/download/{{ t.id }}" class="btn btn-sm btn-success"><i class="bi bi-download me-1"></i>Letöltés</a>{% endif %}
+                <form action="/delete/{{ t.id }}" method="POST" style="display:inline"><button class="btn btn-sm btn-outline-danger" onclick="return confirm('Biztosan törlöd?')"><i class="bi bi-trash"></i></button></form>
               </div>
             </div>
           </div>
@@ -129,136 +79,120 @@
     {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-4">
-      <i class="bi bi-inbox" style="font-size: 3rem; color: var(--text-secondary);"></i>
-      <p class="mt-2 text-secondary">Még nincsenek fordításaid.</p>
-    </div>
+    <div class="text-center py-4"><i class="bi bi-inbox" style="font-size:3rem; color:var(--text-secondary);"></i><p class="mt-2 text-secondary">Még nincsenek fordításaid.</p></div>
     {% endif %}
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- FORDÍTÁSI BEÁLLÍTÁSOK ÉS FELTÖLTÉS                             -->
+<!-- ÚJ EPUB FELTÖLTÉSE + KÖNYV AJÁNLÓ                              -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div class="card mb-4">
   <div class="card-body">
     <h5 class="card-title mb-3"><i class="bi bi-cloud-upload me-2"></i>Új EPUB feltöltése és fordítása</h5>
     
-    <div class="row g-3 mb-3">
-      <div class="col-md-6">
-        <label class="form-label fw-medium"><i class="bi bi-cpu me-1"></i>Fordító modell</label>
-        <select class="form-select" id="modelSource" onchange="onModelSourceChange()">
-          <option value="local" {% if not user.preferred_model_source or user.preferred_model_source == 'local' %}selected{% endif %}>🖥️ Helyi modell (Ollama)</option>
-          <option value="remote" {% if user.preferred_model_source == 'remote' %}selected{% endif %}>☁️ DeepSeek Pro (felhő API)</option>
-        </select>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label fw-medium"><i class="bi bi-key me-1"></i>DeepSeek API kulcs</label>
-        <div class="d-flex align-items-center gap-2">
-          <span id="apiKeyStatus">
-            {% if user.deepseek_api_key %}
-              <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Beállítva (***{{ user.deepseek_api_key[-4:] }})</span>
-            {% else %}
-              <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Nincs beállítva</span>
-            {% endif %}
-          </span>
-          <button class="btn btn-outline-light btn-sm" type="button" onclick="toggleApiKeyEdit()"><i class="bi bi-pencil"></i></button>
-        </div>
-        <div class="input-group mt-2" id="apiKeyEditGroup" style="display:none;">
-          <input type="password" class="form-control" id="deepseekApiKey" placeholder="sk-...">
-          <button class="btn btn-success" type="button" onclick="saveApiKey()"><i class="bi bi-check-lg me-1"></i>Mentés</button>
-        </div>
-      </div>
-    </div>
-    
-    <form action="/upload" method="POST" enctype="multipart/form-data" onsubmit="handleUploadStart()">
+    <form action="/upload" method="POST" enctype="multipart/form-data" onsubmit="return handleUploadSubmit()">
       <input type="hidden" name="model_source" id="hiddenModelSource" value="{{ user.preferred_model_source or 'local' }}">
       <input type="hidden" name="selected_model" id="hiddenSelectedModel" value="{{ user.preferred_model or '' }}">
       
-      <div class="upload-zone mb-3" id="dropZone">
-        <div class="py-3">
-          <i class="bi bi-file-earmark-arrow-up" style="font-size: 3rem; color: var(--accent-blue);"></i>
-          <p class="mt-3 mb-1 fw-semibold">Válaszd ki a fordítandó EPUB fájlt</p>
-          <p class="text-secondary small mb-0">vagy húzd ide a fájlt · Maximum 200 MB</p>
+      <!-- Fájl feltöltés + metaadat kinyerés -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="upload-zone" id="dropZone" style="padding:1.5rem;">
+            <i class="bi bi-file-earmark-arrow-up" style="font-size:2rem; color:var(--accent-blue);"></i>
+            <p class="mb-1 fw-semibold mt-2">Válaszd ki a fordítandó EPUB fájlt</p>
+            <p class="text-secondary small mb-2">vagy húzd ide · Maximum 200 MB</p>
+            <input type="file" class="form-control" name="file" accept=".epub" required id="fileInput" style="max-width:300px; margin:0 auto;">
+          </div>
+        </div>
+        <div class="col-md-6" id="fileMetaInfo" style="display:none;">
+          <div class="card bg-dark h-100 p-3">
+            <h6 id="metaTitle" class="mb-1">📖 Fájl betöltése...</h6>
+            <small id="metaAuthor" class="text-secondary mb-2"></small>
+            <div id="metaBadges" class="d-flex flex-wrap gap-1 mb-2"></div>
+            <div id="metaProgress" class="progress" style="height:4px; display:none;"><div class="progress-bar" style="width:0%;"></div></div>
+            <button type="button" class="btn btn-sm btn-outline-info mt-2" id="btnFetchRecommendations" onclick="fetchRecommendations()" style="display:none;">
+              <i class="bi bi-lightbulb me-1"></i>Kapcsolódó könyvek keresése
+            </button>
+          </div>
         </div>
       </div>
-      <div class="mb-3">
-        <input type="file" class="form-control" name="file" accept=".epub" required id="fileInput">
+      
+      <!-- Kiválasztott referenciák -->
+      <div id="selectedRefs" class="mb-3" style="display:none;">
+        <label class="form-label fw-medium"><i class="bi bi-bookmark-check me-1"></i>Kiválasztott referenciakönyvek</label>
+        <div id="selectedRefsList" class="d-flex flex-wrap gap-2 mb-2"></div>
+        <small class="text-secondary"><i class="bi bi-info-circle me-1"></i>Ezek a könyvek terminológiát és stílust adnak a fordításhoz</small>
       </div>
+      
+      <!-- Könyv ajánló panel -->
+      <div id="recommendationPanel" class="mb-3" style="display:none;">
+        <div class="card bg-dark border-info" style="border-left:3px solid var(--accent-blue);">
+          <div class="card-body py-2 px-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0"><i class="bi bi-lightbulb text-warning me-1"></i>Kapcsolódó könyvek a könyvtárból</h6>
+              <button type="button" class="btn btn-sm btn-outline-success" onclick="addAllRecommendations()"><i class="bi bi-plus-circle me-1"></i>Összes hozzáadása</button>
+            </div>
+            <div id="recommendationList" class="row g-2"></div>
+          </div>
+        </div>
+      </div>
+      
       <button type="submit" class="btn btn-success btn-lg" id="btnUpload">
         <i class="bi bi-translate me-2"></i>Feltöltés és fordítás
       </button>
       <small class="text-secondary ms-3"><i class="bi bi-token me-1"></i>A fordítás 1 tokent használ fel</small>
+      <span class="badge bg-success-subtle text-success-emphasis ms-2" id="selectedCount" style="display:none;">0 referencia kiválasztva</span>
     </form>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- KÖNYVTÁRI KÖNYVEK + MINTAKÖNYVEK (meglévő template részek)     -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Könyvtár link -->
 <div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h5><i class="bi bi-collection me-2"></i>Könyvtár & Referenciák</h5>
-  </div>
-  <div class="card-body">
-    <a href="/library" class="btn btn-outline-light btn-sm"><i class="bi bi-collection me-1"></i>Könyvtár megnyitása</a>
-    <span class="text-secondary ms-2">{{ books|length if books else 0 }} könyv</span>
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-collection me-2"></i>Könyvtár & Referenciák</span>
+    <a href="/library" class="btn btn-outline-light btn-sm"><i class="bi bi-arrow-right me-1"></i>Könyvtár megnyitása ({{ books|length if books else 0 }} könyv)</a>
   </div>
 </div>
 
 <script>
 // ============================
-// ÉLŐ FRISSÍTÉS (polling 10mp)
+// ÁLLAPOT
 // ============================
-let livePolling = true;
+let selectedReferences = [];  // {id, title, author, source: 'manual'|'recommended'}
+let currentFileMetadata = null;
 let pollingInterval = null;
 
+// ============================
+// ÉLŐ FRISSÍTÉS
+// ============================
 function startLiveUpdates() {
   if (pollingInterval) return;
   pollingInterval = setInterval(checkTranslationUpdates, 10000);
   document.getElementById('liveBadge').innerHTML = '<i class="bi bi-broadcast me-1"></i>Élő';
   document.getElementById('liveBadge').className = 'badge bg-success-subtle text-success-emphasis p-2';
 }
-
 function stopLiveUpdates() {
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
   document.getElementById('liveBadge').innerHTML = '<i class="bi bi-pause-circle me-1"></i>Szünetel';
   document.getElementById('liveBadge').className = 'badge bg-warning-subtle text-warning-emphasis p-2';
 }
+function toggleLiveUpdates() { if (pollingInterval) stopLiveUpdates(); else startLiveUpdates(); }
 
-function toggleLiveUpdates() {
-  if (pollingInterval) stopLiveUpdates(); else startLiveUpdates();
-}
-
-// Fordítások állapotának ellenőrzése
 async function checkTranslationUpdates() {
   const cards = document.querySelectorAll('.translation-card[data-status="processing"], .translation-card[data-status="pending"]');
   if (cards.length === 0) return;
-  
   for (const card of cards) {
     const id = card.dataset.id;
     try {
       const resp = await fetch('/api/status/' + id, {credentials: 'same-origin'});
       if (resp.ok) {
         const data = await resp.json();
-        // Frissítjük a kártya adatait
         card.dataset.status = data.status;
-        card.dataset.progress = data.progress;
-        card.dataset.stage = data.current_stage || '';
-        
-        // Ha a fordítás befejeződött, frissítsük az egész oldalt
-        if (data.status === 'completed' || data.status === 'failed') {
-          location.reload();
-          return;
-        }
+        if (data.status === 'completed' || data.status === 'failed') { location.reload(); return; }
       }
-    } catch(e) {
-      // Csendes hiba
-    }
+    } catch(e) {}
   }
-  
-  // Oldal frissítése 2 percenként ha van folyamatban lévő fordítás
-  // (hogy a progressz bar is frissüljön)
   const now = Date.now();
   if (!window._lastReload || (now - window._lastReload) > 120000) {
     window._lastReload = now;
@@ -267,50 +201,209 @@ async function checkTranslationUpdates() {
 }
 
 // ============================
-// FELTÖLTÉS
+// FÁJL KEZELÉS + METAADAT
 // ============================
-function handleUploadStart() {
-  document.getElementById('btnUpload').disabled = true;
-  document.getElementById('btnUpload').innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Feltöltés...';
-}
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
 
-// ============================
-// MODELL + API KULCS (meglévő)
-// ============================
-function onModelSourceChange() {
-  document.getElementById('hiddenModelSource').value = document.getElementById('modelSource').value;
-}
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#0d6efd'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#555'; });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.style.borderColor = '#555';
+  if (e.dataTransfer.files.length > 0) {
+    fileInput.files = e.dataTransfer.files;
+    handleFileSelected(e.dataTransfer.files[0]);
+  }
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) handleFileSelected(fileInput.files[0]); });
 
-function toggleApiKeyEdit() {
-  const el = document.getElementById('apiKeyEditGroup');
-  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
-}
-
-async function saveApiKey() {
-  const key = document.getElementById('deepseekApiKey').value.trim();
-  if (!key) { alert('Add meg az API kulcsot!'); return; }
+async function handleFileSelected(file) {
+  if (!file.name.toLowerCase().endsWith('.epub')) { alert('Csak EPUB fájl tölthető fel!'); return; }
+  
+  document.getElementById('fileMetaInfo').style.display = 'block';
+  document.getElementById('metaTitle').textContent = '📖 ' + file.name.replace(/\.epub$/i,'').replace(/_/g,' ');
+  document.getElementById('metaAuthor').textContent = 'Metaadat kinyerés...';
+  document.getElementById('metaProgress').style.display = 'block';
+  document.getElementById('metaProgress').querySelector('.progress-bar').style.width = '50%';
+  
+  // Metaadat kinyerés
+  const fd = new FormData(); fd.append('file', file);
   try {
-    const resp = await fetch('/api/user/settings', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({deepseek_api_key: key})
+    const resp = await fetch('/api/library/extract-metadata', {method:'POST', credentials:'same-origin', body:fd});
+    const data = await resp.json();
+    if (data.success && data.metadata) {
+      currentFileMetadata = data.metadata;
+      document.getElementById('metaTitle').textContent = '📖 ' + (data.metadata.title || file.name);
+      document.getElementById('metaAuthor').textContent = '✍️ ' + (data.metadata.author || 'Ismeretlen szerző');
+      
+      // Badge-ek
+      let badges = '';
+      if (data.metadata.language) badges += `<span class="badge bg-secondary">${data.metadata.language}</span>`;
+      if (data.metadata.genre) {
+        data.metadata.genre.split(',').slice(0,3).forEach(g => {
+          badges += `<span class="badge bg-info">${g.trim()}</span>`;
+        });
+      }
+      if (data.metadata.series) badges += `<span class="badge bg-dark">📚 ${data.metadata.series}${data.metadata.series_number ? ' #'+data.metadata.series_number : ''}</span>`;
+      document.getElementById('metaBadges').innerHTML = badges;
+      
+      // Ajánlások gombja
+      document.getElementById('btnFetchRecommendations').style.display = 'inline-block';
+      
+      // Automatikus ajánlás lekérés
+      await fetchRecommendations();
+    } else {
+      document.getElementById('metaAuthor').textContent = 'Nem sikerült kinyerni a metaadatokat';
+    }
+  } catch(e) {
+    document.getElementById('metaAuthor').textContent = 'Hiba: ' + e.message;
+  }
+  document.getElementById('metaProgress').style.display = 'none';
+}
+
+// ============================
+// AJÁNLÁSOK LEKÉRÉSE
+// ============================
+async function fetchRecommendations() {
+  if (!currentFileMetadata) return;
+  
+  const panel = document.getElementById('recommendationPanel');
+  const list = document.getElementById('recommendationList');
+  panel.style.display = 'block';
+  list.innerHTML = '<div class="col-12 text-center py-2"><div class="spinner-border spinner-border-sm text-info"></div> Ajánlások keresése...</div>';
+  
+  try {
+    const resp = await fetch('/api/library/recommend', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, credentials:'same-origin',
+      body: JSON.stringify(currentFileMetadata)
     });
     const data = await resp.json();
-    if (data.success) {
-      document.getElementById('apiKeyStatus').innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Beállítva (' + data.deepseek_api_key + ')</span>';
-      document.getElementById('apiKeyEditGroup').style.display = 'none';
+    
+    if (data.recommendations && data.recommendations.length > 0) {
+      renderRecommendations(data.recommendations);
+    } else {
+      list.innerHTML = '<div class="col-12 text-center py-2 text-secondary">Nincsenek kapcsolódó könyvek a könyvtárban</div>';
     }
-  } catch(e) { alert('Hiba: ' + e.message); }
+  } catch(e) {
+    list.innerHTML = '<div class="col-12 text-center py-2 text-danger">Hiba: ' + e.message + '</div>';
+  }
+}
+
+function renderRecommendations(recs) {
+  const list = document.getElementById('recommendationList');
+  let html = '';
+  recs.forEach(r => {
+    const alreadySelected = selectedReferences.some(ref => ref.id === r.id);
+    const reasonBadge = r.reason === 'series' ? '<span class="badge bg-dark">📚 Sorozat</span>' :
+                        r.reason === 'author' ? '<span class="badge bg-purple">✍️ Szerző</span>' :
+                        '<span class="badge bg-info">🏷️ Műfaj</span>';
+    html += `
+    <div class="col-md-6">
+      <div class="card bg-dark border-secondary h-100">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1" style="min-width:0;">
+              <small class="fw-bold text-truncate d-block">${escHtml(r.title)}</small>
+              <small class="text-secondary">${escHtml(r.author)}</small>
+              <div class="mt-1">${reasonBadge} ${r.series ? `<span class="badge bg-dark">📚 ${escHtml(r.series)}${r.series_number ? ' #'+r.series_number : ''}</span>` : ''}</div>
+            </div>
+            <button class="btn btn-sm ${alreadySelected ? 'btn-success' : 'btn-outline-success'} flex-shrink-0 ms-2" 
+                    onclick="toggleRecommendation(${r.id}, '${escHtml(r.title).replace(/'/g, "\\'")}', '${escHtml(r.author).replace(/'/g, "\\'")}', this)" 
+                    ${alreadySelected ? 'disabled' : ''}>
+              <i class="bi ${alreadySelected ? 'bi-check-lg' : 'bi-plus-lg'}"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+function toggleRecommendation(id, title, author, btn) {
+  if (selectedReferences.some(ref => ref.id === id)) return; // már kiválasztva
+  
+  selectedReferences.push({id, title, author, source: 'recommended'});
+  updateSelectedRefsUI();
+  btn.className = 'btn btn-sm btn-success';
+  btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+  btn.disabled = true;
+}
+
+function addAllRecommendations() {
+  const btns = document.querySelectorAll('#recommendationList .btn-outline-success');
+  btns.forEach(btn => btn.click());
+}
+
+// ============================
+// KIVÁLASZTOTT REFERENCIÁK
+// ============================
+function updateSelectedRefsUI() {
+  const container = document.getElementById('selectedRefs');
+  const list = document.getElementById('selectedRefsList');
+  const countBadge = document.getElementById('selectedCount');
+  
+  if (selectedReferences.length === 0) {
+    container.style.display = 'none';
+    countBadge.style.display = 'none';
+    return;
+  }
+  
+  container.style.display = 'block';
+  countBadge.style.display = 'inline-block';
+  countBadge.textContent = selectedReferences.length + ' referencia kiválasztva';
+  
+  list.innerHTML = selectedReferences.map(ref => `
+    <span class="badge bg-success p-2">
+      <i class="bi bi-bookmark-check me-1"></i>${escHtml(ref.title)}
+      <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" 
+              onclick="removeReference(${ref.id})" title="Eltávolítás"></button>
+    </span>
+  `).join('');
+}
+
+function removeReference(id) {
+  selectedReferences = selectedReferences.filter(ref => ref.id !== id);
+  updateSelectedRefsUI();
+  // Visszaállítjuk az ajánlás gombot
+  if (currentFileMetadata) {
+    fetchRecommendations();
+  }
+}
+
+// ============================
+// FELTÖLTÉS
+// ============================
+function handleUploadSubmit() {
+  // Referencia könyvek hozzáadása a form-hoz rejtett mezőkként
+  const form = document.querySelector('form[action="/upload"]');
+  // Eltávolítjuk a korábbi referencia mezőket
+  form.querySelectorAll('input[name="reference_ids[]"]').forEach(el => el.remove());
+  
+  selectedReferences.forEach(ref => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'reference_ids[]';
+    input.value = ref.id;
+    form.appendChild(input);
+  });
+  
+  document.getElementById('btnUpload').disabled = true;
+  document.getElementById('btnUpload').innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Feltöltés...';
+  return true;
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
 }
 
 // ============================
 // INDÍTÁS
 // ============================
-document.getElementById('liveBadge').addEventListener('click', toggleLiveUpdates);
-document.getElementById('liveBadge').style.cursor = 'pointer';
-document.getElementById('liveBadge').title = 'Kattints az élő frissítés ki/be kapcsolásához';
-
 {% if translations|selectattr('status','equalto','processing')|list|length > 0 %}
-// Van folyamatban lévő fordítás – élő frissítés indítása
 startLiveUpdates();
 {% endif %}
 </script>
