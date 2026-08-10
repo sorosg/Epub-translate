@@ -585,13 +585,44 @@ def library_extract_metadata():
             if descs:
                 description = descs[0][0][:500] if isinstance(descs[0], tuple) else str(descs[0])[:500]
             
-            # Kalibre metaadatok (gyakran itt vannak a jobb adatok)
+            # dc:subject (téma/műfaj) – több is lehet, vesszővel összefűzzük
+            genre = ''
+            subjects = book.get_metadata('DC', 'subject')
+            if subjects:
+                subject_list = []
+                for s in subjects[:5]:  # max 5 téma
+                    val = s[0] if isinstance(s, tuple) else str(s)
+                    if val and len(val) > 1:
+                        subject_list.append(val.strip())
+                if subject_list:
+                    genre = ', '.join(subject_list)
+            
+            # Kalibre sorozat metaadatok
+            series = ''
+            series_number = None
+            calibre_series = book.get_metadata('OPF', 'calibre:series')
+            if calibre_series:
+                s_val = calibre_series[0][0] if isinstance(calibre_series[0], tuple) else str(calibre_series[0])
+                if s_val and s_val.strip():
+                    series = s_val.strip()
+            
+            # Sorozat szám
+            calibre_series_idx = book.get_metadata('OPF', 'calibre:series_index')
+            if calibre_series_idx:
+                try:
+                    idx_val = calibre_series_idx[0][0] if isinstance(calibre_series_idx[0], tuple) else str(calibre_series_idx[0])
+                    # A Calibre float-ként tárolja (pl. 1.0), egészre kerekítjük
+                    series_number = int(float(str(idx_val)))
+                except (ValueError, TypeError):
+                    pass
+            
+            # Kalibre cím (ha a dc:title üres)
             if not title:
                 calibre_titles = book.get_metadata('OPF', 'calibre:title_sort')
                 if calibre_titles:
                     title = calibre_titles[0][0] if isinstance(calibre_titles[0], tuple) else str(calibre_titles[0])
             
-            app_logger.info(f"EPUB metaadat kinyerve: '{title}' by '{author}' (lang: {language})")
+            app_logger.info(f"EPUB metaadat kinyerve: '{title}' by '{author}' (lang: {language}, genre: {genre}, series: {series}#{series_number})")
             
             return jsonify({
                 'success': True,
@@ -599,7 +630,10 @@ def library_extract_metadata():
                     'title': title,
                     'author': author,
                     'language': language,
-                    'description': description[:300] if description else ''
+                    'description': description[:300] if description else '',
+                    'genre': genre,
+                    'series': series,
+                    'series_number': series_number
                 }
             })
         finally:
@@ -614,7 +648,10 @@ def library_extract_metadata():
                 'title': file.filename.rsplit('.', 1)[0].replace('_', ' '),
                 'author': '',
                 'language': 'en',
-                'description': ''
+                'description': '',
+                'genre': '',
+                'series': '',
+                'series_number': None
             }
         })
 

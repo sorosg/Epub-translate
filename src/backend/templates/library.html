@@ -360,17 +360,17 @@ function renderBatchList() {
     if (bf.status === 'extracted' || bf.status === 'ready' || bf.status === 'searching') {
       metaFields = `
         <div class="row g-1 mt-1">
-          <div class="col-5">
+          <div class="col-6">
             <input type="text" class="form-control form-control-sm" placeholder="Cím" 
                    value="${escHtml(bf.metadata.title || '')}" 
                    onchange="batchFiles[${i}].metadata.title = this.value; updateButtons();">
           </div>
-          <div class="col-4">
+          <div class="col-6">
             <input type="text" class="form-control form-control-sm" placeholder="Szerző"
                    value="${escHtml(bf.metadata.author || '')}"
                    onchange="batchFiles[${i}].metadata.author = this.value; updateButtons();">
           </div>
-          <div class="col-2">
+          <div class="col-4">
             <select class="form-select form-select-sm" onchange="batchFiles[${i}].metadata.language = this.value;">
               <option value="en" ${bf.metadata.language === 'en' ? 'selected' : ''}>EN</option>
               <option value="hu" ${bf.metadata.language === 'hu' ? 'selected' : ''}>HU</option>
@@ -379,11 +379,19 @@ function renderBatchList() {
               <option value="es" ${bf.metadata.language === 'es' ? 'selected' : ''}>ES</option>
             </select>
           </div>
-          <div class="col-1">
-            <button class="btn btn-sm btn-outline-info" onclick="fetchMetadataForBook(${i})" title="Keresés az interneten">
-              <i class="bi bi-search"></i>
-            </button>
+          <div class="col-4">
+            <input type="text" class="form-control form-control-sm" placeholder="Műfaj (pl. sci-fi)"
+                   value="${escHtml(bf.metadata.genre || '')}" 
+                   onchange="batchFiles[${i}].metadata.genre = this.value;">
           </div>
+          <div class="col-4">
+            <input type="text" class="form-control form-control-sm" placeholder="Sorozat"
+                   value="${escHtml(bf.metadata.series || '')}" 
+                   onchange="batchFiles[${i}].metadata.series = this.value;">
+          </div>
+          <button class="btn btn-sm btn-outline-info mt-1 ms-1" onclick="fetchMetadataForBook(${i})" title="Keresés az interneten">
+            <i class="bi bi-search me-1"></i>OpenLibrary
+          </button>
         </div>`;
     }
     
