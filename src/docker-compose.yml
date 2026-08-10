@@ -94,10 +94,6 @@ services:
     networks:
       - translator-network
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: ${OPTIMAL_MEMORY_LIMIT}
     healthcheck:
       test: ["CMD", "/healthcheck.sh"]
       interval: 10s

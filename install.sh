@@ -561,6 +561,10 @@ perform_update() {
     $DOCKER compose build --no-cache backend 2>/dev/null || $DOCKER compose build backend
     log_info "Többi konténer építése..."
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+    # Biztonsági törlés: eltávolítjuk a deploy/reservations részt,
+    # ami 'Minimum memory limit < reservation limit' hibát okozhat
+    sed -i '/^ *deploy:/,+3d' docker-compose.yml 2>/dev/null || true
+    sed -i '/reservations:/d' docker-compose.yml 2>/dev/null || true
     $DOCKER compose up -d
     sleep 15
     
@@ -997,10 +1001,6 @@ services:
     networks:
       - translator-network
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: ${OPTIMAL_MEMORY_LIMIT}
     healthcheck:
       test: ["CMD", "/healthcheck.sh"]
       interval: 10s
@@ -1026,9 +1026,6 @@ services:
     networks:
       - translator-network
     restart: unless-stopped
-    profiles:
-      - local
-      - all
 networks:
   translator-network:
     driver: bridge
