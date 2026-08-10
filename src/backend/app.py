@@ -837,7 +837,7 @@ def profile():
 @app.route('/api/user/settings', methods=['POST'])
 @login_required
 def user_settings():
-    """Felhasználói beállítások mentése (API kulcs, preferált modell)"""
+    """Felhasználói beállítások mentése (API kulcs, preferált modell, téma)"""
     data = request.get_json() or {}
     
     # DeepSeek API kulcs mentése
@@ -852,13 +852,18 @@ def user_settings():
     if 'preferred_model' in data:
         current_user.preferred_model = data['preferred_model']
     
+    # Sötét/világos téma preferencia (10. fejlesztés)
+    if 'dark_mode' in data:
+        current_user.dark_mode = bool(data['dark_mode'])
+    
     db.session.commit()
     
     return jsonify({
         'success': True,
         'deepseek_api_key': ('***' + current_user.deepseek_api_key[-4:]) if current_user.deepseek_api_key else '',
         'preferred_model_source': current_user.preferred_model_source,
-        'preferred_model': current_user.preferred_model
+        'preferred_model': current_user.preferred_model,
+        'dark_mode': current_user.dark_mode
     })
 
 @app.route('/api/models/list')

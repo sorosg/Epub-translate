@@ -243,11 +243,14 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 - **Backend API**: `/api/library/extract-metadata` – EPUB metaadat kinyerés, `/api/library/batch-upload` – batch feltöltés
 - **Használhatóság:** ⭐⭐⭐⭐⭐ (több száz könyv percek alatt)
 
-### 10. Sötét/világos téma váltó
-**Cél:** A felhasználó válthasson a sötét és világos téma között.
-- CSS változók dinamikus cseréje
-- Felhasználói preferencia mentése az adatbázisba
-- Bootstrap 5.3 `data-bs-theme` attribútum használata
+### 10. Sötét/világos téma váltó ✅ (v11.0.69)
+**Státusz:** KÉSZ
+- **CSS változós témakezelés**: `:root` / `[data-bs-theme="dark"]` és `[data-bs-theme="light"]` változók
+- **Felhasználói preferencia mentése**: `User.dark_mode` oszlop az adatbázisban, `/api/user/settings` API
+- **Témaváltó gomb**: 🌙/☀️ ikon a navbar jobb oldalán, Bootstrap `data-bs-theme` attribútummal
+- **Világos téma dizájn**: GitHub-szerű világos színséma (fehér háttér, sötét szöveg, kék akcentus)
+- **Perzisztencia**: bejelentkezés után automatikusan visszaáll a mentett preferencia
+- **Használhatóság:** ⭐⭐⭐⭐ (személyre szabható megjelenés)
 
 ---
 
