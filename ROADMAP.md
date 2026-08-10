@@ -232,11 +232,16 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 - Ez segít a narratív folytonosság fenntartásában és jobb kontextust ad a modellnek
 - **Minőségjavulás:** ⭐⭐⭐ (jobb kontextus = jobb fordítás)
 
-### 9. Drag & drop a dashboardra
-**Cél:** EPUB fájlok közvetlen behúzása a böngészőbe.
-- JavaScript DragEvent kezelés
-- Vizuális visszajelzés (drop zone kiemelés)
-- Több fájl egyidejű feltöltése
+### 9. Drag & drop + Batch könyvtár feltöltés ✅ (v11.0.69)
+**Státusz:** KÉSZ
+- **Több fájl egyidejű behúzása**: drop zóna egyszerre több EPUB-ot fogad
+- **Automatikus metaadat kinyerés**: EPUB belső `dc:title`, `dc:creator`, `dc:language` mezők olvasása
+- **OpenLibrary automatikus keresés**: "Összes keresése" gomb az internetes metaadat kiegészítéshez
+- **Batch feldolgozási lista**: kártyás nézet, státusz jelzőkkel (kinyerés, keresés, menthető, duplikátum, hiba)
+- **Progress bar**: vizuális visszajelzés a feldolgozás állapotáról
+- **"Összes mentése" gomb**: egy kattintással az összes feldolgozott könyv mentése
+- **Backend API**: `/api/library/extract-metadata` – EPUB metaadat kinyerés, `/api/library/batch-upload` – batch feltöltés
+- **Használhatóság:** ⭐⭐⭐⭐⭐ (több száz könyv percek alatt)
 
 ### 10. Sötét/világos téma váltó
 **Cél:** A felhasználó válthasson a sötét és világos téma között.

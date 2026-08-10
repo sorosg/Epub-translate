@@ -1,36 +1,49 @@
 {% extends "base.html" %}{% block title %}Könyvtár{% endblock %}{% block content %}
-<h2>📚 Könyvtár</h2>
+<h2><i class="bi bi-collection me-2"></i>Könyvtár</h2>
 
-<!-- Drag & Drop feltöltő zóna -->
-<div class="card mt-3" id="dropZone" style="border:2px dashed #666; border-radius:10px; padding:30px; text-align:center; cursor:pointer; transition: all .3s;">
-  <h4>📁 Húzd ide a EPUB fájlokat</h4>
-  <p class="text-muted">vagy kattints a feltöltéshez</p>
-  <input type="file" id="fileInput" accept=".epub" style="display:none" multiple>
-</div>
-
-<!-- Feltöltött könyv űrlap (a drop után jelenik meg) -->
-<div id="uploadForm" style="display:none" class="card mt-3">
-  <div class="card-header"><h5>📝 Könyv adatai</h5></div>
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- BATCH FELTÖLTŐ ZÓNA (több fájl drop, automatikus metaadat)      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="card mb-4" id="batchUploadCard">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5><i class="bi bi-cloud-upload me-2"></i>Könyvek feltöltése</h5>
+    <span class="badge bg-info" id="batchProgress" style="display:none;">Feldolgozás...</span>
+  </div>
   <div class="card-body">
-    <div class="row g-3">
-      <div class="col-md-6"><label class="form-label">Cím</label><input type="text" class="form-control" id="bookTitle"></div>
-      <div class="col-md-6"><label class="form-label">Szerző</label><input type="text" class="form-control" id="bookAuthor"></div>
-      <div class="col-md-3"><label class="form-label">Nyelv</label><select class="form-select" id="bookLanguage"><option value="en">Angol</option><option value="hu">Magyar</option><option value="de">Német</option><option value="fr">Francia</option><option value="es">Spanyol</option></select></div>
-      <div class="col-md-3"><label class="form-label">Típus/Műfaj</label><select class="form-select" id="bookGenre"><option value="">Válassz...</option><option value="sci-fi">Sci-Fi</option><option value="fantasy">Fantasy</option><option value="adventure">Kaland</option><option value="mystery">Krimi</option><option value="romance">Romantikus</option><option value="horror">Horror</option><option value="historical">Történelmi</option><option value="biography">Életrajz</option><option value="science">Tudományos</option><option value="other">Egyéb</option></select></div>
-      <div class="col-md-4"><label class="form-label">Sorozat</label><input type="text" class="form-control" id="bookSeries" placeholder="Sorozat címe (ha van)"></div>
-      <div class="col-md-2"><label class="form-label">Könyv #</label><input type="number" class="form-control" id="bookSeriesNumber" min="1" placeholder="#"></div>
+    <!-- Drop zóna -->
+    <div id="dropZone" style="border:2px dashed #555; border-radius:12px; padding:40px 20px; text-align:center; cursor:pointer; transition:all .3s; background:rgba(30,35,50,0.3);">
+      <i class="bi bi-file-earmark-arrow-up" style="font-size:3rem; color:var(--accent-blue);"></i>
+      <h5 class="mt-3 mb-2">Húzd ide az EPUB fájlokat</h5>
+      <p class="text-secondary mb-0">vagy kattints a tallózáshoz · Több fájl is kiválasztható</p>
+      <input type="file" id="fileInput" accept=".epub" style="display:none" multiple>
     </div>
-    <div class="mt-3">
-      <button class="btn btn-primary" onclick="fetchMetadata()">🔍 Keresés az interneten</button>
-      <button class="btn btn-success" onclick="uploadBook()">✅ Mentés</button>
-      <button class="btn btn-secondary" onclick="cancelUpload()">Mégse</button>
+
+    <!-- Batch feldolgozási lista -->
+    <div id="batchList" class="mt-3" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0"><i class="bi bi-list-ul me-1"></i>Feldolgozás alatt (<span id="batchCount">0</span> fájl)</h6>
+        <div>
+          <button class="btn btn-sm btn-outline-light me-2" onclick="autoFetchAll()"><i class="bi bi-search me-1"></i>Összes keresése</button>
+          <button class="btn btn-sm btn-success" id="btnSaveAll" onclick="saveAllBooks()" disabled>
+            <i class="bi bi-check-all me-1"></i>Összes mentése
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="clearBatch()"><i class="bi bi-x-lg me-1"></i>Mégse</button>
+        </div>
+      </div>
+      <!-- Progress bar -->
+      <div class="progress mb-3" style="height:6px;">
+        <div class="progress-bar bg-gradient" id="batchProgressBar" style="width:0%; background:linear-gradient(90deg, var(--accent-blue), var(--accent-green));"></div>
+      </div>
+      <!-- Fájlok listája -->
+      <div id="batchBookList" class="row g-2"></div>
     </div>
-    <div id="searchResults" class="mt-3"></div>
   </div>
 </div>
 
-<!-- Szűrők -->
-<div class="card mt-3">
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SZŰRŐK                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="card mb-3">
   <div class="card-body">
     <div class="row g-2">
       <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="filterTitle" placeholder="Cím szűrés" oninput="renderBooks()"></div>
@@ -46,52 +59,140 @@
         </select>
       </div>
       <div class="col-md-3">
-        <button class="btn btn-sm btn-outline-info" onclick="loadBooks()">🔄 Frissítés</button>
-        <small class="text-muted ms-2">Összesen: <span id="bookCount">0</span> könyv</small>
+        <button class="btn btn-sm btn-outline-info" onclick="loadBooks()"><i class="bi bi-arrow-repeat me-1"></i>Frissítés</button>
+        <small class="text-muted ms-2">Összesen: <strong id="bookCount">0</strong> könyv</small>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Könyvek táblázata -->
-<div class="card mt-3">
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- KÖNYVEK TÁBLÁZATA                                               -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="card">
   <div class="card-body">
     <div id="booksTable"></div>
   </div>
 </div>
 
 <script>
-let currentFile = null;
+// ============================
+// ÁLLAPOT
+// ============================
 let allBooks = [];
+let batchFiles = [];  // {file, metadata, status, error, filepath}
 
-// Drag & Drop
+// ============================
+// DROP ZÓNA ESEMÉNYEK
+// ============================
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 
 dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#0d6efd'; });
-dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#666'; });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#0d6efd'; dropZone.style.background = 'rgba(13,110,253,0.08)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#555'; dropZone.style.background = 'rgba(30,35,50,0.3)'; });
 dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.style.borderColor = '#666';
-  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+  e.preventDefault(); 
+  dropZone.style.borderColor = '#555'; 
+  dropZone.style.background = 'rgba(30,35,50,0.3)';
+  if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
 });
-fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) handleFile(fileInput.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) handleFiles(fileInput.files); });
 
-function handleFile(file) {
-  if (!file.name.toLowerCase().endsWith('.epub')) { alert('Csak EPUB fájl tölthető fel!'); return; }
-  currentFile = file;
-  document.getElementById('uploadForm').style.display = 'block';
-  document.getElementById('bookTitle').value = file.name.replace('.epub','').replace(/_/g,' ');
-  document.getElementById('bookAuthor').value = '';
-  document.getElementById('searchResults').innerHTML = '';
+// ============================
+// FÁJLOK FELDOLGOZÁSA (BATCH)
+// ============================
+async function handleFiles(files) {
+  const epubFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.epub'));
+  if (epubFiles.length === 0) { alert('Nincsenek EPUB fájlok a kiválasztottak között!'); return; }
+  
+  // Hozzáadjuk a batch listához
+  for (const file of epubFiles) {
+    // Duplikáció ellenőrzés a batch listán belül
+    if (batchFiles.some(bf => bf.file.name === file.name && bf.file.size === file.size)) continue;
+    
+    batchFiles.push({
+      file: file,
+      metadata: { title: file.name.replace(/\.epub$/i,'').replace(/_/g,' '), author: '', language: 'en', description: '' },
+      status: 'pending',  // pending, extracting, extracted, searching, ready, duplicate, error
+      error: '',
+      filepath: ''
+    });
+  }
+  
+  document.getElementById('batchList').style.display = 'block';
+  document.getElementById('batchCount').textContent = batchFiles.length;
+  document.getElementById('batchProgress').style.display = 'inline-block';
+  
+  renderBatchList();
+  
+  // Automatikus metaadat kinyerés minden fájlhoz
+  await extractAllMetadata();
 }
 
-async function fetchMetadata() {
-  const title = document.getElementById('bookTitle').value.trim();
-  const author = document.getElementById('bookAuthor').value.trim();
+async function extractAllMetadata() {
+  const total = batchFiles.length;
+  for (let i = 0; i < batchFiles.length; i++) {
+    const bf = batchFiles[i];
+    if (bf.status !== 'pending') continue;
+    
+    bf.status = 'extracting';
+    renderBatchList();
+    updateProgress(i, total, 'Metaadat kinyerés...');
+    
+    try {
+      // Fájl feltöltése a szerverre metaadat kinyeréshez
+      const fd = new FormData();
+      fd.append('file', bf.file);
+      
+      const resp = await fetch('/api/library/extract-metadata', {
+        method: 'POST', credentials: 'same-origin', body: fd
+      });
+      const data = await resp.json();
+      
+      if (data.success && data.metadata) {
+        bf.metadata = data.metadata;
+        bf.status = 'extracted';
+      } else {
+        // Hiba esetén is van fallback metaadat (fájlnévből)
+        if (data.metadata) bf.metadata = data.metadata;
+        bf.status = 'extracted';
+        bf.metadata._extractError = data.error || '';
+      }
+    } catch (e) {
+      bf.status = 'error';
+      bf.error = 'Metaadat kinyerés sikertelen: ' + e.message;
+    }
+    
+    renderBatchList();
+    updateProgress(i + 1, total, 'Kész: ' + (i+1) + '/' + total);
+  }
+  
+  document.getElementById('batchProgress').style.display = 'none';
+  updateButtons();
+}
+
+// ============================
+// OPENLIBRARY KERESÉS (egy könyvhöz)
+// ============================
+async function fetchMetadataForBook(index) {
+  const bf = batchFiles[index];
+  if (!bf || bf.status === 'duplicate') return;
+  
+  const title = bf.metadata.title || '';
+  const author = bf.metadata.author || '';
   const query = [title, author].filter(x => x).join(' ');
-  if (query.length < 3) { alert('Adj meg egy címet vagy szerzőt a kereséshez!'); return; }
-  document.getElementById('searchResults').innerHTML = '<div class="spinner-border spinner-border-sm"></div> Keresés...';
+  if (query.length < 3) {
+    bf.status = 'ready';
+    renderBatchList();
+    updateButtons();
+    return;
+  }
+  
+  bf.status = 'searching';
+  renderBatchList();
+  bf._searchResults = null;
+  
   try {
     const resp = await fetch('/api/library/fetch-metadata', {
       method: 'POST', headers: {'Content-Type':'application/json'}, credentials:'same-origin',
@@ -99,60 +200,230 @@ async function fetchMetadata() {
     });
     const data = await resp.json();
     if (data.results && data.results.length > 0) {
-      let html = '<h6>Találatok:</h6>';
-      data.results.forEach((r, i) => {
-        html += `<div class="card bg-dark mb-2 p-2" style="cursor:pointer" onclick="fillMetadata(${i})">
-          <strong>${r.title}</strong><br>
-          <small>${r.author || 'Ismeretlen szerző'} | ${r.first_publish || '?'} | Nyelv: ${r.language || '?'}</small><br>
-          <small class="text-muted">${r.subjects.join(', ')}</small>
-        </div>`;
-      });
-      document.getElementById('searchResults').innerHTML = html;
-      window._searchResults = data.results;
-    } else {
-      document.getElementById('searchResults').innerHTML = '<div class="text-muted">Nincs találat.</div>';
+      bf._searchResults = data.results;
+      // Első találat automatikus kitöltése
+      const r = data.results[0];
+      if (r.title) bf.metadata.title = r.title;
+      if (r.author) bf.metadata.author = r.author;
+      if (r.language) {
+        const lang = r.language.split(',')[0].trim().substring(0,2);
+        bf.metadata.language = lang;
+      }
+      // Műfaj kitalálása
+      if (r.subjects) {
+        const genreMap = {'science fiction':'sci-fi','fantasy':'fantasy','adventure':'adventure','mystery':'mystery','romance':'romance','horror':'horror','historical':'historical','biography':'biography','science':'science'};
+        for (let s of r.subjects) {
+          for (let [k,v] of Object.entries(genreMap)) {
+            if (s.toLowerCase().includes(k)) { bf.metadata.genre = v; break; }
+          }
+          if (bf.metadata.genre) break;
+        }
+      }
     }
-  } catch(e) { document.getElementById('searchResults').innerHTML = '<div class="text-danger">Hiba: '+e.message+'</div>'; }
+    bf.status = 'ready';
+  } catch (e) {
+    bf.status = 'ready';
+  }
+  
+  renderBatchList();
+  updateButtons();
 }
 
-function fillMetadata(idx) {
-  const r = window._searchResults[idx];
-  if (!r) return;
-  document.getElementById('bookTitle').value = r.title || '';
-  document.getElementById('bookAuthor').value = r.author || '';
-  if (r.language) {
-    const lang = r.language.split(',')[0].trim().substring(0,2);
-    document.getElementById('bookLanguage').value = lang;
+async function autoFetchAll() {
+  document.getElementById('batchProgress').style.display = 'inline-block';
+  const total = batchFiles.length;
+  for (let i = 0; i < batchFiles.length; i++) {
+    const bf = batchFiles[i];
+    if (bf.status === 'duplicate' || bf.status === 'error') continue;
+    updateProgress(i + 1, total, 'Keresés: ' + (i+1) + '/' + total);
+    await fetchMetadataForBook(i);
   }
-  if (r.subjects && r.subjects.length > 0) {
-    const genreMap = { 'science fiction':'sci-fi','fantasy':'fantasy','adventure':'adventure','mystery':'mystery','romance':'romance','horror':'horror','historical':'historical','biography':'biography','science':'science'};
-    for (let s of r.subjects) { for (let [k,v] of Object.entries(genreMap)) { if (s.toLowerCase().includes(k)) { document.getElementById('bookGenre').value = v; return; }}}
-  }
+  document.getElementById('batchProgress').style.display = 'none';
 }
 
-async function uploadBook() {
-  if (!currentFile) return;
-  const fd = new FormData();
-  fd.append('file', currentFile);
-  fd.append('title', document.getElementById('bookTitle').value);
-  fd.append('author', document.getElementById('bookAuthor').value);
-  fd.append('language', document.getElementById('bookLanguage').value);
-  fd.append('genre', document.getElementById('bookGenre').value);
-  fd.append('series', document.getElementById('bookSeries').value);
-  fd.append('series_number', document.getElementById('bookSeriesNumber').value);
-  const resp = await fetch('/api/library/upload', {method:'POST', credentials:'same-origin', body:fd});
-  const data = await resp.json();
-  if (data.success) { 
-    cancelUpload(); loadBooks(); 
-  } else if (data.duplicate) {
-    alert('⚠️ ' + data.error + '\n\nEz a könyv már megtalálható a közös könyvtárban, nem szükséges újra feltölteni.');
-  } else { 
-    alert(data.error || 'Hiba történt a feltöltés során'); 
+// ============================
+// SAVE ALL (batch feltöltés)
+// ============================
+async function saveAllBooks() {
+  const ready = batchFiles.filter(bf => bf.status === 'ready' || bf.status === 'extracted');
+  if (ready.length === 0) { alert('Nincsenek menthető könyvek!'); return; }
+  
+  document.getElementById('btnSaveAll').disabled = true;
+  document.getElementById('batchProgress').style.display = 'inline-block';
+  updateProgress(0, ready.length, 'Feltöltés...');
+  
+  // Először feltöltjük a fájlokat (egyenként, hogy legyen filepath)
+  const booksToUpload = [];
+  for (let i = 0; i < ready.length; i++) {
+    const bf = ready[i];
+    bf.status = 'uploading';
+    renderBatchList();
+    updateProgress(i + 1, ready.length, 'Feltöltés: ' + (i+1) + '/' + ready.length);
+    
+    try {
+      // Fájl feltöltése - az extract végpont már nem menti el,
+      // ezért az upload végpontot használjuk, de nem commit-oljuk
+      // egyenként, hanem a batch-upload végpont fogja.
+      // Először mentsük el a fájlt ideiglenesen
+      const fd = new FormData();
+      fd.append('file', bf.file);
+      fd.append('title', bf.metadata.title);
+      fd.append('author', bf.metadata.author);
+      fd.append('language', bf.metadata.language || 'en');
+      fd.append('genre', bf.metadata.genre || '');
+      fd.append('series', bf.metadata.series || '');
+      fd.append('series_number', bf.metadata.series_number || '');
+      
+      const resp = await fetch('/api/library/upload', {
+        method: 'POST', credentials: 'same-origin', body: fd
+      });
+      const data = await resp.json();
+      
+      if (data.success) {
+        bf.status = 'done';
+        bf.uploadedId = data.id;
+      } else if (data.duplicate) {
+        bf.status = 'duplicate';
+        bf.duplicateInfo = data;
+      } else {
+        bf.status = 'error';
+        bf.error = data.error || 'Ismeretlen hiba';
+      }
+    } catch (e) {
+      bf.status = 'error';
+      bf.error = e.message;
+    }
+    
+    renderBatchList();
   }
+  
+  // Statisztika
+  const done = batchFiles.filter(bf => bf.status === 'done').length;
+  const dups = batchFiles.filter(bf => bf.status === 'duplicate').length;
+  const errs = batchFiles.filter(bf => bf.status === 'error').length;
+  
+  document.getElementById('batchProgress').style.display = 'none';
+  alert('✅ Feltöltés kész!\n\n' +
+    `Sikeres: ${done} könyv\n` +
+    (dups > 0 ? `Duplikátum (kihagyva): ${dups}\n` : '') +
+    (errs > 0 ? `Hiba: ${errs}` : ''));
+  
+  updateButtons();
+  loadBooks();
 }
 
-function cancelUpload() { currentFile = null; document.getElementById('uploadForm').style.display='none'; document.getElementById('searchResults').innerHTML=''; }
+// ============================
+// SEGÉDFÜGGVÉNYEK
+// ============================
+function updateProgress(current, total, label) {
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById('batchProgressBar').style.width = pct + '%';
+  document.getElementById('batchProgress').textContent = label + ' (' + pct + '%)';
+}
 
+function updateButtons() {
+  const ready = batchFiles.filter(bf => bf.status === 'ready' || bf.status === 'extracted').length;
+  document.getElementById('btnSaveAll').disabled = (ready === 0);
+}
+
+function clearBatch() {
+  batchFiles = [];
+  document.getElementById('batchList').style.display = 'none';
+  document.getElementById('batchBookList').innerHTML = '';
+  document.getElementById('batchCount').textContent = '0';
+  document.getElementById('batchProgressBar').style.width = '0%';
+  document.getElementById('batchProgress').style.display = 'none';
+  document.getElementById('btnSaveAll').disabled = true;
+}
+
+function renderBatchList() {
+  let html = '';
+  batchFiles.forEach((bf, i) => {
+    const statusBadge = {
+      'pending': '<span class="badge bg-secondary">Várakozik</span>',
+      'extracting': '<span class="badge bg-info"><i class="bi bi-hourglass-split me-1"></i>Metaadat kinyerés...</span>',
+      'extracted': '<span class="badge bg-info"><i class="bi bi-check me-1"></i>Kinyerve</span>',
+      'searching': '<span class="badge bg-warning"><i class="bi bi-search me-1"></i>Keresés...</span>',
+      'ready': '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Menthető</span>',
+      'uploading': '<span class="badge bg-info"><i class="bi bi-cloud-upload me-1"></i>Feltöltés...</span>',
+      'done': '<span class="badge bg-success"><i class="bi bi-check-all me-1"></i>Feltöltve</span>',
+      'duplicate': '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle me-1"></i>Már létezik</span>',
+      'error': '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Hiba</span>',
+    }[bf.status] || '<span class="badge bg-secondary">' + bf.status + '</span>';
+    
+    // Metaadat mezők (csak ha már kinyerve)
+    let metaFields = '';
+    if (bf.status === 'extracted' || bf.status === 'ready' || bf.status === 'searching') {
+      metaFields = `
+        <div class="row g-1 mt-1">
+          <div class="col-5">
+            <input type="text" class="form-control form-control-sm" placeholder="Cím" 
+                   value="${escHtml(bf.metadata.title || '')}" 
+                   onchange="batchFiles[${i}].metadata.title = this.value; updateButtons();">
+          </div>
+          <div class="col-4">
+            <input type="text" class="form-control form-control-sm" placeholder="Szerző"
+                   value="${escHtml(bf.metadata.author || '')}"
+                   onchange="batchFiles[${i}].metadata.author = this.value; updateButtons();">
+          </div>
+          <div class="col-2">
+            <select class="form-select form-select-sm" onchange="batchFiles[${i}].metadata.language = this.value;">
+              <option value="en" ${bf.metadata.language === 'en' ? 'selected' : ''}>EN</option>
+              <option value="hu" ${bf.metadata.language === 'hu' ? 'selected' : ''}>HU</option>
+              <option value="de" ${bf.metadata.language === 'de' ? 'selected' : ''}>DE</option>
+              <option value="fr" ${bf.metadata.language === 'fr' ? 'selected' : ''}>FR</option>
+              <option value="es" ${bf.metadata.language === 'es' ? 'selected' : ''}>ES</option>
+            </select>
+          </div>
+          <div class="col-1">
+            <button class="btn btn-sm btn-outline-info" onclick="fetchMetadataForBook(${i})" title="Keresés az interneten">
+              <i class="bi bi-search"></i>
+            </button>
+          </div>
+        </div>`;
+    }
+    
+    // Hibaüzenet
+    let errorMsg = '';
+    if (bf.error) errorMsg = `<small class="text-danger">${escHtml(bf.error)}</small>`;
+    if (bf.metadata && bf.metadata._extractError) errorMsg += `<small class="text-warning d-block">${escHtml(bf.metadata._extractError)}</small>`;
+    
+    // Duplikátum info
+    let dupInfo = '';
+    if (bf.status === 'duplicate' && bf.duplicateInfo) {
+      dupInfo = `<small class="text-warning d-block">Feltöltő: ${bf.duplicateInfo.uploader_name || 'ismeretlen'}</small>`;
+    }
+    
+    html += `
+    <div class="col-md-6 col-lg-4">
+      <div class="card bg-dark border-secondary h-100" style="border-left:3px solid ${bf.status === 'done' ? 'var(--accent-green)' : bf.status === 'error' ? '#dc3545' : bf.status === 'duplicate' ? '#ffc107' : '#666'};">
+        <div class="card-body py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1" style="min-width:0;">
+              <small class="text-truncate d-block fw-bold" title="${escHtml(bf.file.name)}">${escHtml(bf.file.name)}</small>
+              ${dupInfo}
+              ${errorMsg}
+            </div>
+            <div class="flex-shrink-0 ms-2">${statusBadge}</div>
+          </div>
+          ${metaFields}
+        </div>
+      </div>
+    </div>`;
+  });
+  
+  document.getElementById('batchBookList').innerHTML = html;
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ============================
+// KÖNYVTÁR LISTA (meglévő kód)
+// ============================
 async function loadBooks() {
   const resp = await fetch('/api/library/list', {credentials:'same-origin'});
   const data = await resp.json();
@@ -174,9 +445,9 @@ function renderBooks() {
   });
   let html = '';
   if (filtered.length === 0) {
-    html = '<p class="text-muted text-center py-3">Nincsenek könyvek a könyvtárban. Húzz ide EPUB fájlokat a feltöltéshez!</p>';
+    html = '<p class="text-muted text-center py-4"><i class="bi bi-inbox" style="font-size:2rem;"></i><br>Nincsenek könyvek. Húzz ide EPUB fájlokat a feltöltéshez!</p>';
   } else {
-      html = '<table class="table table-dark table-striped"><thead><tr><th>Cím</th><th>Szerző</th><th>Nyelv</th><th>Műfaj</th><th>Sorozat</th><th>Feltöltő</th><th>Kontextus</th><th>Művelet</th></tr></thead><tbody>';
+    html = '<div class="table-responsive"><table class="table table-dark table-striped table-sm"><thead><tr><th>Cím</th><th>Szerző</th><th>Nyelv</th><th>Műfaj</th><th>Sorozat</th><th>Feltöltő</th><th>Kontextus</th><th>Művelet</th></tr></thead><tbody>';
     filtered.forEach(b => {
       const seriesStr = b.series ? (b.series + (b.series_number ? ' #'+b.series_number : '')) : '-';
       const selectedBtn = b.is_selected 
@@ -184,18 +455,21 @@ function renderBooks() {
         : `<button class="btn btn-sm btn-outline-secondary" onclick="toggleBook(${b.id})" title="Kiválasztás fordításhoz">☆</button>`;
       let actionBtns = '';
       if (b.is_owner) {
-        actionBtns = `
-          <button class="btn btn-sm btn-outline-warning" onclick="editBook(${b.id})">✏️</button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteBook(${b.id})">🗑️</button>`;
+        actionBtns = `<button class="btn btn-sm btn-outline-warning me-1" onclick="editBook(${b.id})" title="Szerkesztés"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteBook(${b.id})" title="Törlés"><i class="bi bi-trash"></i></button>`;
       }
       html += `<tr>
-        <td>${b.title || '-'}</td><td>${b.author || '-'}</td><td>${b.language || '-'}</td><td>${b.genre || '-'}</td><td>${seriesStr}</td>
-        <td><small>${b.uploader_name || '-'}</small></td>
+        <td class="text-truncate" style="max-width:200px;" title="${escHtml(b.title || '')}">${escHtml(b.title || '-')}</td>
+        <td>${escHtml(b.author || '-')}</td>
+        <td><span class="badge bg-secondary">${escHtml(b.language || '-')}</span></td>
+        <td>${escHtml(b.genre || '-')}</td>
+        <td>${escHtml(seriesStr)}</td>
+        <td><small>${escHtml(b.uploader_name || '-')}</small></td>
         <td>${selectedBtn}</td>
         <td>${actionBtns || '<small class="text-muted">-</small>'}</td>
       </tr>`;
     });
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
   }
   document.getElementById('booksTable').innerHTML = html;
 }

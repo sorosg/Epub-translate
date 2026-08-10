@@ -520,6 +520,196 @@ def library_toggle(book_id):
     db.session.commit()
     return jsonify({'success':True,'is_selected':pref.is_selected})
 
+@app.route('/api/library/extract-metadata', methods=['POST'])
+@login_required
+def library_extract_metadata():
+    """EPUB fájl belső metaadatainak kinyerése (cím, szerző, nyelv).
+    ---
+    tags:
+      - Library
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: A feltöltendő EPUB fájl
+    responses:
+      200:
+        description: A kinyert metaadatok
+    """
+    # EPUB belső metaadat kinyerése (dc:title, dc:creator, dc:language)
+    if 'file' not in request.files:
+        return jsonify({'error': 'Nincs fájl'}), 400
+    file = request.files['file']
+    if not file.filename or not allowed_file(file.filename):
+        return jsonify({'error': 'Csak EPUB fájl dolgozható fel'}), 400
+    
+    try:
+        import tempfile
+        from ebooklib import epub as epub_lib
+        
+        # EPUB tartalom beolvasása memóriából (ideiglenes fájlba mentés)
+        with tempfile.NamedTemporaryFile(suffix='.epub', delete=False) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+        
+        try:
+            book = epub_lib.read_epub(tmp_path)
+            
+            # Metaadatok kinyerése
+            title = ''
+            author = ''
+            language = 'en'
+            description = ''
+            
+            # dc:title
+            titles = book.get_metadata('DC', 'title')
+            if titles:
+                title = titles[0][0] if isinstance(titles[0], tuple) else str(titles[0])
+            
+            # dc:creator
+            creators = book.get_metadata('DC', 'creator')
+            if creators:
+                author = creators[0][0] if isinstance(creators[0], tuple) else str(creators[0])
+            
+            # dc:language
+            langs = book.get_metadata('DC', 'language')
+            if langs:
+                lang_val = langs[0][0] if isinstance(langs[0], tuple) else str(langs[0])
+                language = lang_val[:2].lower() if len(lang_val) >= 2 else 'en'
+            
+            # dc:description
+            descs = book.get_metadata('DC', 'description')
+            if descs:
+                description = descs[0][0][:500] if isinstance(descs[0], tuple) else str(descs[0])[:500]
+            
+            # Kalibre metaadatok (gyakran itt vannak a jobb adatok)
+            if not title:
+                calibre_titles = book.get_metadata('OPF', 'calibre:title_sort')
+                if calibre_titles:
+                    title = calibre_titles[0][0] if isinstance(calibre_titles[0], tuple) else str(calibre_titles[0])
+            
+            app_logger.info(f"EPUB metaadat kinyerve: '{title}' by '{author}' (lang: {language})")
+            
+            return jsonify({
+                'success': True,
+                'metadata': {
+                    'title': title,
+                    'author': author,
+                    'language': language,
+                    'description': description[:300] if description else ''
+                }
+            })
+        finally:
+            os.unlink(tmp_path)  # takarítás
+            
+    except Exception as e:
+        app_logger.warning(f"EPUB metaadat kinyerési hiba: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Nem sikerült kinyerni a metaadatokat: {str(e)[:100]}',
+            'metadata': {
+                'title': file.filename.rsplit('.', 1)[0].replace('_', ' '),
+                'author': '',
+                'language': 'en',
+                'description': ''
+            }
+        })
+
+@app.route('/api/library/batch-upload', methods=['POST'])
+@login_required
+def library_batch_upload():
+    """Több könyv egyidejű feltöltése metaadatokkal.
+    ---
+    tags:
+      - Library
+    consumes:
+      - application/json
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            books:
+              type: array
+              description: A feltöltendő könyvek listája metaadatokkal
+    responses:
+      200:
+        description: Feltöltés eredménye (sikeres + kihagyott)
+    """
+    data = request.get_json()
+    books_data = data.get('books', [])
+    if not books_data:
+        return jsonify({'error': 'Nincsenek könyvek a listában'}), 400
+    
+    results = {'uploaded': [], 'duplicates': [], 'errors': []}
+    
+    for book_info in books_data:
+        title = (book_info.get('title') or '').strip()
+        author = (book_info.get('author') or '').strip()
+        filename = (book_info.get('filename') or '').strip()
+        filepath = (book_info.get('filepath') or '').strip()
+        
+        if not title:
+            results['errors'].append({'filename': filename, 'error': 'Hiányzó cím'})
+            continue
+        
+        # Deduplikáció ellenőrzés
+        existing = None
+        if title and author:
+            existing = Book.query.filter(
+                db.func.lower(Book.title) == title.lower(),
+                db.func.lower(Book.author) == author.lower()
+            ).first()
+        
+        if existing:
+            results['duplicates'].append({
+                'title': title, 'author': author,
+                'existing_id': existing.id,
+                'uploader': existing.uploader.username if existing.uploader else 'ismeretlen'
+            })
+            # Ha van fájlunk és duplikátum, töröljük a felesleges fájlt
+            if filepath and os.path.exists(filepath):
+                try: os.remove(filepath)
+                except: pass
+            continue
+        
+        # Könyv létrehozása
+        # Ha a fájl már fel van töltve (batch extract során mentve), használjuk azt
+        # különben a filepath alapján másoljuk be
+        if filepath and os.path.exists(filepath):
+            # A fájl már a megfelelő helyen van (extract mentette)
+            book = Book(
+                user_id=current_user.id,
+                filename=filename,
+                file_path=filepath,
+                title=title,
+                author=author,
+                language=book_info.get('language', 'en'),
+                genre=book_info.get('genre', ''),
+                series=book_info.get('series', ''),
+                series_number=int(book_info.get('series_number', 0)) if str(book_info.get('series_number', '')).isdigit() else None
+            )
+            db.session.add(book)
+            results['uploaded'].append({'title': title, 'author': author})
+        else:
+            results['errors'].append({'filename': filename, 'error': 'A fájl nem található a szerveren'})
+    
+    db.session.commit()
+    
+    summary = f"{len(results['uploaded'])} feltöltve"
+    if results['duplicates']:
+        summary += f", {len(results['duplicates'])} kihagyva (már létezik)"
+    if results['errors']:
+        summary += f", {len(results['errors'])} hiba"
+    
+    app_logger.info(f"Batch feltöltés: {summary} (user: {current_user.email})")
+    return jsonify({'success': True, 'results': results, 'summary': summary})
+
 @app.route('/api/library/fetch-metadata', methods=['POST'])
 @login_required
 def library_fetch_metadata():
