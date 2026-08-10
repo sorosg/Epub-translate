@@ -167,9 +167,8 @@
   <div class="card-body">
     <h5 class="card-title mb-3"><i class="bi bi-cloud-upload me-2"></i>Új EPUB feltöltése és fordítása</h5>
     
-    <!-- Modell választó és API kulcs sor -->
+    <!-- Modell választó -->
     <div class="row g-3 mb-3">
-      <!-- Modell forrás választó -->
       <div class="col-md-6">
         <label class="form-label fw-medium"><i class="bi bi-cpu me-1"></i>Fordító modell kiválasztása</label>
         <select class="form-select" id="modelSource" onchange="onModelSourceChange()">
@@ -181,12 +180,29 @@
           </option>
         </select>
       </div>
-      <div class="col-md-6" id="remoteApiKeyGroup" {% if not user.preferred_model_source or user.preferred_model_source != 'remote' %}style="display:none;"{% endif %}>
+      <!-- API kulcs státusz – mindig látható -->
+      <div class="col-md-6">
         <label class="form-label fw-medium"><i class="bi bi-key me-1"></i>DeepSeek API kulcs</label>
-        <div class="input-group">
+        <div class="d-flex align-items-center gap-2">
+          <span id="apiKeyStatus">
+            {% if user.deepseek_api_key %}
+              <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Beállítva (***{{ user.deepseek_api_key[-4:] }})</span>
+            {% else %}
+              <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Nincs beállítva</span>
+            {% endif %}
+          </span>
+          <button class="btn btn-outline-light btn-sm" type="button" onclick="toggleApiKeyEdit()" title="API kulcs módosítása">
+            <i class="bi bi-pencil"></i>
+          </button>
+        </div>
+        <!-- Szerkesztő mező (alapból rejtett) -->
+        <div class="input-group mt-2" id="apiKeyEditGroup" style="display:none;">
           <input type="password" class="form-control" id="deepseekApiKey" placeholder="sk-..." value="{% if user.deepseek_api_key %}***{{ user.deepseek_api_key[-4:] }}{% endif %}">
-          <button class="btn btn-outline-light" type="button" onclick="saveApiKey()" title="API kulcs mentése">
-            <i class="bi bi-check-lg"></i>
+          <button class="btn btn-success" type="button" onclick="saveApiKey()" title="API kulcs mentése">
+            <i class="bi bi-check-lg me-1"></i>Mentés
+          </button>
+          <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKeyEdit()" title="Mégse">
+            <i class="bi bi-x-lg"></i>
           </button>
         </div>
         <small class="text-secondary"><i class="bi bi-info-circle me-1"></i>Az API kulcs titkosítva tárolódik. <a href="https://platform.deepseek.com/api_keys" target="_blank">Kulcs beszerzése</a></small>
@@ -365,8 +381,13 @@ function onModelSourceChange() {
   document.getElementById('hiddenModelSource').value = source;
   document.getElementById('localModelGroup').style.display = source === 'local' ? 'block' : 'none';
   document.getElementById('remoteModelGroup').style.display = source === 'remote' ? 'block' : 'none';
-  document.getElementById('remoteApiKeyGroup').style.display = source === 'remote' ? 'block' : 'none';
   saveModelPreference();
+}
+
+// === API kulcs szerkesztő toggle ===
+function toggleApiKeyEdit() {
+  const editGroup = document.getElementById('apiKeyEditGroup');
+  editGroup.style.display = editGroup.style.display === 'none' ? 'flex' : 'none';
 }
 
 // === API kulcs mentése ===
@@ -381,6 +402,9 @@ async function saveApiKey() {
     });
     const data = await resp.json();
     if (data.success) {
+      // Frissítjük a státusz badge-t és elrejtjük a szerkesztő mezőt
+      document.getElementById('apiKeyStatus').innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Beállítva (' + data.deepseek_api_key + ')</span>';
+      document.getElementById('apiKeyEditGroup').style.display = 'none';
       document.getElementById('deepseekApiKey').value = data.deepseek_api_key || '***';
       alert('✅ API kulcs mentve!');
     }
