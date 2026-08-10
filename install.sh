@@ -705,7 +705,8 @@ perform_fresh_install() {
         log_success "A(z) $SELECTED_MODEL modell már le van töltve."
     else
         log_info "AI modell letöltése: $SELECTED_MODEL (ez akár 30-60 perc is lehet)..."
-        if $DOCKER exec -it epub-ollama ollama pull "$SELECTED_MODEL" 2>&1; then
+        # -i (nem -it, hogy ne igényeljen TTY-t, pl. CI/CD-ben is működjön)
+        if $DOCKER exec -i epub-ollama ollama pull "$SELECTED_MODEL" 2>&1; then
             log_success "Modell letöltése sikeres: $SELECTED_MODEL"
         else
             log_warn "Modell letöltés sikertelen. Később próbáld újra:"
