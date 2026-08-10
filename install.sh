@@ -560,7 +560,7 @@ perform_update() {
     log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
     $DOCKER compose build --no-cache backend 2>/dev/null || $DOCKER compose build backend
     log_info "Többi konténer építése..."
-    $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+    $DOCKER compose build --no-cache 2>/dev/null || $DOCKER compose build 2>/dev/null
     
     # Konténerek indítása (retry port foglaltság esetén)
     log_info "Konténerek indítása..."
@@ -708,6 +708,12 @@ perform_fresh_install() {
     set -e
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
+    
+    # Ellenőrizzük, hogy a build sikeres volt-e
+    if ! $DOCKER compose ps --services 2>/dev/null | grep -q backend; then
+        log_error "A build nem sikerült. Ellenőrizd a hibákat fent."
+        return 1
+    fi
     
     # Konténerek indítása – ha a 80-as port foglalt, automatikusan 8080-ra váltunk
     log_info "Konténerek indítása..."
@@ -860,51 +866,23 @@ create_all_files() {
         SRC_DIR="$TEMP_REPO/src"
     fi
     
-    # docker-compose.yml másolása
-    cp "$SRC_DIR/docker-compose.yml" docker-compose.yml
+    # A klónozott repo src/ TELJES tartalmának átmásolása egyben
+    # (megbízhatóbb, mint egyenként cp-zni – nem maradhat ki fájl)
+    log_info "Forrásfájlok másolása (cp -a, teljes tartalom)..."
+    cp -a "$SRC_DIR"/* .
+    chmod +x ollama/healthcheck.sh 2>/dev/null || true
     
-    # nginx config
-    mkdir -p nginx
-    cp "$SRC_DIR/nginx/nginx.conf" nginx/nginx.conf
-    
-    # ollama fájlok
-    mkdir -p ollama
-    cp "$SRC_DIR/ollama/Dockerfile" ollama/Dockerfile
-    cp "$SRC_DIR/ollama/healthcheck.sh" ollama/healthcheck.sh
-    chmod +x ollama/healthcheck.sh
-    
-    # backend fájlok
-    mkdir -p backend/utils backend/templates backend/translations
-    cp "$SRC_DIR/backend/Dockerfile" backend/Dockerfile
-    cp "$SRC_DIR/backend/requirements.txt" backend/requirements.txt
-    cp "$SRC_DIR/backend/config.py" backend/config.py
-    cp "$SRC_DIR/backend/models.py" backend/models.py
-    cp "$SRC_DIR/backend/app.py" backend/app.py
-    
-    # static fájlok (PWA)
-    mkdir -p static/icons
-    cp "$SRC_DIR/static/manifest.json" static/manifest.json 2>/dev/null || true
-    cp "$SRC_DIR/static/sw.js" static/sw.js 2>/dev/null || true
-    cp "$SRC_DIR/static/icons/icon-192.svg" static/icons/icon-192.svg 2>/dev/null || true
-    cp "$SRC_DIR/static/icons/icon-512.svg" static/icons/icon-512.svg 2>/dev/null || true
-
-    # backend template-ek
-    cp "$SRC_DIR/backend/templates/base.html" backend/templates/base.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/login.html" backend/templates/login.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/dashboard.html" backend/templates/dashboard.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/admin.html" backend/templates/admin.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/users.html" backend/templates/users.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/users_form.html" backend/templates/users_form.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/update.html" backend/templates/update.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/library.html" backend/templates/library.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/logs.html" backend/templates/logs.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/profile.html" backend/templates/profile.html 2>/dev/null || true
-    cp "$SRC_DIR/backend/templates/review.html" backend/templates/review.html 2>/dev/null || true
-    
-    # backend utils
-    cp "$SRC_DIR/backend/utils/model_optimizer.py" backend/utils/model_optimizer.py 2>/dev/null || true
-    cp "$SRC_DIR/backend/utils/resource_monitor.py" backend/utils/resource_monitor.py 2>/dev/null || true
-    touch backend/utils/__init__.py
+    # Ellenőrzés: a legfontosabb fájlok léteznek-e
+    if [ ! -f backend/app.py ]; then
+        log_error "HIBA: backend/app.py nem másolódott át!"
+        log_error "Ellenőrizd, hogy a git clone sikeres volt-e: ls $SRC_DIR"
+        exit 1
+    fi
+    if [ ! -f backend/templates/base.html ]; then
+        log_error "HIBA: backend/templates/base.html nem másolódott át!"
+        exit 1
+    fi
+    log_info "Ellenőrzés OK: app.py $(wc -c < backend/app.py) bájt, base.html $(wc -c < backend/templates/base.html) bájt"
     
     create_env_file
     create_scripts
