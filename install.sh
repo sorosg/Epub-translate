@@ -681,11 +681,20 @@ perform_fresh_install() {
         DOCKER="sudo docker"
     fi
     
-    # Korábbi konténerek leállítása és port felszabadítás
-    log_info "Korábbi konténerek leállítása..."
+    # Korábbi konténerek és volume-ok TELJES törlése
+    log_info "Korábbi konténerek és adatok törlése..."
     set +e
-    $DOCKER compose down --remove-orphans 2>/dev/null || true
-    $DOCKER rm -f epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog 2>/dev/null || true
+    # Volume-ok törlése a compose fájl alapján (ha létezik)
+    if [ -f docker-compose.yml ]; then
+        $DOCKER compose down --volumes --remove-orphans 2>/dev/null || true
+    fi
+    # Biztonsági kézi törlés: minden epub- prefixű konténer és volume
+    for ct in epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog; do
+        $DOCKER rm -f "$ct" 2>/dev/null || true
+    done
+    for vol in epub_translator-network postgres_data ollama_data redis_data epub_uploads epub_output; do
+        $DOCKER volume rm -f "$vol" 2>/dev/null || true
+    done
     # Host webszerverek leállítása, letiltása ÉS maszkolása (systemd újraindítás ellen)
     log_info "Host webszerverek leállítása és portok felszabadítása..."
     for svc in nginx apache2 httpd; do
