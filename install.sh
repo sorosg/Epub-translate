@@ -827,6 +827,8 @@ create_all_files() {
     cp "$SRC_DIR/backend/templates/update.html" backend/templates/update.html 2>/dev/null || true
     cp "$SRC_DIR/backend/templates/library.html" backend/templates/library.html 2>/dev/null || true
     cp "$SRC_DIR/backend/templates/logs.html" backend/templates/logs.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/profile.html" backend/templates/profile.html 2>/dev/null || true
+    cp "$SRC_DIR/backend/templates/review.html" backend/templates/review.html 2>/dev/null || true
     
     # backend utils
     cp "$SRC_DIR/backend/utils/model_optimizer.py" backend/utils/model_optimizer.py 2>/dev/null || true
