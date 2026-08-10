@@ -564,6 +564,7 @@ perform_update() {
     
     # Konténerek indítása (retry port foglaltság esetén)
     log_info "Konténerek indítása..."
+    set +e  # retry loop
     COMPOSE_STARTED=false
     for attempt in 1 2 3; do
         if $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
@@ -580,6 +581,7 @@ perform_update() {
             sed -i 's/"443:443"/"8443:443"/' docker-compose.yml
         fi
     done
+    set -e
     
     if [ "$COMPOSE_STARTED" = false ]; then
         log_error "Nem sikerült elindítani a konténereket 3 próbálkozás után sem."
@@ -717,6 +719,7 @@ perform_fresh_install() {
     
     # Konténerek indítása – ha a 80-as port foglalt, automatikusan 8080-ra váltunk
     log_info "Konténerek indítása..."
+    set +e  # retry loop alatt ne álljon le a script hibánál
     COMPOSE_STARTED=false
     for attempt in 1 2 3; do
         if $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
@@ -736,6 +739,7 @@ perform_fresh_install() {
             HTTPS_PORT=8443
         fi
     done
+    set -e  # visszaállítjuk a szigorú hibakezelést
     
     if [ "$COMPOSE_STARTED" = false ]; then
         log_error "Nem sikerült elindítani a konténereket 3 próbálkozás után sem."
