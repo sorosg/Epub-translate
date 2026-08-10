@@ -561,7 +561,30 @@ perform_update() {
     $DOCKER compose build --no-cache backend 2>/dev/null || $DOCKER compose build backend
     log_info "Többi konténer építése..."
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
-    $DOCKER compose up -d
+    
+    # Konténerek indítása (retry port foglaltság esetén)
+    log_info "Konténerek indítása..."
+    COMPOSE_STARTED=false
+    for attempt in 1 2 3; do
+        if $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
+            COMPOSE_STARTED=true
+            break
+        fi
+        log_warn "Indítási hiba ($attempt. próbálkozás): port foglaltság vagy hálózati probléma"
+        $DOCKER compose down --remove-orphans 2>/dev/null || true
+        $DOCKER network prune -f 2>/dev/null || true
+        sleep 3
+        if [ "$attempt" -eq 2 ]; then
+            log_warn "80-as port továbbra is foglalt, automatikus váltás 8080-ra..."
+            sed -i 's/"80:80"/"8080:80"/' docker-compose.yml
+            sed -i 's/"443:443"/"8443:443"/' docker-compose.yml
+        fi
+    done
+    
+    if [ "$COMPOSE_STARTED" = false ]; then
+        log_error "Nem sikerült elindítani a konténereket 3 próbálkozás után sem."
+        return 1
+    fi
     sleep 15
     
     $DOCKER exec -i epub-backend python3 -c "from app import app, db; app.app_context().push(); db.create_all(); print('OK')" 2>/dev/null || log_warn "Migráció figyelmeztetés"
@@ -685,7 +708,35 @@ perform_fresh_install() {
     set -e
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
-    $DOCKER compose up -d
+    
+    # Konténerek indítása – ha a 80-as port foglalt, automatikusan 8080-ra váltunk
+    log_info "Konténerek indítása..."
+    COMPOSE_STARTED=false
+    for attempt in 1 2 3; do
+        if $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
+            COMPOSE_STARTED=true
+            break
+        fi
+        log_warn "Indítási hiba ($attempt. próbálkozás): port foglaltság vagy hálózati probléma"
+        $DOCKER compose down --remove-orphans 2>/dev/null || true
+        $DOCKER network prune -f 2>/dev/null || true
+        sleep 3
+        if [ "$attempt" -eq 2 ]; then
+            # Második próbálkozásnál átváltunk 8080-ra
+            log_warn "80-as port továbbra is foglalt, automatikus váltás 8080-ra..."
+            sed -i 's/"80:80"/"8080:80"/' docker-compose.yml
+            sed -i 's/"443:443"/"8443:443"/' docker-compose.yml
+            HTTP_PORT=8080
+            HTTPS_PORT=8443
+        fi
+    done
+    
+    if [ "$COMPOSE_STARTED" = false ]; then
+        log_error "Nem sikerült elindítani a konténereket 3 próbálkozás után sem."
+        log_error "Hiba log: $(cat /tmp/epub-compose-up-err.log 2>/dev/null || echo 'nem elérhető')"
+        return 1
+    fi
+    
     # Várakozás az Ollama konténer indulására (healthcheck start_period: 60s)
     log_info "Várakozás a konténerek indulására (Ollama egészségellenőrzés)..."
     for i in $(seq 1 12); do
