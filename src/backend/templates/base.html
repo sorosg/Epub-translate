@@ -2,7 +2,7 @@
 <html lang="hu" data-bs-theme="{{ 'dark' if current_user.is_authenticated and current_user.dark_mode else 'dark' }}" id="htmlRoot">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{% block title %}EPUB Fordító{% endblock %}</title>
 
 <!-- PWA meta tagek -->
@@ -124,8 +124,9 @@ body {
 .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.5); z-index: 1035; }
 
-@media (max-width: 768px) {
-  .sidebar { transform: translateX(-100%); }
+/* Tablet és mobil: a sidebar elrejtése, hamburger menü */
+@media (max-width: 1024px) {
+  .sidebar { transform: translateX(-100%); width: 280px; }
   .sidebar.open { transform: translateX(0); }
   .sidebar-overlay.open { display: block; }
   .main-content { margin-left: 0; }

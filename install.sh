@@ -817,6 +817,13 @@ create_all_files() {
     cp "$SRC_DIR/backend/models.py" backend/models.py
     cp "$SRC_DIR/backend/app.py" backend/app.py
     
+    # static fájlok (PWA)
+    mkdir -p static/icons
+    cp "$SRC_DIR/static/manifest.json" static/manifest.json 2>/dev/null || true
+    cp "$SRC_DIR/static/sw.js" static/sw.js 2>/dev/null || true
+    cp "$SRC_DIR/static/icons/icon-192.svg" static/icons/icon-192.svg 2>/dev/null || true
+    cp "$SRC_DIR/static/icons/icon-512.svg" static/icons/icon-512.svg 2>/dev/null || true
+
     # backend template-ek
     cp "$SRC_DIR/backend/templates/base.html" backend/templates/base.html 2>/dev/null || true
     cp "$SRC_DIR/backend/templates/login.html" backend/templates/login.html 2>/dev/null || true
