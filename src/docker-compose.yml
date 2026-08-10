@@ -127,9 +127,9 @@ services:
     networks:
       - translator-network
     restart: unless-stopped
-    profiles:
-      - local
-      - all
+    # MailHog email tesztelő SMTP szerver – minden kimenő emailt elfog
+    # Webes felület: http://localhost:8025
+    # SMTP: localhost:1025 (nem igényel hitelesítést)
 networks:
   translator-network:
     driver: bridge
