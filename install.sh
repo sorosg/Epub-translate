@@ -843,11 +843,23 @@ create_all_files() {
     log_info "Fájlok másolása a forrás könyvtárból..."
     SRC_DIR="${SCRIPT_DIR}/src"
     
-    # Ha a src könyvtár nem létezik (pl. régi install.sh), használjuk a heredoc-generálást
+    # Ha a src könyvtár nem létezik (wget-tel letöltött install.sh), klónozzuk a repót
     if [ ! -d "$SRC_DIR" ]; then
-        log_info "Önálló mód: a src/ könyvtár nem része a letöltött scriptnek, fájlok generálása..."
-        _create_files_from_script
-        return
+        log_info "Önálló mód: a src/ könyvtár nem része a letöltött scriptnek..."
+        
+        # Git repo klónozása (--depth 1 = csak a legfrissebb verzió, gyors)
+        TEMP_REPO="/tmp/epub-translate-$$"
+        log_info "GitHub repó klónozása a legfrissebb fájlokért..."
+        if git clone --depth 1 https://github.com/sorosg/Epub-translate.git "$TEMP_REPO" 2>/dev/null; then
+            log_success "Repó klónozva, forrásfájlok másolása..."
+            SRC_DIR="$TEMP_REPO/src"
+        else
+            log_warn "GitHub nem érhető el (internetkapcsolat?), fallback: beépített fájlok generálása"
+            log_warn "FIGYELEM: Az internet nélkül generált fájlok alapfunkciós verziót telepítenek!"
+            log_warn "A teljes funkcionalitáshoz internetkapcsolat szükséges a telepítéskor."
+            _create_files_from_script
+            return
+        fi
     fi
     
     # docker-compose.yml másolása
