@@ -2,7 +2,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.62-blue)
+![Version](https://img.shields.io/badge/version-11.0.68-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -312,4 +312,4 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.62
+Készült ❤️-vel Magyarországon – v11.0.68
