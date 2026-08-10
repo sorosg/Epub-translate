@@ -907,6 +907,8 @@ _create_files_from_script() {
 
 create_env_file() {
     [ "$IS_UPDATE" = true ] && [ -f ".env" ] && { sed -i "s/VERSION=.*/VERSION=${VERSION}/" .env; sed -i "s/CODENAME=.*/CODENAME=\"${CODENAME}\"/" .env; return; }
+    # Titkos kulcs generálása – minden útvonalon szükséges (git clone és heredoc is)
+    SECRET_KEY="${SECRET_KEY:-$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || date +%s | sha256sum | head -c 64)}"
     cat > .env << ENVEOF
 SECRET_KEY=${SECRET_KEY}
 VERSION=${VERSION}
