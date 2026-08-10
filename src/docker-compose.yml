@@ -18,8 +18,6 @@ services:
     networks:
       - translator-network
     restart: unless-stopped
-    # Ha nincs SSL tanúsítvány, a HTTPS szerver nem indul el
-    # de a konténer futni fog (csak HTTP-n)
   backend:
     build: ./backend
     container_name: epub-backend
@@ -101,7 +99,7 @@ services:
         limits:
           memory: ${OPTIMAL_MEMORY_LIMIT}
         reservations:
-          memory: 20G
+          memory: 8G
     healthcheck:
       test: ["CMD", "/healthcheck.sh"]
       interval: 10s
