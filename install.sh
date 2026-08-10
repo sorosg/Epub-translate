@@ -795,7 +795,7 @@ create_all_files() {
     
     # Ha a src könyvtár nem létezik (pl. régi install.sh), használjuk a heredoc-generálást
     if [ ! -d "$SRC_DIR" ]; then
-        log_warn "A src/ könyvtár nem található, fájlok generálása a scriptből..."
+        log_info "Önálló mód: a src/ könyvtár nem része a letöltött scriptnek, fájlok generálása..."
         _create_files_from_script
         return
     fi
