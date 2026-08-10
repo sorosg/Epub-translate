@@ -1789,6 +1789,8 @@ def init_db():
                 ('deepseek_api_key', "VARCHAR(255) DEFAULT ''"),
                 ('preferred_model_source', "VARCHAR(20) DEFAULT 'local'"),
                 ('preferred_model', "VARCHAR(100) DEFAULT ''"),
+                # Sötét/világos téma preferencia (v11.0.69+, #10 fejlesztés)
+                ('dark_mode', "BOOLEAN DEFAULT TRUE"),
             ]:
                 db.session.execute(db.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             db.session.commit()
