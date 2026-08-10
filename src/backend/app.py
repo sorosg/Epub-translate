@@ -1131,15 +1131,31 @@ Minták a kívánt stílushoz:
                     source_texts = [tn[1] for tn in text_nodes]
                     combined_source = NODE_SEP.join(source_texts)
                     
-                    # 3. Sliding window kontextus: előző node szövegének első 300 karaktere
+                    # 3. Szélesebb sliding window kontextus (8. fejlesztés):
+                    #    Előző fejezet első bekezdése (max 800 karakter) +
+                    #    következő fejezet első bekezdése (max 500 karakter, előretekintő)
+                    #    Ez segít a narratív folytonosság fenntartásában és jobb kontextust ad a modellnek.
                     surrounding_context = ""
+                    # Előző fejezet kontextusa
                     if idx > 0:
                         try:
                             prev_item = items[idx-1]
                             prev_soup = BeautifulSoup(prev_item.get_body_content(), 'html.parser')
-                            prev_text = prev_soup.get_text()[:300].strip()
+                            prev_text = prev_soup.get_text()[:800].strip()
                             if prev_text:
                                 surrounding_context = f"Előző fejezet/bekezdés kontextusa: {prev_text}\n---\n"
+                        except Exception:
+                            pass
+                    # Következő fejezet kontextusa (előretekintő) – a prompt elejére kerül,
+                    # hogy a modell lássa, merre halad a történet
+                    if idx < total - 1:
+                        try:
+                            next_item = items[idx+1]
+                            next_soup = BeautifulSoup(next_item.get_body_content(), 'html.parser')
+                            next_text = next_soup.get_text()[:500].strip()
+                            if next_text:
+                                lookahead_context = f"Következő fejezet/bekezdés kontextusa (előretekintő): {next_text}\n---\n"
+                                surrounding_context = lookahead_context + surrounding_context
                         except Exception:
                             pass
                     

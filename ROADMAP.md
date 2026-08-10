@@ -1,7 +1,7 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.61 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-07-17  
+**Verzió:** 11.0.69 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-10  
 
 ---
 
@@ -224,11 +224,12 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 - Böngésző Notification API: a dashboard oldal értesíthet a fordítás végén
 - **Használhatóság:** ⭐⭐⭐⭐ (nem kell folyamatosan figyelni a dashboardot)
 
-### 8. Kontextus-érzékeny fordítás (szélesebb sliding window)
-**Cél:** A jelenlegi sliding window (előző fejezet 300 karakter) bővítése.
-- Előző fejezet teljes első bekezdése (500-800 karakter)
-- Következő fejezet első bekezdése (előretekintő kontextus)
-- Ez segít a narratív folytonosság fenntartásában
+### 8. Kontextus-érzékeny fordítás (szélesebb sliding window) ✅ (v11.0.69)
+**Státusz:** KÉSZ
+- Előző fejezet teljes első bekezdése (max 800 karakter) – korábban 300 karakter
+- Következő fejezet első bekezdése (max 500 karakter, előretekintő kontextus) – ÚJ
+- A `surrounding_context` változó most előretekintő + visszatekintő kontextust is tartalmaz
+- Ez segít a narratív folytonosság fenntartásában és jobb kontextust ad a modellnek
 - **Minőségjavulás:** ⭐⭐⭐ (jobb kontextus = jobb fordítás)
 
 ### 9. Drag & drop a dashboardra

@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.68')
+    VERSION = os.environ.get('VERSION', '11.0.69')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
-    RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
+    RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-08-10')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://ollama:11434')
