@@ -607,10 +607,40 @@ def api_models_pull():
     thread.daemon = True; thread.start()
     return jsonify({'success':True,'message':f'Modell letöltés elindítva: {model_name}'})
 
+@app.route('/api/user/settings', methods=['POST'])
+@login_required
+def user_settings():
+    """Felhasználói beállítások mentése (API kulcs, preferált modell)"""
+    data = request.get_json() or {}
+    
+    # DeepSeek API kulcs mentése
+    if 'deepseek_api_key' in data:
+        current_user.deepseek_api_key = data['deepseek_api_key'].strip()
+    
+    # Preferált modell forrás (local/remote)
+    if 'preferred_model_source' in data:
+        current_user.preferred_model_source = data['preferred_model_source']
+    
+    # Preferált modell név
+    if 'preferred_model' in data:
+        current_user.preferred_model = data['preferred_model']
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'deepseek_api_key': ('***' + current_user.deepseek_api_key[-4:]) if current_user.deepseek_api_key else '',
+        'preferred_model_source': current_user.preferred_model_source,
+        'preferred_model': current_user.preferred_model
+    })
+
 @app.route('/api/models/list')
 @login_required
 def api_models_list():
+    """Modell lista – helyi (Ollama) + távoli (DeepSeek Pro) modellek egyesített listája."""
     models = []; error = None
+    
+    # Helyi modellek lekérése az Ollama-tól
     for attempt in range(1,4):
         try:
             resp = requests.get(f"{app.config['OLLAMA_HOST']}/api/tags", timeout=5)
@@ -619,7 +649,20 @@ def api_models_list():
         except Exception as e:
             if attempt == 3: error = str(e)[:100]
             else: import time; time.sleep(2)
-    return jsonify({'models':models,'current_model':app.config['DEFAULT_MODEL'],'error':error})
+    
+    # Távoli (DeepSeek Pro) modellek hozzáadása, ha van API kulcs
+    remote_available = bool(current_user.deepseek_api_key)
+    remote_models = []
+    if remote_available:
+        remote_models = Config.REMOTE_MODELS
+    
+    return jsonify({
+        'models': models,
+        'remote_models': remote_models,
+        'remote_available': remote_available,
+        'current_model': app.config['DEFAULT_MODEL'],
+        'error': error
+    })
 
 @app.route('/admin/users')
 @login_required

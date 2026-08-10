@@ -3,15 +3,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '11.0.66')
+    VERSION = os.environ.get('VERSION', '11.0.68')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-07-16')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://ollama:11434')
+    DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions'
     DEFAULT_MODEL = os.environ.get('SELECTED_MODEL', 'deepseek-r1:14b')
     RECOMMENDED_MODEL = os.environ.get('RECOMMENDED_MODEL', 'deepseek-r1:14b')
     MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 3))
+    # Elérhető távoli (felhős) modellek listája – DeepSeek Pro
+    REMOTE_MODELS = [
+        {'id': 'deepseek-chat', 'name': 'DeepSeek Chat (V3)', 'provider': 'deepseek', 'description': 'Általános célú, gyors'},
+        {'id': 'deepseek-reasoner', 'name': 'DeepSeek Reasoner (R1)', 'provider': 'deepseek', 'description': 'Logikai feladatokhoz, lassabb de pontosabb'},
+    ]
     BATCH_SIZE = int(os.environ.get('BATCH_SIZE', 5))
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@epub-translator.local')
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Abrakadabra')

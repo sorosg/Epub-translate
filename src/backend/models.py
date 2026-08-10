@@ -16,6 +16,9 @@ class User(UserMixin, db.Model):
     tokens = db.Column(db.Integer, default=5)
     is_admin = db.Column(db.Boolean, default=False)
     language = db.Column(db.String(5), default='hu')
+    deepseek_api_key = db.Column(db.String(255), default='')  # DeepSeek Pro API kulcs
+    preferred_model_source = db.Column(db.String(20), default='local')  # 'local' vagy 'remote'
+    preferred_model = db.Column(db.String(100), default='')  # preferált modell név (pl. deepseek-chat)
     dark_mode = db.Column(db.Boolean, default=True)
     points = db.Column(db.Integer, default=0)
     level = db.Column(db.Integer, default=1)

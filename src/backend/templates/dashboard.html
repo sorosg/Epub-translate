@@ -48,11 +48,179 @@
   </div>
 </div>
 
-<!-- Feltöltési kártya -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- FORDÍTÁSOK (a lap tetején – ez a legfontosabb visszajelzés)    -->
+<!-- KÁRTYÁS NÉZET a táblázat helyett – modernebb, áttekinthetőbb  -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5><i class="bi bi-list-check me-2"></i>Fordításaim</h5>
+    <span class="badge bg-secondary">{{ translations|length if translations else 0 }}</span>
+  </div>
+  <div class="card-body">
+    {% if translations %}
+    <div class="row g-3">
+    {% for t in translations %}
+      <div class="col-lg-6">
+        <div class="card h-100 border-0 shadow-sm" style="background:linear-gradient(135deg, rgba(28,35,51,0.95), rgba(22,27,34,0.95)); border:1px solid var(--border-color) !important; border-radius:14px;">
+          <div class="card-body d-flex flex-column">
+            <!-- Fájlnév és státusz sor -->
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="flex-grow-1 me-2" style="min-width:0;">
+                <h6 class="mb-1 text-truncate" title="{{ t.original_filename }}">{{ t.original_filename }}</h6>
+                <small class="text-secondary">
+                  <i class="bi bi-cpu me-1"></i>{{ t.model_used }}
+                </small>
+              </div>
+              <div class="flex-shrink-0">
+                {% if t.status == 'pending' %}
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis fs-6"><i class="bi bi-hourglass-split me-1"></i>Várakozik</span>
+                {% elif t.status == 'processing' %}
+                  <span class="badge bg-warning-subtle text-warning-emphasis fs-6"><i class="bi bi-arrow-repeat me-1"></i>Folyamatban</span>
+                {% elif t.status == 'completed' %}
+                  <span class="badge bg-success-subtle text-success-emphasis fs-6"><i class="bi bi-check-circle me-1"></i>Kész</span>
+                {% elif t.status == 'failed' %}
+                  <span class="badge bg-danger-subtle text-danger-emphasis fs-6"><i class="bi bi-x-circle me-1"></i>Hiba</span>
+                {% endif %}
+              </div>
+            </div>
+            
+            <!-- Progressz bar (csak folyamatban lévőknél) -->
+            {% if t.status == 'processing' %}
+            <div class="progress mb-2" style="height:8px; border-radius:4px;">
+              {% set stage_pct = 5 if t.current_stage == 'first_pass' else (91 if t.current_stage == 'second_pass' else 99 if t.current_stage == 'post_processing' else t.progress) %}
+              <div class="progress-bar progress-bar-striped progress-bar-animated bg-gradient" 
+                   style="width:{{ stage_pct }}%; background:linear-gradient(90deg, var(--accent-blue), var(--accent-purple));">
+              </div>
+            </div>
+            <small class="text-secondary mb-2">
+              {% if t.current_stage == 'first_pass' %}🧠 Első menet (AI fordítás)
+              {% elif t.current_stage == 'second_pass' %}🔍 Második menet (minőségellenőrzés)
+              {% elif t.current_stage == 'post_processing' %}📦 Utófeldolgozás
+              {% else %}Fordítás alatt...{% endif %}
+              {% if t.current_chapter and t.total_chapters %}
+                · {{ t.current_chapter }}/{{ t.total_chapters }} fejezet
+              {% endif %}
+              {% if t.words_processed and t.total_words %}
+                · {{ (t.words_processed / 1000)|round(0) }}K / {{ (t.total_words / 1000)|round(0) }}K szó
+              {% endif %}
+            </small>
+            {% endif %}
+            
+            <!-- Hiba üzenet (csak failed státusznál) -->
+            {% if t.status == 'failed' and t.output_filename and t.output_filename.startswith('HIBA:') %}
+            <small class="text-danger mb-2" title="{{ t.output_filename }}">
+              <i class="bi bi-exclamation-triangle me-1"></i>{{ t.output_filename[5:100] }}{% if t.output_filename|length > 100 %}...{% endif %}
+            </small>
+            {% endif %}
+            
+            <!-- Minőségi pontszám + review link (befejezett fordításoknál) -->
+            {% if t.status == 'completed' %}
+            <div class="d-flex gap-2 align-items-center mb-2">
+              {% if t.quality_score %}
+              <span class="badge bg-info-subtle text-info-emphasis" title="Minőségi pontszám">
+                <i class="bi bi-star-fill me-1"></i>{{ t.quality_score }}/100
+              </span>
+              {% endif %}
+              {% if t.nodes_translated %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis" title="Lefordított csomópontok">
+                <i class="bi bi-puzzle me-1"></i>{{ t.nodes_translated }} node
+              </span>
+              {% endif %}
+            </div>
+            <a href="/review/{{ t.id }}" class="text-decoration-none small mb-2">
+              <i class="bi bi-pencil-square me-1"></i>Átnézés és javítás
+            </a>
+            {% endif %}
+            
+            <!-- Dátum + gombok (lábléc) -->
+            <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top border-secondary">
+              <small class="text-secondary"><i class="bi bi-clock me-1"></i>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+              <div class="d-flex gap-1">
+                {% if t.status == 'completed' %}
+                <a href="/download/{{ t.id }}" class="btn btn-sm btn-success" title="Letöltés"><i class="bi bi-download me-1"></i>Letöltés</a>
+                {% endif %}
+                <form action="/delete/{{ t.id }}" method="POST" style="display:inline">
+                  <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Biztosan törlöd?')" title="Törlés"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-4">
+      <i class="bi bi-inbox" style="font-size: 3rem; color: var(--text-secondary);"></i>
+      <p class="mt-2 text-secondary">Még nincsenek fordításaid.</p>
+      <p class="text-secondary small">Tölts fel egy EPUB fájlt a fordításhoz lentebb!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- FORDÍTÁSI BEÁLLÍTÁSOK ÉS FELTÖLTÉS                             -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <div class="card mb-4">
   <div class="card-body">
     <h5 class="card-title mb-3"><i class="bi bi-cloud-upload me-2"></i>Új EPUB feltöltése és fordítása</h5>
+    
+    <!-- Modell választó és API kulcs sor -->
+    <div class="row g-3 mb-3">
+      <!-- Modell forrás választó -->
+      <div class="col-md-6">
+        <label class="form-label fw-medium"><i class="bi bi-cpu me-1"></i>Fordító modell kiválasztása</label>
+        <select class="form-select" id="modelSource" onchange="onModelSourceChange()">
+          <option value="local" {% if not user.preferred_model_source or user.preferred_model_source == 'local' %}selected{% endif %}>
+            🖥️ Helyi modell (Ollama)
+          </option>
+          <option value="remote" {% if user.preferred_model_source == 'remote' %}selected{% endif %}>
+            ☁️ DeepSeek Pro (felhő API)
+          </option>
+        </select>
+      </div>
+      <div class="col-md-6" id="remoteApiKeyGroup" {% if not user.preferred_model_source or user.preferred_model_source != 'remote' %}style="display:none;"{% endif %}>
+        <label class="form-label fw-medium"><i class="bi bi-key me-1"></i>DeepSeek API kulcs</label>
+        <div class="input-group">
+          <input type="password" class="form-control" id="deepseekApiKey" placeholder="sk-..." value="{% if user.deepseek_api_key %}***{{ user.deepseek_api_key[-4:] }}{% endif %}">
+          <button class="btn btn-outline-light" type="button" onclick="saveApiKey()" title="API kulcs mentése">
+            <i class="bi bi-check-lg"></i>
+          </button>
+        </div>
+        <small class="text-secondary"><i class="bi bi-info-circle me-1"></i>Az API kulcs titkosítva tárolódik. <a href="https://platform.deepseek.com/api_keys" target="_blank">Kulcs beszerzése</a></small>
+      </div>
+    </div>
+    
+    <!-- Helyi modell lista (Ollama) -->
+    <div class="mb-3" id="localModelGroup" {% if user.preferred_model_source == 'remote' %}style="display:none;"{% endif %}>
+      <label class="form-label fw-medium"><i class="bi bi-box me-1"></i>Helyi modell</label>
+      <select class="form-select" id="localModelSelect" onchange="saveModelPreference()">
+        <option value="">-- Modell betöltése... --</option>
+      </select>
+      <small class="text-secondary"><i class="bi bi-info-circle me-1"></i>Admin felületen tölthetsz le új modelleket</small>
+    </div>
+    
+    <!-- Távoli modell lista (DeepSeek Pro) -->
+    <div class="mb-3" id="remoteModelGroup" {% if not user.preferred_model_source or user.preferred_model_source != 'remote' %}style="display:none;"{% endif %}>
+      <label class="form-label fw-medium"><i class="bi bi-cloud me-1"></i>DeepSeek modell</label>
+      <select class="form-select" id="remoteModelSelect" onchange="saveModelPreference()">
+        <option value="deepseek-chat" {% if user.preferred_model == 'deepseek-chat' %}selected{% endif %}>
+          DeepSeek Chat (V3) – Általános célú, gyors
+        </option>
+        <option value="deepseek-reasoner" {% if user.preferred_model == 'deepseek-reasoner' %}selected{% endif %}>
+          DeepSeek Reasoner (R1) – Logikai feladatokhoz, lassabb de pontosabb
+        </option>
+      </select>
+      <small class="text-secondary"><i class="bi bi-info-circle me-1"></i>API kulcs szükséges a használathoz</small>
+    </div>
+    
+    <!-- Fájl feltöltő zóna -->
     <form action="/upload" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="model_source" id="hiddenModelSource" value="{{ user.preferred_model_source or 'local' }}">
+      <input type="hidden" name="selected_model" id="hiddenSelectedModel" value="{{ user.preferred_model or '' }}">
+      
       <div class="upload-zone mb-3" id="dropZone">
         <div class="py-3">
           <i class="bi bi-file-earmark-arrow-up" style="font-size: 3rem; color: var(--accent-blue);"></i>
@@ -73,7 +241,7 @@
       {% set selected_count = book_prefs.values()|selectattr('is_selected','equalto',True)|list|length if book_prefs else 0 %}
       {% if selected_count > 0 %}
       <div class="mt-2">
-        <span class="badge bg-info-subtle text-info-emphasis">
+        <span class="badge bg-success-subtle text-success-emphasis">
           <i class="bi bi-bookmark-check me-1"></i>{{ selected_count }} könyv kijelölve referenciaként – terminológia és stílus figyelembe véve
         </span>
       </div>
@@ -82,7 +250,58 @@
   </div>
 </div>
 
-<!-- Mintakönyvek -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- KÖNYVTÁRI KÖNYVEK (kontextus választó – kiválasztottak zölddel) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5><i class="bi bi-collection me-2"></i>Könyvtári könyvek <small class="text-muted">(relevancia kijelölés)</small></h5>
+    <span class="badge bg-secondary">{{ books|length if books else 0 }}</span>
+  </div>
+  <div class="card-body">
+    {% if books %}
+    <p class="text-secondary small mb-3"><i class="bi bi-info-circle me-1"></i>Jelöld be a könyveket, amelyeket a rendszer figyelembe vegyen a következő fordításnál (stílus, terminológia). A kiválasztott könyvek <span class="text-success">zöld keretet</span> kapnak.</p>
+    <div class="row g-2">
+    {% for b in books %}
+      {% set is_selected = book_prefs and b.id in book_prefs and book_prefs[b.id].is_selected %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 {% if is_selected %}selected-context-book{% endif %}" 
+             style="{% if is_selected %}border:2px solid var(--accent-green) !important; box-shadow:0 0 12px rgba(63,185,80,0.25); background:linear-gradient(135deg, rgba(63,185,80,0.08), rgba(28,35,51,0.95));{% else %}border:1px solid var(--border-color);{% endif %} border-radius:12px; transition:all 0.3s ease;">
+          <div class="card-body py-2 px-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="book_{{ b.id }}" {% if is_selected %}checked{% endif %} onchange="toggleBook({{ b.id }}, this.checked)">
+              <label class="form-check-label" for="book_{{ b.id }}">
+                <strong>{{ b.title or b.filename }}</strong>
+                {% if b.author %}<br><small class="text-secondary">{{ b.author }}</small>{% endif %}
+              </label>
+            </div>
+            <div class="mt-1 d-flex flex-wrap gap-1">
+              {% if b.genre %}<span class="badge bg-secondary">{{ b.genre }}</span>{% endif %}
+              {% if b.language %}<span class="badge bg-info">{{ b.language }}</span>{% endif %}
+              {% if is_selected %}<span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Kiválasztva</span>{% endif %}
+            </div>
+            {% if is_selected %}
+            <small class="text-success d-block mt-1"><i class="bi bi-info-circle me-1"></i>A fordításhoz referenciaként használva</small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+    <a href="/library" class="btn btn-outline-light btn-sm mt-3"><i class="bi bi-arrow-right me-1"></i>Könyvtár megnyitása</a>
+    {% else %}
+    <div class="text-center py-4">
+      <i class="bi bi-collection" style="font-size: 3rem; color: var(--text-secondary);"></i>
+      <p class="mt-3 text-secondary">Még nincsenek könyvek a könyvtáradban.</p>
+      <a href="/library" class="btn btn-outline-light"><i class="bi bi-plus-circle me-1"></i>Könyvek feltöltése a Könyvtárban</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MINTAKÖNYVEK (fordítási kontextushoz)                         -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <h5><i class="bi bi-bookmark-star me-2"></i>Mintakönyvek <small class="text-muted">(fordítási kontextushoz)</small></h5>
@@ -134,131 +353,108 @@
   </div>
 </div>
 
-<!-- Könyvtári könyvek -->
-<div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h5><i class="bi bi-collection me-2"></i>Könyvtári könyveim <small class="text-muted">(relevancia kijelölés)</small></h5>
-    <span class="badge bg-secondary">{{ books|length if books else 0 }}</span>
-  </div>
-  <div class="card-body">
-    {% if books %}
-    <p class="text-secondary small mb-3"><i class="bi bi-info-circle me-1"></i>Jelöld be a könyveket, amelyeket a rendszer figyelembe vegyen a következő fordításnál (stílus, terminológia).</p>
-    <div class="row g-2">
-    {% for b in books %}
-      <div class="col-md-6 col-lg-4">
-        <div class="card bg-secondary bg-opacity-25 border-secondary h-100">
-          <div class="card-body py-2 px-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="book_{{ b.id }}" {% if book_prefs and b.id in book_prefs and book_prefs[b.id].is_selected %}checked{% endif %} onchange="toggleBook({{ b.id }}, this.checked)">
-              <label class="form-check-label" for="book_{{ b.id }}">
-                <strong>{{ b.title or b.filename }}</strong>
-                {% if b.author %}<br><small class="text-secondary">{{ b.author }}</small>{% endif %}
-              </label>
-            </div>
-            <div class="mt-1">
-              {% if b.genre %}<span class="badge bg-secondary me-1">{{ b.genre }}</span>{% endif %}
-              {% if b.language %}<span class="badge bg-info me-1">{{ b.language }}</span>{% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-    {% endfor %}
-    </div>
-    <a href="/library" class="btn btn-outline-light btn-sm mt-3"><i class="bi bi-arrow-right me-1"></i>Könyvtár megnyitása</a>
-    {% else %}
-    <div class="text-center py-4">
-      <i class="bi bi-collection" style="font-size: 3rem; color: var(--text-secondary);"></i>
-      <p class="mt-3 text-secondary">Még nincsenek könyvek a könyvtáradban.</p>
-      <a href="/library" class="btn btn-outline-light"><i class="bi bi-plus-circle me-1"></i>Könyvek feltöltése a Könyvtárban</a>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
-<!-- Fordításaim -->
-<div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h5><i class="bi bi-list-check me-2"></i>Fordításaim</h5>
-    <span class="badge bg-secondary">{{ translations|length if translations else 0 }}</span>
-  </div>
-  <div class="card-body p-0">
-    {% if translations %}
-    <div class="table-responsive">
-    <table class="table table-dark table-hover">
-      <thead><tr><th>Fájl</th><th>Modell</th><th>Státusz</th><th>Haladás</th><th style="min-width:120px">Dátum</th><th></th></tr></thead>
-      <tbody>
-      {% for t in translations %}
-      <tr>
-        <td>
-          <div class="fw-medium">{{ t.original_filename }}</div>
-          {% if t.status == 'failed' and t.output_filename and t.output_filename.startswith('HIBA:') %}
-          <small class="text-danger d-block mt-1" title="{{ t.output_filename }}">
-            <i class="bi bi-exclamation-triangle me-1"></i>{{ t.output_filename[5:85] }}{% if t.output_filename|length > 85 %}...{% endif %}
-          </small>
-          {% endif %}
-        </td>
-        <td><small class="text-secondary">{{ t.model_used }}</small></td>
-        <td>
-          {% if t.status == 'pending' %}<span class="badge bg-secondary"><i class="bi bi-hourglass-split me-1"></i>Várakozik</span>
-          {% elif t.status == 'processing' %}<span class="badge bg-warning text-dark"><i class="bi bi-arrow-repeat me-1"></i>Fordítás alatt</span>
-          {% elif t.status == 'completed' %}<span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Kész</span>
-          {% elif t.status == 'failed' %}<span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>Hiba</span>
-          {% endif %}
-        </td>
-        <td style="min-width:150px">
-          {% if t.status == 'processing' %}
-          <div class="progress" style="height:20px">
-            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:{{ t.progress }}%">{{ t.progress }}%</div>
-          </div>
-          {% elif t.status == 'pending' %}
-          <small class="text-secondary"><i class="bi bi-clock me-1"></i>Sorban áll...</small>
-          {% elif t.status == 'completed' %}
-          <span class="text-success"><i class="bi bi-check-circle me-1"></i>100%</span>
-          {% elif t.status == 'failed' %}
-          <span class="text-danger"><i class="bi bi-x-circle me-1"></i>Sikertelen</span>
-          {% endif %}
-        </td>
-        <td><small class="text-secondary">{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</small></td>
-        <td>
-          <div class="d-flex gap-1">
-            {% if t.status == 'completed' %}
-            <a href="/download/{{ t.id }}" class="btn btn-sm btn-success" title="Letöltés"><i class="bi bi-download"></i></a>
-            {% endif %}
-            <form action="/delete/{{ t.id }}" method="POST" style="display:inline">
-              <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Biztosan törlöd?')" title="Törlés"><i class="bi bi-trash"></i></button>
-            </form>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    </div>
-    {% else %}
-    <div class="text-center py-5">
-      <i class="bi bi-inbox" style="font-size: 4rem; color: var(--text-secondary);"></i>
-      <p class="mt-3 text-secondary">Még nincsenek fordításaid.</p>
-      <p class="text-secondary small">Tölts fel egy EPUB fájlt a fordításhoz a fenti űrlapon!</p>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
 {% if translations|selectattr('status','equalto','processing')|list|length > 0 %}
 <script>
 setTimeout(function(){ location.reload(); }, 30000);
 </script>
 {% endif %}
 <script>
+// === Modell forrás váltás ===
+function onModelSourceChange() {
+  const source = document.getElementById('modelSource').value;
+  document.getElementById('hiddenModelSource').value = source;
+  document.getElementById('localModelGroup').style.display = source === 'local' ? 'block' : 'none';
+  document.getElementById('remoteModelGroup').style.display = source === 'remote' ? 'block' : 'none';
+  document.getElementById('remoteApiKeyGroup').style.display = source === 'remote' ? 'block' : 'none';
+  saveModelPreference();
+}
+
+// === API kulcs mentése ===
+async function saveApiKey() {
+  const key = document.getElementById('deepseekApiKey').value.trim();
+  if (!key) { alert('Add meg az API kulcsot!'); return; }
+  try {
+    const resp = await fetch('/api/user/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({deepseek_api_key: key})
+    });
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('deepseekApiKey').value = data.deepseek_api_key || '***';
+      alert('✅ API kulcs mentve!');
+    }
+  } catch(e) {
+    alert('Hiba: ' + e.message);
+  }
+}
+
+// === Modell preferencia mentése ===
+async function saveModelPreference() {
+  const source = document.getElementById('modelSource').value;
+  let model = '';
+  if (source === 'local') {
+    model = document.getElementById('localModelSelect').value;
+  } else {
+    model = document.getElementById('remoteModelSelect').value;
+  }
+  document.getElementById('hiddenSelectedModel').value = model;
+  document.getElementById('hiddenModelSource').value = source;
+  
+  try {
+    await fetch('/api/user/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({preferred_model_source: source, preferred_model: model})
+    });
+  } catch(e) {
+    console.error('Preference save failed:', e);
+  }
+}
+
+// === Helyi modellek betöltése ===
+async function loadLocalModels() {
+  try {
+    const resp = await fetch('/api/models/list');
+    const data = await resp.json();
+    const select = document.getElementById('localModelSelect');
+    select.innerHTML = '';
+    if (data.models && data.models.length > 0) {
+      data.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name + (m.size ? ' (' + (m.size / 1024 / 1024 / 1024).toFixed(1) + ' GB)' : '');
+        {% if user.preferred_model and user.preferred_model_source != 'remote' %}
+        if (m.name === '{{ user.preferred_model }}' || m.name === data.current_model) opt.selected = true;
+        {% endif %}
+        select.appendChild(opt);
+      });
+    } else {
+      select.innerHTML = '<option value="">-- Nincsenek helyi modellek --</option>';
+    }
+  } catch(e) {
+    document.getElementById('localModelSelect').innerHTML = '<option value="">-- Nem sikerült betölteni --</option>';
+  }
+}
+
+// === Könyvtár toggle ===
 async function toggleBook(bookId, checked) {
   try {
     await fetch('/api/library/toggle/' + bookId, {method: 'POST', credentials: 'same-origin'});
-    // Vizuális visszajelzés
     const el = document.getElementById('book_' + bookId);
     if (el) el.parentElement.parentElement.style.opacity = checked ? '1' : '0.6';
+    // Oldal újratöltése a vizuális változásokhoz (zöld keret)
+    setTimeout(() => location.reload(), 500);
   } catch(e) {
     console.error('Toggle failed:', e);
   }
 }
+
+// Oldal betöltésekor
+window.addEventListener('load', () => {
+  loadLocalModels();
+  document.getElementById('hiddenModelSource').value = document.getElementById('modelSource').value;
+  document.getElementById('hiddenSelectedModel').value = '{{ user.preferred_model or '' }}';
+});
 </script>
 {% endblock %}
