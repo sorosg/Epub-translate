@@ -60,6 +60,10 @@
       </div>
       <div class="col-md-3">
         <button class="btn btn-sm btn-outline-info" onclick="loadBooks()"><i class="bi bi-arrow-repeat me-1"></i>Frissítés</button>
+        <!-- Nézetváltó -->
+        <button class="btn btn-sm btn-outline-light ms-1" id="btnViewToggle" onclick="toggleBookView()" title="Váltás táblázat / kártya nézet">
+          <i class="bi" id="viewIcon">📋</i>
+        </button>
         <small class="text-muted ms-2">Összesen: <strong id="bookCount">0</strong> könyv</small>
       </div>
     </div>
@@ -432,6 +436,50 @@ async function loadBooks() {
   renderBooks();
 }
 
+let bookViewMode = 'table'; // 'table' vagy 'card'
+
+function toggleBookView() {
+  bookViewMode = bookViewMode === 'table' ? 'card' : 'table';
+  document.getElementById('viewIcon').innerHTML = bookViewMode === 'table' ? '📋' : '🪟';
+  renderBooks();
+}
+
+function renderCardView(filtered) {
+  let html = '<div class="row g-3">';
+  filtered.forEach(b => {
+    const selectedBtn = b.is_selected 
+      ? `<button class="btn btn-sm btn-success" onclick="toggleBook(${b.id})" title="Kiválasztva fordításhoz">⭐ Kiválasztva</button>`
+      : `<button class="btn btn-sm btn-outline-secondary" onclick="toggleBook(${b.id})" title="Kiválasztás fordításhoz">☆ Kontextus</button>`;
+    let actionBtns = '';
+    if (b.is_owner) {
+      actionBtns = `<button class="btn btn-sm btn-outline-warning me-1" onclick="editBook(${b.id})" title="Szerkesztés"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteBook(${b.id})" title="Törlés"><i class="bi bi-trash"></i></button>`;
+    }
+    const seriesStr = b.series ? (b.series + (b.series_number ? ' #'+b.series_number : '')) : '';
+    html += `
+    <div class="col-md-4 col-lg-3">
+      <div class="card h-100" style="border-left:3px solid ${b.is_selected ? 'var(--accent-green)' : 'var(--border-color)'};">
+        <div class="card-body d-flex flex-column">
+          <h6 class="card-title mb-1 text-truncate" title="${escHtml(b.title || '')}">${escHtml(b.title || 'Ismeretlen')}</h6>
+          ${b.author ? `<small class="text-secondary mb-2">✍️ ${escHtml(b.author)}</small>` : ''}
+          <div class="d-flex flex-wrap gap-1 mb-2">
+            <span class="badge bg-secondary">${escHtml(b.language || '?')}</span>
+            ${b.genre ? `<span class="badge bg-info">${escHtml(b.genre)}</span>` : ''}
+            ${b.series ? `<span class="badge bg-dark">📚 ${escHtml(seriesStr)}</span>` : ''}
+          </div>
+          <small class="text-secondary mb-2">Feltöltő: ${escHtml(b.uploader_name || '-')}</small>
+          <div class="d-flex gap-1 mt-auto">
+            ${selectedBtn}
+            ${actionBtns}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
 function renderBooks() {
   const ft = document.getElementById('filterTitle').value.toLowerCase();
   const fa = document.getElementById('filterAuthor').value.toLowerCase();
@@ -446,7 +494,10 @@ function renderBooks() {
   let html = '';
   if (filtered.length === 0) {
     html = '<p class="text-muted text-center py-4"><i class="bi bi-inbox" style="font-size:2rem;"></i><br>Nincsenek könyvek. Húzz ide EPUB fájlokat a feltöltéshez!</p>';
+  } else if (bookViewMode === 'card') {
+    html = renderCardView(filtered);
   } else {
+    // Táblázat nézet
     html = '<div class="table-responsive"><table class="table table-dark table-striped table-sm"><thead><tr><th>Cím</th><th>Szerző</th><th>Nyelv</th><th>Műfaj</th><th>Sorozat</th><th>Feltöltő</th><th>Kontextus</th><th>Művelet</th></tr></thead><tbody>';
     filtered.forEach(b => {
       const seriesStr = b.series ? (b.series + (b.series_number ? ' #'+b.series_number : '')) : '-';
