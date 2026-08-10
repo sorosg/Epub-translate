@@ -1,0 +1,28 @@
+{
+  "name": "EPUB Fordító v11.0",
+  "short_name": "EPUB Fordító",
+  "description": "EPUB könyvek fordítása angolról magyarra, AI modellel",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#58a6ff",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities", "education"],
+  "lang": "hu",
+  "dir": "ltr",
+  "scope": "/"
+}

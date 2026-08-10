@@ -2,8 +2,18 @@
 <html lang="hu" data-bs-theme="{{ 'dark' if current_user.is_authenticated and current_user.dark_mode else 'dark' }}" id="htmlRoot">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <title>{% block title %}EPUB Fordító{% endblock %}</title>
+
+<!-- PWA meta tagek -->
+<meta name="theme-color" content="#0d1117" id="themeColorMeta">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EPUB Fordító">
+<meta name="description" content="EPUB könyvek fordítása angolról magyarra, Ollama AI modellel">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/static/icons/icon-192.svg">
+
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -260,11 +270,54 @@ body {
   background: var(--hover-bg);
 }
 
-/* Reszponzív */
+/* Reszponzív – mobil optimalizálás */
 @media (max-width: 768px) {
   .stat-value { font-size: 1.5rem !important; }
   .card-body { padding: 1rem; }
   .navbar-brand { font-size: 1rem; }
+  .container { padding-left: 12px; padding-right: 12px; }
+  /* Nagyobb érintési célterületek mobilra */
+  .btn { padding: 0.6rem 1.4rem; min-height: 44px; }
+  .nav-link { padding: 0.7rem 1rem !important; min-height: 44px; display: flex; align-items: center; }
+  /* Táblázat scroll vízszintesen */
+  .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Kártyák kisebb kerekítéssel */
+  .card { border-radius: 12px; }
+  /* Toast pozíció mobilra */
+  .toast-container { top: 60px; right: 10px; left: 10px; }
+  /* Fejléc kisebb */
+  h2 { font-size: 1.3rem; }
+  /* Drop zóna nagyobb */
+  .upload-zone { padding: 1.5rem 1rem; }
+  /* Témaváltó gomb nagyobb */
+  #themeToggle { width: 44px; height: 44px; }
+  /* Navbar mobil menü szebb */
+  .navbar-collapse { padding: 0.5rem 0; }
+  /* Footer kisebb */
+  .footer { padding: 1rem 0; font-size: 0.7rem; }
+  /* Progress bar magasabb */
+  .progress { height: 28px; }
+  /* Szélesebb form elemek */
+  .form-control, .form-select { padding: 0.7rem 1rem; }
+  /* Stat kártyák mobilra */
+  .stat-card { padding: 1rem 0.5rem; }
+  .stat-card .stat-value { font-size: 1.8rem !important; }
+  .stat-card .stat-icon { font-size: 1.5rem; }
+}
+/* Érintőképernyős optimalizálás */
+@media (hover: none) {
+  /* Nagyobb kattintható felületek touch eszközökön */
+  .btn, .nav-link, button, [onclick] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  /* Animációk kikapcsolása gyengébb eszközökön */
+  .card:hover { transform: none; }
+  .stat-card:hover { transform: none; }
+  .btn:hover { transform: none; }
+}
+/* Kis mobilok (320-375px) */
+@media (max-width: 375px) {
+  .stat-card .stat-value { font-size: 1.4rem !important; }
+  h2 { font-size: 1.1rem; }
+  .btn { padding: 0.5rem 1rem; font-size: 0.85rem; }
 }
 
 /* Témaváltó gomb */
@@ -420,6 +473,24 @@ async function toggleTheme() {
     console.error('Téma mentési hiba:', e);
   }
 }
+</script>
+<!-- PWA Service Worker regisztráció -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js')
+      .then(reg => console.log('[PWA] Service Worker regisztrálva:', reg.scope))
+      .catch(err => console.log('[PWA] Service Worker hiba:', err));
+  });
+}
+
+// Theme color meta tag frissítése (témaváltáskor)
+const themeColorMeta = document.getElementById('themeColorMeta');
+const observer = new MutationObserver(() => {
+  const theme = document.getElementById('htmlRoot').getAttribute('data-bs-theme');
+  themeColorMeta.setAttribute('content', theme === 'dark' ? '#0d1117' : '#f6f8fa');
+});
+observer.observe(document.getElementById('htmlRoot'), { attributes: true, attributeFilter: ['data-bs-theme'] });
 </script>
 {% block scripts %}{% endblock %}
 </body>
