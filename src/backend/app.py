@@ -1548,10 +1548,21 @@ def init_db():
         
         # Hiányzó oszlopok hozzáadása a users táblához (régebbi verziókból frissítve)
         try:
-            for col, col_type in [('address','VARCHAR(255)'),('birth_date','VARCHAR(20)'),('tax_id','VARCHAR(50)'),('phone','VARCHAR(30)')]:
+            for col, col_type in [
+                ('address','VARCHAR(255)'),
+                ('birth_date','VARCHAR(20)'),
+                ('tax_id','VARCHAR(50)'),
+                ('phone','VARCHAR(30)'),
+                # DeepSeek Pro API + modell preferencia mezők (v11.0.69+)
+                ('deepseek_api_key', "VARCHAR(255) DEFAULT ''"),
+                ('preferred_model_source', "VARCHAR(20) DEFAULT 'local'"),
+                ('preferred_model', "VARCHAR(100) DEFAULT ''"),
+            ]:
                 db.session.execute(db.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            db.session.commit()
         except Exception as e:
             db.session.rollback()
+            app_logger.warning(f"Users tábla migráció figyelmeztetés: {e}")
         
         # Hiányzó oszlopok hozzáadása a translations táblához (v11.0.50+ mezők)
         try:
