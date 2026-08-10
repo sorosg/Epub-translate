@@ -683,14 +683,36 @@ perform_fresh_install() {
     
     $DOCKER compose build 2>/dev/null || $DOCKER compose build --no-cache
     $DOCKER compose up -d
-    sleep 10
+    # Várakozás az Ollama konténer indulására (healthcheck start_period: 60s)
+    log_info "Várakozás a konténerek indulására (Ollama egészségellenőrzés)..."
+    for i in $(seq 1 12); do
+        if $DOCKER exec epub-ollama ollama list 2>/dev/null; then
+            log_success "Ollama konténer fut ($i. próbálkozás)"
+            break
+        fi
+        if [ "$i" -eq 12 ]; then
+            log_warn "Az Ollama konténer 60 mp után sem indult el. Modell letöltés később manuálisan:"
+            log_warn "  docker exec -it epub-ollama ollama pull $SELECTED_MODEL"
+        else
+            log_info "Ollama még nem fut, várakozás... ($i/12)"
+            sleep 5
+        fi
+    done
     
-    # Modell letöltés háttérben (nem blokkoljuk a telepítést)
-    log_info "AI modell letöltése háttérben: $SELECTED_MODEL"
-    $DOCKER exec -d epub-ollama ollama pull "$SELECTED_MODEL" 2>/dev/null || log_warn "Modell letöltés figyelmeztetés (háttérben fut, akár 30-60 perc is lehet)"
-    log_info "A modell letöltése a háttérben zajlik. A webes felület azonnal elérhető."
-    log_info "Amíg a modell töltődik, a fordítás nem fog működni."
-    sleep 5
+    # Modell letöltés (látható kimenettel, hogy tudd mi történik)
+    # Először ellenőrizzük, hogy a modell már le van-e töltve
+    if $DOCKER exec epub-ollama ollama list 2>/dev/null | grep -q "$SELECTED_MODEL"; then
+        log_success "A(z) $SELECTED_MODEL modell már le van töltve."
+    else
+        log_info "AI modell letöltése: $SELECTED_MODEL (ez akár 30-60 perc is lehet)..."
+        if $DOCKER exec -it epub-ollama ollama pull "$SELECTED_MODEL" 2>&1; then
+            log_success "Modell letöltése sikeres: $SELECTED_MODEL"
+        else
+            log_warn "Modell letöltés sikertelen. Később próbáld újra:"
+            log_warn "  docker exec -it epub-ollama ollama pull $SELECTED_MODEL"
+        fi
+    fi
+    log_info "A webes felület elérhető. Ha a modell még töltődik, a fordítás később fog működni."
     $DOCKER exec -i epub-backend python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')" 2>/dev/null || log_warn "DB figyelmeztetés"
     
     [[ $ENABLE_AUTO_UPDATE =~ ^[Ii]$ ]] && [ -n "$GITHUB_REPO" ] && $DOCKER exec -i epub-backend python3 -c "from app import app, db; from models import UpdateChannel; app.app_context().push(); c=UpdateChannel.query.filter_by(name='stable').first() or UpdateChannel(name='stable',github_repo='${GITHUB_REPO}',github_branch='${GITHUB_BRANCH:-main}',github_token='${GITHUB_TOKEN}' if '${GITHUB_TOKEN}' else None,auto_check=True); db.session.add(c); db.session.commit()" 2>/dev/null || true
