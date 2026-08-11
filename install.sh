@@ -121,6 +121,15 @@ detect_installation_mode() {
     PROJECT_DIR="$HOME/epub-translator"
     SCRIPT_VERSION="$VERSION"  # elmentjük a script verzióját, mielőtt a source felülírná
     
+    # Önfrissítés: ha a projektkönyvtárban van frissebb install.sh, használjuk azt
+    if [ -f "$PROJECT_DIR/install.sh" ] && [ "$PROJECT_DIR/install.sh" != "$(realpath "$0" 2>/dev/null || echo "$0")" ]; then
+        PROJECT_VERSION=$(grep -m1 '^VERSION=' "$PROJECT_DIR/install.sh" 2>/dev/null | cut -d'"' -f2)
+        if [ -n "$PROJECT_VERSION" ] && [ "$PROJECT_VERSION" != "$VERSION" ]; then
+            log_info "A projektkönyvtárban lévő install.sh újabb (v$PROJECT_VERSION), átváltás..."
+            exec bash "$PROJECT_DIR/install.sh"
+        fi
+    fi
+    
     if [ -d "$PROJECT_DIR" ] && { [ -f "$PROJECT_DIR/.install_config" ] || [ -f "$PROJECT_DIR/docker-compose.yml" ]; }; then
         source "$PROJECT_DIR/.install_config" 2>/dev/null || true
         EXISTING_VERSION="${VERSION:-unknown}"
