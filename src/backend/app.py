@@ -196,8 +196,18 @@ def upload_epub():
     filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
-    translation = Translation(user_id=current_user.id, original_filename=file.filename, output_filename=None, status='pending', progress=0, model_used=app.config['DEFAULT_MODEL'])
+    
+    # Modell forrás mentése (local/remote) a felhasználó preferenciája alapján
+    model_source = request.form.get('model_source', 'local')
+    model_used = app.config['DEFAULT_MODEL']
+    if model_source == 'remote' and current_user.deepseek_api_key:
+        model_used = 'deepseek-chat'  # DeepSeek Pro API modell
+    
+    translation = Translation(user_id=current_user.id, original_filename=file.filename, output_filename=None, status='pending', progress=0, model_used=model_used)
     db.session.add(translation)
+    # Modell forrás elmentése a Translation objektumba (a model_used mezőbe kódolva)
+    translation.first_pass_model = model_source  # ideiglenesen itt tároljuk a source-t
+    
     current_user.tokens -= 1
     # A kiválasztott könyvtári könyveket hozzárendeljük a fordításhoz
     # 1. A dashboard-ból érkező reference_ids[] (könyvajánló alapján)
@@ -230,7 +240,7 @@ def upload_epub():
     for p in selected_prefs:
         p.is_selected = False
     db.session.commit()
-    thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath, [b.file_path for b in all_selected_books]))
+    thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath, [b.file_path for b in all_selected_books], model_source))
     thread.daemon = True
     thread.start()
     flash(_('Fájl feltöltve, fordítás folyamatban...'),'success')
@@ -1296,7 +1306,7 @@ def admin_logs_clear():
     except Exception as e:
         return jsonify({'error': str(e)[:200]}), 500
 
-def translate_epub(app_ref, translation_id, filepath, context_files=None):
+def translate_epub(app_ref, translation_id, filepath, context_files=None, model_source='local'):
     with app_ref.app_context():
         t = Translation.query.get(translation_id)
         if not t:
@@ -1317,6 +1327,14 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None):
             book = epub_lib.read_epub(filepath)
             model = app_ref.config['DEFAULT_MODEL']
             ollama_host = app_ref.config['OLLAMA_HOST']
+            deepseek_api_key = user.deepseek_api_key if user else ''
+            use_deepseek = (model_source == 'remote' and deepseek_api_key)
+            
+            if use_deepseek:
+                model = 'deepseek-chat'
+                translation_logger.info(f"[ID:{translation_id}] 🌐 DeepSeek Pro API használata (nem helyi Ollama)")
+            else:
+                translation_logger.info(f"[ID:{translation_id}] 🖥️ Helyi Ollama modell: {model}")
             items = list(book.get_items_of_type(9))  # ITEM_DOCUMENT
             total = len(items)
             t.total_chapters = total  # összes fejezet/dokumentum
@@ -1578,40 +1596,60 @@ Csak a fordítást add vissza, semmi mást!
 {original[:800]}"""
                         
                         try:
-                            resp = requests.post(f"{ollama_host}/api/generate", json={
-                                'model': model,
-                                'prompt': single_prompt,
-                                'stream': False,
-                                'options': {
-                                    'num_predict': 1024,  # kevesebb token, mert egyesével fordítunk
+                            if use_deepseek:
+                                # DeepSeek Pro API hívás (Chat Completions formátum)
+                                resp = requests.post("https://api.deepseek.com/v1/chat/completions", json={
+                                    'model': model,
+                                    'messages': [{'role': 'user', 'content': single_prompt}],
+                                    'max_tokens': 1024,
                                     'temperature': 0.2,
-                                    'repeat_penalty': 1.1,
-                                    'top_p': 0.9
-                                }
-                            }, timeout=None)
-                            
-                            if resp.status_code == 200:
-                                translated = resp.json().get('response', '').strip()
-                                if translated and translated != original:
-                                    # Placeholder-s csere
-                                    ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
-                                    try:
-                                        node.replace_with(ph)
-                                        placeholders.append((ph, translated, False))
-                                        nodes_translated_here += 1
-                                        total_nodes_translated += 1
-                                    except:
-                                        placeholders.append((ph, original, False))  # hiba esetén az eredeti
+                                    'stream': False
+                                }, headers={
+                                    'Authorization': f'Bearer {deepseek_api_key}',
+                                    'Content-Type': 'application/json'
+                                }, timeout=None)
+                                if resp.status_code == 200:
+                                    translated = resp.json()['choices'][0]['message']['content'].strip()
                                 else:
-                                    # Üres vagy azonos válasz – az eredeti marad
-                                    ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
-                                    try:
-                                        node.replace_with(ph)
-                                        placeholders.append((ph, original, False))
-                                    except:
-                                        pass
+                                    translation_logger.warning(f"[ID:{translation_id}] DeepSeek API hiba (HTTP {resp.status_code}): {resp.text[:200]}")
+                                    translated = ''
                             else:
-                                translation_logger.warning(f"[ID:{translation_id}] Ollama hiba (HTTP {resp.status_code}) node {node_idx+1}-nél")
+                                # Helyi Ollama API hívás
+                                resp = requests.post(f"{ollama_host}/api/generate", json={
+                                    'model': model,
+                                    'prompt': single_prompt,
+                                    'stream': False,
+                                    'options': {
+                                        'num_predict': 1024,
+                                        'temperature': 0.2,
+                                        'repeat_penalty': 1.1,
+                                        'top_p': 0.9
+                                    }
+                                }, timeout=None)
+                                if resp.status_code == 200:
+                                    translated = resp.json().get('response', '').strip()
+                                else:
+                                    translation_logger.warning(f"[ID:{translation_id}] Ollama hiba (HTTP {resp.status_code}) node {node_idx+1}-nél")
+                                    translated = ''
+                            
+                            if translated and translated != original:
+                                # Placeholder-s csere
+                                ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
+                                try:
+                                    node.replace_with(ph)
+                                    placeholders.append((ph, translated, False))
+                                    nodes_translated_here += 1
+                                    total_nodes_translated += 1
+                                except:
+                                    placeholders.append((ph, original, False))  # hiba esetén az eredeti
+                            else:
+                                # Üres vagy azonos válasz – az eredeti marad
+                                ph = f"__TNPLACEHOLDER_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
+                                try:
+                                    node.replace_with(ph)
+                                    placeholders.append((ph, original, False))
+                                except:
+                                    pass
                         except Exception as node_err:
                             translation_logger.warning(f"[ID:{translation_id}] Node fordítási hiba: {node_err}")
                     
