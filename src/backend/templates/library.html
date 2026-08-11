@@ -476,7 +476,8 @@ function renderCardView(filtered) {
             ${b.series ? `<span class="badge bg-dark">📚 ${escHtml(seriesStr)}</span>` : ''}
           </div>
           <small class="text-secondary mb-2">Feltöltő: ${escHtml(b.uploader_name || '-')}</small>
-          <div class="d-flex gap-1 mt-auto">
+           <div class="d-flex gap-1 mt-auto">
+            <a href="/reader/${b.id}" class="btn btn-sm btn-outline-info" title="Könyv olvasása"><i class="bi bi-book"></i></a>
             ${selectedBtn}
             ${actionBtns}
           </div>
@@ -525,7 +526,10 @@ function renderBooks() {
         <td>${escHtml(seriesStr)}</td>
         <td><small>${escHtml(b.uploader_name || '-')}</small></td>
         <td>${selectedBtn}</td>
-        <td>${actionBtns || '<small class="text-muted">-</small>'}</td>
+        <td>
+          <a href="/reader/${b.id}" class="btn btn-sm btn-outline-info me-1" title="Könyv olvasása"><i class="bi bi-book"></i></a>
+          ${actionBtns || '<small class="text-muted">-</small>'}
+        </td>
       </tr>`;
     });
     html += '</tbody></table></div>';
