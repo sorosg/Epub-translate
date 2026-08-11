@@ -26,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="1.1.0"
+VERSION="1.1.1"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="1.0.0"
@@ -635,6 +635,12 @@ perform_update() {
     
     echo "v${VERSION} - $(date +%Y-%m-%d)" > VERSION.txt
     echo "$(date): Frissítve ${EXISTING_VERSION} → ${VERSION}" >> updates.log
+    
+    # .install_config frissítése az új verzióval (hogy a következő frissítés jó verziót mutasson)
+    if [ -f .install_config ]; then
+        sed -i "s/VERSION=.*/VERSION=\"${VERSION}\"/" .install_config
+    fi
+    
     log_success "Frissítés kész!"
 }
 

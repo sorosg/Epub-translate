@@ -1342,14 +1342,19 @@ def api_reader_chapter(book_id, idx):
         if idx < 0 or idx >= len(items):
             return jsonify({'error': 'Érvénytelen fejezet index', 'text': ''})
         item = items[idx]
-        soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+        body_html = item.get_body_content().decode('utf-8', errors='replace') if isinstance(item.get_body_content(), bytes) else str(item.get_body_content())
+        soup = BeautifulSoup(body_html, 'html.parser')
         # Fejezet cím kinyerése
         title_tag = soup.find(['h1', 'h2', 'h3'])
         title = title_tag.get_text().strip() if title_tag else f'Fejezet {idx+1}'
+        # Tisztított HTML (script, style eltávolítása)
+        for tag in soup(['script', 'style', 'meta', 'link']):
+            tag.decompose()
         text = soup.get_text().strip()
         return jsonify({
             'title': title,
             'text': text,
+            'html': str(soup),  # HTML struktúra megtartása
             'index': idx,
             'length': len(text),
             'total': len(items)
