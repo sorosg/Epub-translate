@@ -1289,6 +1289,43 @@ def api_update_run():
     except Exception as e:
         return jsonify({'success':False,'error':str(e)[:200]}), 500
 
+@app.route('/api/system/containers')
+@login_required
+@admin_required
+def api_system_containers():
+    """Docker konténerek állapotának lekérése (docker compose ps alapján)"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['docker', 'compose', '-f', '/app/../docker-compose.yml', 'ps', '--format', 'json'],
+            capture_output=True, text=True, timeout=10, cwd='/app/..'
+        )
+        if result.returncode != 0:
+            # Fallback: sima docker ps
+            result2 = subprocess.run(
+                ['docker', 'ps', '--format', '{{json .}}', '--filter', 'name=epub-'],
+                capture_output=True, text=True, timeout=10
+            )
+            containers = []
+            for line in result2.stdout.strip().split('\n'):
+                if line.strip():
+                    try:
+                        containers.append(json.loads(line))
+                    except:
+                        pass
+            return jsonify({'containers': containers, 'source': 'docker ps'})
+        
+        containers = []
+        for line in result.stdout.strip().split('\n'):
+            if line.strip():
+                try:
+                    containers.append(json.loads(line))
+                except:
+                    pass
+        return jsonify({'containers': containers, 'source': 'compose ps'})
+    except Exception as e:
+        return jsonify({'error': str(e)[:200], 'containers': []})
+
 @app.route('/api/system/monitor')
 @login_required
 @admin_required

@@ -34,6 +34,25 @@
   </div>
 </div>
 
+<!-- Konténerek kártya -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5><i class="bi bi-box-seam me-2"></i>Konténerek</h5>
+    <span id="containerCount" class="badge bg-secondary">-</span>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-dark table-sm mb-0">
+        <thead><tr><th>Konténer</th><th>Státusz</th><th>Port</th><th>Indítás</th></tr></thead>
+        <tbody id="containersBody">
+          <tr><td colspan="4" class="text-center text-secondary py-2"><span class="spinner-border spinner-border-sm"></span> Betöltés...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle me-1"></i>Automatikusan frissül 10 másodpercenként</small>
+  </div>
+</div>
+
 <!-- AI Modellek kártya -->
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -182,6 +201,54 @@ async function pullModel() {
   btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Letöltés';
 }
 
-window.addEventListener('load', () => loadModels());
+async function loadContainers() {
+  try {
+    const resp = await fetch('/api/system/containers', {credentials: 'same-origin'});
+    const data = await resp.json();
+    const containers = data.containers || [];
+    document.getElementById('containerCount').textContent = containers.length;
+    
+    if (containers.length === 0) {
+      document.getElementById('containersBody').innerHTML = '<tr><td colspan="4" class="text-center text-secondary py-2"><i class="bi bi-exclamation-triangle me-1"></i>Nem érhetők el konténer adatok</td></tr>';
+      return;
+    }
+    
+    // Konténer nevek rövidítése és formázása
+    const knownNames = ['epub-nginx', 'epub-backend', 'epub-postgres', 'epub-ollama', 'epub-redis', 'epub-mailhog'];
+    let html = '';
+    for (const name of knownNames) {
+      const c = containers.find(x => (x.Names || x.Name || '').includes(name));
+      if (c) {
+        const status = (c.State || c.Status || '').toLowerCase();
+        const running = status.includes('up');
+        const statusBadge = running 
+          ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Fut</span>'
+          : '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Leállt</span>';
+        const ports = (c.Ports || '') || (c.PublishedPorts || '') || '-';
+        const started = c.RunningFor || c.CreatedAt || c.Created || '-';
+        html += `<tr>
+          <td><strong>${name}</strong></td>
+          <td>${statusBadge}</td>
+          <td><small>${ports}</small></td>
+          <td><small class="text-secondary">${started}</small></td>
+        </tr>`;
+      } else {
+        html += `<tr>
+          <td><strong>${name}</strong></td>
+          <td><span class="badge bg-secondary"><i class="bi bi-dash-circle me-1"></i>N/A</span></td>
+          <td>-</td>
+          <td><small class="text-secondary">-</small></td>
+        </tr>`;
+      }
+    }
+    document.getElementById('containersBody').innerHTML = html;
+  } catch(e) {
+    document.getElementById('containersBody').innerHTML = '<tr><td colspan="4" class="text-center text-danger py-2">Hiba: ' + e.message + '</td></tr>';
+  }
+}
+
+window.addEventListener('load', () => { loadModels(); loadContainers(); });
+// Konténerek automatikus frissítése 10 másodpercenként
+setInterval(loadContainers, 10000);
 </script>
 {% endblock %}
