@@ -553,28 +553,17 @@ perform_update() {
     log_success "Mentés: $BACK"
     
     $DOCKER compose down 2>/dev/null || true
-    GIT_UPDATED=false
     if [ -d .git ]; then
         if git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null; then
             log_success "Git frissítés sikeres (a GitHub-ról letöltött fájlok a frissebbek)"
-            GIT_UPDATED=true
         else
             log_warn "Git frissítés nem sikerült, a script mellé csomagolt fájlokat használjuk"
         fi
     fi
     
-    # Frissítéskor: ha a git frissítés sikeres volt, a GitHub-ról letöltött fájlok
-    # már tartalmazzák a legfrissebb forráskódot, így NEM írjuk felül őket a
-    # script mellé csomagolt src/ fájlokkal (amik régebbiek lehetnek).
-    # Csak akkor másolunk a script src/ könyvtárából, ha a git frissítés nem sikerült.
-    if [ "$GIT_UPDATED" = true ]; then
-        log_info "GitHub fájlok használata (a script src/-jének kihagyása)"
-        # Csak az .env és a szkriptek frissüljenek, a forráskód maradjon a git verzió
-        create_env_file
-        create_scripts
-    else
-        create_all_files
-    fi
+    # create_all_files() mostantól először a helyi ./src/ mappát használja
+    # (amit a git reset --hard épp frissített), így nincs átfedés/felülírás probléma
+    create_all_files
     log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
     if ! DOCKER_BUILDKIT=0 $DOCKER compose build --no-cache backend; then
         log_warn "Backend --no-cache build hiba, próba cache-elt build-del..."
@@ -885,10 +874,14 @@ create_all_files() {
     log_info "Fájlok másolása a forrás könyvtárból..."
     SRC_DIR="${SCRIPT_DIR}/src"
     
-    # Ha az src/ mappa nem létezik (wget-tel letöltött install.sh esetén),
+    # Prioritás: 1) helyi ./src/ (git reset --hard után friss) > 2) script mellől src/ > 3) git clone
+    # Ha a projekt gyökérben van friss src/ (pl. git reset --hard után), azt használjuk
+    if [ -d "./src" ] && [ -f "./src/backend/app.py" ]; then
+        SRC_DIR="./src"
+        log_info "Helyi src/ használata (git által frissített): $SRC_DIR"
+    # Ha az src/ mappa a script mellett sem létezik (wget-tel letöltött install.sh esetén),
     # git clone-nal letöltjük a legfrissebb verziót a GitHub-ról.
-    # Internetkapcsolat szükséges – az elavult heredoc generálás NEM megbízható!
-    if [ ! -d "$SRC_DIR" ]; then
+    elif [ ! -d "$SRC_DIR" ]; then
         TEMP_REPO="/tmp/epub-translate-$$"
         log_info "GitHub repó klónozása a legfrissebb fájlokért (--depth 1)..."
         if ! git clone --depth 1 https://github.com/sorosg/Epub-translate.git "$TEMP_REPO"; then
@@ -1768,30 +1761,53 @@ APPEOF
 
     touch backend/utils/__init__.py
     
-    # Base HTML
+    # Base HTML (fallback – az src/ használata ajánlott, ez csak vészhelyzeti generálás)
     cat > backend/templates/base.html << 'BASEEOF'
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" data-bs-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{% block title %}EPUB Fordító{% endblock %}</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/static/icons/icon-192.svg">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="/static/css/main.css" rel="stylesheet">
 </head>
 <body class="bg-dark text-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary mb-4">
-  <div class="container">
-    <a class="navbar-brand" href="/">🧠 EPUB Fordító</a>
-    <div class="navbar-nav ms-auto">
-      {% if current_user.is_authenticated %}
-        <a class="nav-link" href="/dashboard">Vezérlőpult</a>
-        {% if current_user.is_admin %}<a class="nav-link" href="/admin">Admin</a><a class="nav-link" href="/admin/users">Felhasználók</a><a class="nav-link" href="/admin/update">Frissítés</a>{% endif %}
-        <a class="nav-link" href="/logout">Kijelentkezés</a>
-      {% endif %}
-    </div>
+<div class="d-flex">
+<aside class="sidebar" style="width:260px;min-height:100vh;background:#161b22;border-right:1px solid #30363d;padding:1.5rem 0;position:fixed;top:0;left:0;bottom:0;z-index:1040;">
+  <div style="padding:0 1.5rem 1.5rem;border-bottom:1px solid #30363d;margin-bottom:1rem">
+    <a href="/" style="font-weight:700;font-size:1.25rem;text-decoration:none;background:linear-gradient(135deg,#58a6ff,#a371f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent"><i class="bi bi-translate"></i> EPUB Fordító</a>
+    <span style="font-size:.65rem;color:#8b949e;display:block;margin-top:2px">v{{ config.VERSION if config else '11.0' }}</span>
   </div>
-</nav>
-<div class="container">
+  <nav style="flex:1;padding:0 .75rem">
+    {% if current_user.is_authenticated %}
+    <a class="sidebar-link" href="/dashboard"><i class="bi bi-speedometer2"></i> Vezérlőpult</a>
+    <a class="sidebar-link" href="/library"><i class="bi bi-collection"></i> Könyvtár</a>
+    <a class="sidebar-link" href="/profile"><i class="bi bi-person-circle"></i> Profilom</a>
+    {% if current_user.is_admin %}
+    <div style="border-top:1px solid #30363d;margin:.75rem 1rem"></div>
+    <a class="sidebar-link" href="/admin"><i class="bi bi-gear"></i> Admin</a>
+    <a class="sidebar-link" href="/admin/users"><i class="bi bi-people"></i> Felhasználók</a>
+    <a class="sidebar-link" href="/admin/update"><i class="bi bi-cloud-download"></i> Frissítés</a>
+    <a class="sidebar-link" href="/admin/logs"><i class="bi bi-journal-text"></i> Logok</a>
+    {% endif %}
+    {% endif %}
+  </nav>
+  <div style="padding:1rem 1.5rem;border-top:1px solid #30363d">
+    {% if current_user.is_authenticated %}
+    <strong>{{ current_user.first_name }}</strong>
+    <div style="font-size:.75rem;color:#8b949e">{{ current_user.email }}</div>
+    <a class="sidebar-link text-danger mt-1" href="/logout" style="padding:.5rem .75rem"><i class="bi bi-box-arrow-right"></i> Kijelentkezés</a>
+    {% endif %}
+  </div>
+</aside>
+<div style="margin-left:260px;flex:1;min-height:100vh">
+<main class="flex-grow-1" style="padding:1.5rem">
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
@@ -1800,8 +1816,15 @@ APPEOF
   {% endif %}
 {% endwith %}
 {% block content %}{% endblock %}
+</main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</div>
+<style>
+.sidebar-link{display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:10px;color:#8b949e;text-decoration:none;font-weight:500;font-size:.95rem;margin-bottom:2px}
+.sidebar-link:hover,.sidebar-link.active{background:rgba(88,166,255,.1);color:#58a6ff}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/main.js"></script>
 </body>
 </html>
 BASEEOF
