@@ -570,30 +570,26 @@ perform_update() {
     log_info "Többi konténer építése..."
     $DOCKER compose build
     
-    # Konténerek indítása (retry port foglaltság esetén)
-    log_info "Konténerek indítása..."
-    set +e  # retry loop
-    COMPOSE_STARTED=false
-    for attempt in 1 2 3; do
-        if $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
-            COMPOSE_STARTED=true
-            break
-        fi
-        log_warn "Indítási hiba ($attempt. próbálkozás): port foglaltság vagy hálózati probléma"
-        $DOCKER compose down --remove-orphans 2>/dev/null || true
-        $DOCKER network prune -f 2>/dev/null || true
-        sleep 3
-        if [ "$attempt" -eq 2 ]; then
-            log_warn "80-as port továbbra is foglalt, automatikus váltás 8080-ra..."
-            sed -i 's/"80:80"/"8080:80"/' docker-compose.yml
-            sed -i 's/"443:443"/"8443:443"/' docker-compose.yml
-        fi
-    done
-    set -e
+    # Port felszabadítás (ha a kernel TIME_WAIT-ben tartaná)
+    if sudo fuser 80/tcp 2>/dev/null; then
+        log_info "80-as port foglalt, felszabadítás..."
+        sudo fuser -k 80/tcp 2>/dev/null || true
+        sleep 2
+    fi
+    if sudo fuser 443/tcp 2>/dev/null; then
+        sudo fuser -k 443/tcp 2>/dev/null || true
+    fi
     
-    if [ "$COMPOSE_STARTED" = false ]; then
-        log_error "Nem sikerült elindítani a konténereket 3 próbálkozás után sem."
-        return 1
+    log_info "Konténerek indítása..."
+    if ! $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
+        log_warn "Indítási hiba, próbálkozás felszabadítás után újra..."
+        sudo fuser -k 80/tcp 2>/dev/null || true
+        sudo fuser -k 443/tcp 2>/dev/null || true
+        sleep 3
+        if ! $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
+            log_error "Nem sikerült elindítani a konténereket."
+            return 1
+        fi
     fi
     sleep 15
     
