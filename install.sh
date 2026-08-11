@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v1.0
-# Verzió: 1.0.3
+# Verzió: 1.0.4
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-08-11
 # Leírás: 1.0.1 hibajavítások – Docker build gyorsítás, frissítés oldal fix,
@@ -26,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="1.0.3"
+VERSION="1.0.4"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="1.0.0"
