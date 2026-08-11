@@ -563,16 +563,10 @@ perform_update() {
     # create_all_files() mostantól először a helyi ./src/ mappát használja
     # (amit a git reset --hard épp frissített), így nincs átfedés/felülírás probléma
     create_all_files
-    log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
-    if ! DOCKER_BUILDKIT=0 $DOCKER compose build --no-cache backend; then
-        log_warn "Backend --no-cache build hiba, próba cache-elt build-del..."
-        $DOCKER compose build backend
-    fi
+    log_info "Backend újraépítése..."
+    $DOCKER compose build backend
     log_info "Többi konténer építése..."
-    if ! DOCKER_BUILDKIT=0 $DOCKER compose build --no-cache; then
-        log_warn "Teljes --no-cache build hiba, próba cache-elt build-del..."
-        $DOCKER compose build
-    fi
+    $DOCKER compose build
     
     # Konténerek indítása (retry port foglaltság esetén)
     log_info "Konténerek indítása..."
