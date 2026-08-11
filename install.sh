@@ -1,16 +1,15 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.69
+# Verzió: 11.0.71
 # Kódnév: "Smart Optimizer"
-# Dátum: 2026-08-10
-# Leírás: Automatikus modell optimalizálás, dinamikus erőforrás kezelés,
-#          intelligens modellváltás, valós idejű rendszerfigyelés,
-#          közös könyvtár deduplikációval, DNS javítás (frissítésellenőrzés),
-#          modellváltás perzisztencia (.env mentés) + folyamatjelző,
-#          hunspell CLI + nginx HTTP-only + DB migráció, konténer DNS javítás
-#          dns direktíva törölve + eventlet eltávolítva (konténer kommunikáció)
-#          szélesebb sliding window: előző + következő fejezet kontextus
+# Dátum: 2026-08-11
+# Leírás: DeepSeek Pro multi-model (deepseek-chat + deepseek-reasoner),
+#          progress bar live updates becsült idő kijelzéssel,
+#          könyvtár szerkesztő Bootstrap modal, CSS/JS separáció,
+#          snapshot script (git commit + tag), stdout StreamHandler,
+#          sliding window 800+500, batch könyvtár feltöltés, dark/light téma,
+#          PWA + sidebar + mobil optimalizálás, könyvajánló, profil oldal
 
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -30,7 +29,7 @@ NC='\033[0m'
 # Verzió
 VERSION="11.0.71"
 CODENAME="Smart Optimizer"
-RELEASE_DATE="2026-07-19"
+RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="9.0.0"
 
 # Alapértelmezések

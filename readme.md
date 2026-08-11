@@ -275,7 +275,16 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ## 📊 Verzió Történet
 
-### v11.0.69 (2026-08-10) – "Smart Optimizer"
+### v11.0.71 (2026-08-11) – "Smart Optimizer"
+- 🤖 **DeepSeek Pro multi-model**: `deepseek-chat` (V3) és `deepseek-reasoner` (R1) választható távoli modellként, API kulcs kezelés a dashboardon
+- 📊 **Progress bar live updates**: JavaScript DOM polling a fordítási kártyákon, becsült hátralévő idő kijelzéssel
+- 📝 **Könyvtár szerkesztő modal**: Bootstrap modal dialog (`editBook`) a korábbi 6 db `prompt()` helyett – cím, szerző, műfaj, sorozat, nyelv mezők + opcionális EPUB fájlcsere
+- 📁 **CSS/JS separáció**: `static/css/main.css` és `static/js/main.js` kiszervezve a `base.html`-ből, tisztább kódstruktúra
+- 📸 **Snapshot script**: `scripts/snapshot.sh` – git commit + tag pillanatképek készítése, `git checkout tags/snapshot-xxx` visszatérés
+- 📜 **Továbbfejlesztett logolás**: stdout StreamHandler a Docker `logs` parancs láthatóságához, `/api/events` fordítási esemény végpont
+- 🐛 **Hibajavítások**: deepseek-reasoner temperature paraméter (nem támogatott), model_source perzisztencia feltöltés→fordítás között, psycopg2-binary visszaállítás Linux kompatibilitáshoz
+
+### v11.0.70 (2026-08-10)
 - 🔤 **Szélesebb sliding window**: előző fejezet 800 karakter + következő fejezet 500 karakter
 - 📚 **Batch könyvtár feltöltés**: több száz EPUB egyidejű behúzása, automatikus metaadat kinyerés (cím, szerző, műfaj, sorozat)
 - 🎨 **Sötét/világos téma váltó**: felhasználónként mentve, CSS változók, GitHub-szerű világos dizájn
@@ -402,7 +411,7 @@ pip install -r requirements.txt
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
-export VERSION=11.0.70
+export VERSION=11.0.71
 
 # 4. Adatbázis inicializálás (Docker-ben futó PostgreSQL-hez)
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')"

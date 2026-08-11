@@ -1,7 +1,16 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
 **Verzió:** 11.0.71 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-11 (51 commit, DeepSeek API implementáció)  
+**Utolsó frissítés:** 2026-08-11 (65 commit, DeepSeek multi-model + UI/UX stabilizálás)  
+
+### v11.0.71 újdonságok (2026-08-11):
+- 🤖 **DeepSeek Pro multi-model** – `deepseek-chat` (V3) és `deepseek-reasoner` (R1) választható távoli modellként, API kulcs kezelés a dashboardon
+- 📊 **Progress bar live updates** – JavaScript DOM polling, becsült hátralévő idő kijelzéssel (formatTime, formatStageText)
+- 📝 **Könyvtár szerkesztő modal** – Bootstrap modal (`editBook`) prompt() helyett, cím/szerző/műfaj/sorozat/nyelv mezők + opcionális fájlcsere
+- 📁 **CSS/JS separáció** – `static/css/main.css` és `static/js/main.js` kiszervezve a `base.html`-ből
+- 📸 **Snapshot script** – `scripts/snapshot.sh` git commit + tag pillanatképekhez, `git checkout` visszatérés
+- 📜 **Továbbfejlesztett logolás** – stdout StreamHandler a Docker logs láthatóságához, `/api/events` végpont
+- 🐛 **Hibajavítások** – deepseek-reasoner temperature paraméter, deepseek-chat model_source perzisztencia, pszichopg2-binary visszaállítás
 
 ### v11.0.70 újdonságok (2026-08-10):
 - 🔤 **#8 Szélesebb sliding window** – előző fejezet 800 + következő 500 karakter
@@ -323,15 +332,140 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 
 ---
 
-## 🎯 Ajánlott következő lépések
+## 🎯 Ajánlott következő lépések (v11.0.71 után)
 
-A fordítási minőség javítására fókuszálva (az időfaktor nem számít):
+Az alábbi koncepciók a **használhatóságot** és a **fordítási pontosságot** helyezik előtérbe. A korábbi rövid távú célok (kétmenetes fordítás, glosszárium, TM cache, Hunspell, sliding window, batch feltöltés, dark/light téma, PWA, stb.) mind megvalósultak.
 
-1. **Kétmenetes fordítás** – a legnagyobb minőségjavulás (⭐⭐⭐⭐⭐)
-2. **Automatikus glosszárium építés** – terminológiai következetesség (⭐⭐⭐⭐)
-3. **Stílus-transzfer** – formális/informális vezérlés (⭐⭐⭐⭐)
-4. **Magyar utófeldolgozás** – helyesírás-ellenőrzés (⭐⭐⭐)
-5. **Szélesebb sliding window** – 0.5 óra alatt megvan (⭐⭐⭐)
+---
+
+### 🔴 Magas prioritás – Fordítási pontosság
+
+#### A) Ellenőrző/megerősítő API hívások (confidence scoring)
+**Probléma:** A DeepSeek R1 (Ollama) 7b/8b/14b modellek gyakran hallucinálnak – kihagynak mondatokat, félrefordítanak, vagy nem követik a prompt utasításait. A 32b modell pontosabb, de extrém lassú CPU-n.
+
+**Javaslat:** Minden egyes text node fordítás után egy második, **ellenőrző API hívást** küldeni (olcsóbb/gyorsabb modellel, pl. 1.5b vagy akár deepseek-chat API), ami:
+- Összehasonlítja a forrás- és célszöveg hosszát (karakterszám-arány)
+- Detektálja az angolul maradt szavakat (regex: `[a-zA-Z]{3,}`)
+- Ellenőrzi, hogy a fordítás értelmes magyar mondat-e (nem csak random tokenek)
+- Ha az ellenőrzés megbukik, újrafordítja a node-ot (max 3 próbálkozás)
+
+**Várható hatás:** ⭐⭐⭐⭐ (kihagyott/félrefordított mondatok száma drasztikusan csökken)
+**Implementációs idő:** 3-5 óra
+
+#### B) Regiszter- és stílustudatos fordítás
+**Probléma:** A jelenlegi prompt nem különbözteti meg a regisztereket (párbeszéd vs. narráció, formális vs. informális).
+
+**Javaslat:**
+1. **Fejezet szintű stílusdetekció** fordítás előtt: a forrásszöveg alapján a modell meghatározza a domináns stílust (elbeszélő, párbeszédes, technikai, lírai)
+2. **Per-node stílus-címkézés**: minden text node kap egy `style_tag`-et (`narration`, `dialogue`, `thought`, `description`)
+3. **Stílus-specifikus prompt**: a fordítási prompt tartalmazza a stílus-címkét, pl. *"Ez egy párbeszéd. Használj közvetlen, élő magyar beszélt nyelvet."*
+4. **Tegezés/magázás konzisztencia**: a felhasználó kiválaszthatja a preferált regisztert (tegezés/magázás), és a prompt ezt következetesen érvényesíti
+
+**Várható hatás:** ⭐⭐⭐⭐⭐ (természetesebb, konzisztensen stílusos fordítás)
+**Implementációs idő:** 4-6 óra
+
+#### C) Entitás-felismerés és következetes névfordítás (NER)
+**Probléma:** A DeepSeek modellek inkonzisztensen fordítják a tulajdonneveket, helyszíneket, fantasy terminusokat. Ugyanazt a nevet egyik fejezetben lefordítják, a másikban megtartják angolul.
+
+**Javaslat:**
+1. **Első menet**: NER (Named Entity Recognition) futtatása az egész könyvre – személynevek, helyszínek, szervezetek, egyedi terminusok kigyűjtése
+2. **Glosszárium automatikus bővítése**: a NER által talált entitások bekerülnek a glosszáriumba a felhasználó által jóváhagyott fordítással
+3. **Entitás-helyettesítés fordítás előtt**: a forrásszövegben az ismert entitásokat placeholder-ekre cseréljük, fordítás után visszaállítjuk – így a modell nem tudja "elrontani" a már ismert neveket
+4. **Interaktív entitás-jóváhagyás**: a dashboardon a felhasználó áttekintheti és jóváhagyhatja a NER által talált entitásokat fordítás előtt
+
+**Várható hatás:** ⭐⭐⭐⭐⭐ (megszűnik a "Szürke Gandalf" ↔ "Grey Gandalf" típusú inkonzisztencia)
+**Implementációs idő:** 5-8 óra
+
+---
+
+### 🟡 Közepes prioritás – Használhatóság
+
+#### D) Fordítási checkpoint/folytatás
+**Probléma:** Ha a fordítás félbeszakad (áramkimaradás, konténer újraindulás), az egész folyamat elölről kezdődik. Egy 3-5 napos fordításnál ez katasztrofális.
+
+**Javaslat:**
+1. Minden fejezet fordítása után **checkpoint fájl** mentése (fejezet_index, lefordított HTML, timestamp)
+2. A `Translation` modell bővítése `checkpoint_data` JSON mezővel
+3. Ha a fordítás újraindul, a checkpoint alapján onnan folytatja, ahol abbahagyta
+4. A dashboardon "Folytatás" gép a félbemaradt fordításokhoz
+
+**Várható hatás:** ⭐⭐⭐⭐⭐ (kritikus használhatósági fejlesztés hosszú fordításoknál)
+**Implementációs idő:** 3-4 óra
+
+#### E) Több könyv párhuzamos fordítási sora (queue)
+**Probléma:** Jelenleg egyszerre csak egy fordítás fut. Ha a felhasználó több könyvet tölt fel, azok sorban várakoznak, de nincs vizuális visszajelzés a sorrendről.
+
+**Javaslat:**
+1. **Translation queue** a Redis-ben (FIFO sor)
+2. A dashboardon **"Fordítási sor"** panel: mutatja a sorban álló könyveket, becsült kezdési idővel
+3. **Prioritás állítás**: a felhasználó átrendezheti a sort (drag & drop)
+4. **Párhuzamos fordítás opció**: ha a hardver engedi (sok RAM + CPU), több fordítás is mehet egyszerre (max 2)
+
+**Várható hatás:** ⭐⭐⭐⭐ (professzionális munkafolyamat több könyv esetén)
+**Implementációs idő:** 4-6 óra
+
+#### F) Fordítási statisztika és minőség dashboard
+**Probléma:** A felhasználó nem látja, hogy mennyire volt sikeres a fordítás – csak egy quality_score számot kap.
+
+**Javaslat:**
+1. **Részletes fordítási riport** minden könyvhöz:
+   - Szószám forrás/cél nyelven
+   - TM cache találati arány (hány százalék volt cache-elve)
+   - Glosszárium találatok száma
+   - Újrafordított node-ok száma (confidence check miatt)
+   - Második menetben javított mondatok száma
+   - Fejezetenkénti statisztika
+2. **Vizuális dashboard**: grafikonok a fordítási teljesítményről (Chart.js)
+3. **Exportálható riport** PDF/HTML formátumban
+
+**Várható hatás:** ⭐⭐⭐ (átláthatóság, minőségbiztosítás)
+**Implementációs idő:** 3-5 óra
+
+---
+
+### 🟢 Alacsonyabb prioritás – Kényelmi funkciók
+
+#### G) WebSocket alapú valós idejű frissítés
+**Probléma:** A jelenlegi 10 másodperces polling felesleges hálózati forgalmat generál és késleltetett.
+
+**Javaslat:** Flask-SocketIO integráció – a fordítási események (`node_translated`, `chapter_complete`, `pass_complete`) valós időben, WebSocketen keresztül érkeznek a böngészőbe. Nincs polling, azonnali UI frissítés.
+
+**Várható hatás:** ⭐⭐ (szebb, de nem kritikus)
+**Implementációs idő:** 2-3 óra
+
+#### H) OCR támogatás scan-nelt PDF-ekhez
+**Javaslat:** Tesseract OCR integráció a feltöltési folyamatba – ha a felhasználó PDF-et vagy képet tölt fel, automatikus OCR → EPUB konverzió, majd fordítás.
+
+**Várható hatás:** ⭐⭐⭐ (új felhasználási mód)
+**Implementációs idő:** 4-6 óra
+
+#### I) DeepSeek Pro API költségbecslés
+**Javaslat:** A dashboardon a felhasználó láthatja, hogy mennyibe fog kerülni a fordítás DeepSeek Pro API-val (token alapú becslés), mielőtt elindítja. API árazás alapján valós idejű kalkuláció.
+
+**Várható hatás:** ⭐⭐⭐ (költségtudatosság)
+**Implementációs idő:** 1-2 óra
+
+---
+
+### 📊 Összesített prioritási mátrix (új koncepciók)
+
+| Fejlesztés | Minőség | Használhatóság | Idő | Prioritás |
+|-----------|---------|---------------|-----|-----------|
+| A) Confidence scoring / ellenőrző hívás | ⭐⭐⭐⭐ | ⭐⭐ | 3-5h | 🔴 |
+| B) Regiszter/stílus tudatos fordítás | ⭐⭐⭐⭐⭐ | ⭐⭐ | 4-6h | 🔴 |
+| C) NER + entitás konzisztencia | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 5-8h | 🔴 |
+| D) Checkpoint/folytatás | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 3-4h | 🟡 |
+| E) Fordítási sor (queue) | ⭐ | ⭐⭐⭐⭐ | 4-6h | 🟡 |
+| F) Statisztika dashboard | ⭐⭐ | ⭐⭐⭐⭐ | 3-5h | 🟡 |
+| G) WebSocket valós idejű frissítés | ⭐ | ⭐⭐ | 2-3h | 🟢 |
+| H) OCR PDF támogatás | ⭐⭐ | ⭐⭐⭐ | 4-6h | 🟢 |
+| I) API költségbecslés | ⭐ | ⭐⭐⭐ | 1-2h | 🟢 |
+
+### 🎯 TOP 3 ajánlott következő fejlesztés
+
+1. **C) NER + entitás konzisztencia** – a legnagyobb hatás a fordítási minőségre (⭐⭐⭐⭐⭐), megszünteti a tulajdonnév inkonzisztenciát
+2. **D) Checkpoint/folytatás** – kritikus használhatósági fejlesztés, 3-5 napos fordításoknál létfontosságú
+3. **B) Regiszter/stílus tudatos fordítás** – a párbeszédek és narráció megkülönböztetése drámaian javítja az olvashatóságot
 
 ---
 
