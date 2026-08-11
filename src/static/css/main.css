@@ -210,3 +210,13 @@ body {
 .animate-in { animation:fadeInUp 0.5s ease forwards; }
 .upload-zone { border:2px dashed var(--border-color); border-radius:12px; padding:2rem; text-align:center; transition:all 0.3s ease; background:var(--bg-secondary); }
 .upload-zone:hover { border-color:var(--accent-blue); background:var(--hover-bg); }
+
+/* === PROFILE STAT MINI KÁRTYÁK === */
+.stat-card-mini {
+  border-radius: 12px; padding: 0.85rem 0.6rem; text-align: center;
+  transition: all 0.2s ease; cursor: default;
+}
+.stat-card-mini:hover { transform: translateY(-2px); }
+.stat-card-mini-icon { font-size: 1.3rem; margin-bottom: 0.25rem; line-height: 1; }
+.stat-card-mini-value { font-size: 1.5rem; font-weight: 700; line-height: 1.15; }
+.stat-card-mini-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.15rem; }

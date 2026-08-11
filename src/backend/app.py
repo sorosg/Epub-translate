@@ -1028,7 +1028,8 @@ def profile():
         if password:
             if password != password_confirm:
                 flash(_('A jelszavak nem egyeznek!'), 'error')
-                return render_template('profile.html', user=current_user)
+                translations_count = Translation.query.filter_by(user_id=current_user.id).count()
+                return render_template('profile.html', user=current_user, translations_count=translations_count)
             current_user.password_hash = generate_password_hash(password)
             flash(_('Jelszó sikeresen megváltoztatva!'), 'success')
         
@@ -1036,7 +1037,8 @@ def profile():
         flash(_('Profil adatok mentve!'), 'success')
         return redirect(url_for('profile'))
     
-    return render_template('profile.html', user=current_user)
+    translations_count = Translation.query.filter_by(user_id=current_user.id).count()
+    return render_template('profile.html', user=current_user, translations_count=translations_count)
 
 @app.route('/api/user/settings', methods=['POST'])
 @login_required

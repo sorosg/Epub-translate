@@ -1,34 +1,42 @@
 {% extends "base.html" %}{% block title %}Profilom{% endblock %}{% block content %}
-<h2><i class="bi bi-person-circle me-2"></i>Profilom</h2>
+<div class="d-flex align-items-center gap-3 mb-4">
+  <div class="avatar-circle" style="width:64px;height:64px;background:linear-gradient(135deg,var(--accent-blue),var(--accent-purple));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">
+    {{ user.first_name[0] if user.first_name else '?' }}{{ user.last_name[0] if user.last_name else '' }}
+  </div>
+  <div>
+    <h2 class="mb-0">{{ user.last_name }} {{ user.first_name }}</h2>
+    <small class="text-secondary"><i class="bi bi-envelope me-1"></i>{{ user.email }}</small>
+  </div>
+</div>
 
-<!-- Token és statisztika kártyák -->
-<div class="row g-3 mb-4">
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-primary bg-opacity-10 text-center h-100">
-      <div class="stat-icon">💰</div>
-      <div class="stat-value">{{ user.tokens }}</div>
-      <div class="stat-label">Token</div>
+<!-- Kompakt statisztika kártyák -->
+<div class="row g-2 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card-mini" style="background:rgba(88,166,255,0.08); border:1px solid rgba(88,166,255,0.15);">
+      <div class="stat-card-mini-icon">💰</div>
+      <div class="stat-card-mini-value">{{ user.tokens if user.tokens is not none else 0 }}</div>
+      <div class="stat-card-mini-label">token</div>
     </div>
   </div>
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-success bg-opacity-10 text-center h-100">
-      <div class="stat-icon">🏆</div>
-      <div class="stat-value">{{ user.points }}</div>
-      <div class="stat-label">Pontok</div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card-mini" style="background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.15);">
+      <div class="stat-card-mini-icon">🏆</div>
+      <div class="stat-card-mini-value">{{ user.points if user.points is not none else 0 }}</div>
+      <div class="stat-card-mini-label">pont</div>
     </div>
   </div>
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-warning bg-opacity-10 text-center h-100">
-      <div class="stat-icon">⭐</div>
-      <div class="stat-value">{{ user.level }}</div>
-      <div class="stat-label">Szint</div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card-mini" style="background:rgba(210,153,29,0.08); border:1px solid rgba(210,153,29,0.15);">
+      <div class="stat-card-mini-icon">⭐</div>
+      <div class="stat-card-mini-value">{{ user.level if user.level is not none else 1 }}</div>
+      <div class="stat-card-mini-label">szint</div>
     </div>
   </div>
-  <div class="col-md-3 col-6">
-    <div class="stat-card bg-info bg-opacity-10 text-center h-100">
-      <div class="stat-icon">🔑</div>
-      <div class="stat-value">{% if user.deepseek_api_key %}✅{% else %}❌{% endif %}</div>
-      <div class="stat-label">API kulcs</div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card-mini" style="background:rgba(163,113,247,0.08); border:1px solid rgba(163,113,247,0.15);">
+      <div class="stat-card-mini-icon">📖</div>
+      <div class="stat-card-mini-value">{{ translations_count }}</div>
+      <div class="stat-card-mini-label">fordítás</div>
     </div>
   </div>
 </div>

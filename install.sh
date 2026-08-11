@@ -27,7 +27,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.71"
+VERSION="11.0.72"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="9.0.0"
@@ -553,9 +553,28 @@ perform_update() {
     log_success "Mentés: $BACK"
     
     $DOCKER compose down 2>/dev/null || true
-    [ -d .git ] && { git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null || log_warn "Git frissítés nem sikerült"; }
+    GIT_UPDATED=false
+    if [ -d .git ]; then
+        if git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null; then
+            log_success "Git frissítés sikeres (a GitHub-ról letöltött fájlok a frissebbek)"
+            GIT_UPDATED=true
+        else
+            log_warn "Git frissítés nem sikerült, a script mellé csomagolt fájlokat használjuk"
+        fi
+    fi
     
-    create_all_files
+    # Frissítéskor: ha a git frissítés sikeres volt, a GitHub-ról letöltött fájlok
+    # már tartalmazzák a legfrissebb forráskódot, így NEM írjuk felül őket a
+    # script mellé csomagolt src/ fájlokkal (amik régebbiek lehetnek).
+    # Csak akkor másolunk a script src/ könyvtárából, ha a git frissítés nem sikerült.
+    if [ "$GIT_UPDATED" = true ]; then
+        log_info "GitHub fájlok használata (a script src/-jének kihagyása)"
+        # Csak az .env és a szkriptek frissüljenek, a forráskód maradjon a git verzió
+        create_env_file
+        create_scripts
+    else
+        create_all_files
+    fi
     log_info "Backend újraépítése (cache nélkül a friss fájlokért)..."
     if ! DOCKER_BUILDKIT=0 $DOCKER compose build --no-cache backend; then
         log_warn "Backend --no-cache build hiba, próba cache-elt build-del..."
