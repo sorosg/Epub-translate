@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v1.0
-# Verzió: 1.0.0
+# Verzió: 1.0.1
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-08-11
-# Leírás: Stabil 1.0.0 kiadás – profil statisztika, install.sh fixek,
+# Leírás: 1.0.1 hibajavítások – Docker build gyorsítás, frissítés oldal fix,
 #          heredoc base.html Bootstrap Icons + sidebar CSS,
 #          pip/MutationObserver/DEBIAN_FRONTEND hibajavítások,
 #          DeepSeek Pro multi-model, progress bar live updates,
@@ -26,10 +26,10 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="1.0.0"
+VERSION="1.0.1"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
-MIN_VERSION_FOR_UPDATE="9.0.0"
+MIN_VERSION_FOR_UPDATE="1.0.0"
 
 # Alapértelmezések
 DEFAULT_MODEL="deepseek-r1:14b"
