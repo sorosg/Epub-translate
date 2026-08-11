@@ -553,7 +553,21 @@ perform_update() {
     [ -d translation_memory ] && tar -czf "$BACK/translation_memory.tar.gz" translation_memory/ 2>/dev/null || true
     log_success "Mentés: $BACK"
     
-    $DOCKER compose down 2>/dev/null || true
+    $DOCKER compose down --remove-orphans 2>/dev/null || true
+    
+    # Alapos takarítás: régi konténerek és hálózatok eltávolítása
+    for ct in epub-nginx epub-backend epub-postgres epub-ollama epub-redis epub-mailhog; do
+        $DOCKER rm -f "$ct" 2>/dev/null || true
+    done
+    $DOCKER network prune -f 2>/dev/null || true
+    
+    # Port visszaállítás 80-ra (ha korábban 8080-ra volt állítva)
+    if grep -q '"8080:80"' docker-compose.yml 2>/dev/null; then
+        log_info "Port visszaállítás 8080 → 80..."
+        sed -i 's/"8080:80"/"80:80"/' docker-compose.yml
+        sed -i 's/"8443:443"/"443:443"/' docker-compose.yml
+    fi
+    
     if [ -d .git ]; then
         if git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null; then
             log_success "Git frissítés sikeres (a GitHub-ról letöltött fájlok a frissebbek)"
