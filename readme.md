@@ -1,8 +1,8 @@
-# EPUB Fordító Rendszer v11.0
+# EPUB Fordító Rendszer v1.0
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.72-blue)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -275,7 +275,12 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ## 📊 Verzió Történet
 
-### v11.0.71 (2026-08-11) – "Smart Optimizer"
+### v1.0.0 (2026-08-11) – "Smart Optimizer"
+- 🎯 **Stabil 1.0.0 kiadás** – új verziószámozás: MAJOR.MINOR.PATCH (hibajavítás=PATCH, új funkció=MINOR, nagy változás=MAJOR)
+- 🐛 **Számos hibajavítás**: install.sh frissítési logika, MutationObserver/modal JS hiba, pip packaging verzió, DEBIAN_FRONTEND docker fix, profil statisztika áthelyezés, Bootstrap Icons sidebar fallback
+- 📚 **Dokumentáció frissítve**: README.md, ROADMAP.md az új verziószámozási sémával
+
+### v11.0.71 (2026-08-11) – "Smart Optimizer" (archivált)
 - 🤖 **DeepSeek Pro multi-model**: `deepseek-chat` (V3) és `deepseek-reasoner` (R1) választható távoli modellként, API kulcs kezelés a dashboardon
 - 📊 **Progress bar live updates**: JavaScript DOM polling a fordítási kártyákon, becsült hátralévő idő kijelzéssel
 - 📝 **Könyvtár szerkesztő modal**: Bootstrap modal dialog (`editBook`) a korábbi 6 db `prompt()` helyett – cím, szerző, műfaj, sorozat, nyelv mezők + opcionális EPUB fájlcsere
@@ -361,7 +366,7 @@ pip install -r requirements.txt
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
-export VERSION=11.0.72
+export VERSION=1.0.0
 
 # Adatbázis inicializálás
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('✅ DB OK')"
@@ -411,7 +416,7 @@ pip install -r requirements.txt
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
-export VERSION=11.0.72
+export VERSION=1.0.0
 
 # 4. Adatbázis inicializálás (Docker-ben futó PostgreSQL-hez)
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')"
@@ -505,4 +510,4 @@ A snapshot automatikusan commit-ol és tag-et készít. A tag alapján `git chec
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.72
+Készült ❤️-vel Magyarországon – v1.0.0
