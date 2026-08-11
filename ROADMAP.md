@@ -1,12 +1,19 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.72 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-11 (66 commit, profil statisztika áthelyezés + install.sh frissítési hiba javítás)  
+**Verzió:** 1.0.0 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-11 (stabil 1.0.0 kiadás, új verziószámozás: MAJOR.MINOR.PATCH)  
 
-### v11.0.72 újdonságok (2026-08-11):
+### 🎯 Verziószámozási séma (1.0.0-tól)
+- **PATCH** (1.0.x): hibajavítások
+- **MINOR** (1.x.0): új funkciók  
+- **MAJOR** (x.0.0): nagy változások (te döntöd el, mikor)
+
+### v1.0.0 újdonságok (2026-08-11):
+- 🎯 **Stabil 1.0.0 kiadás** – új verziószámozási séma bevezetése
 - 👤 **Profil statisztika áthelyezés**: token, pont, szint, fordítás kompakt kártyák a profil oldalon a sidebar footer helyett
 - 🎨 **Új .stat-card-mini CSS**: kisebb, esztétikus statisztika kártyák hover animációval
 - 🐛 **Install.sh frissítési hiba javítva**: git reset --hard után már nem írja felül a fájlokat a create_all_files() – a GitHub-ról letöltött fájlok maradnak meg
+- 🐛 **További hibajavítások**: MutationObserver/modal JS hiba, pip packaging verzió, DEBIAN_FRONTEND docker fix, Bootstrap Icons sidebar fallback
 
 ### v11.0.71 újdonságok (2026-08-11):
 - 🤖 **DeepSeek Pro multi-model** – `deepseek-chat` (V3) és `deepseek-reasoner` (R1) választható távoli modellként, API kulcs kezelés a dashboardon
@@ -14,7 +21,7 @@
 - 📝 **Könyvtár szerkesztő modal** – Bootstrap modal (`editBook`) prompt() helyett, cím/szerző/műfaj/sorozat/nyelv mezők + opcionális fájlcsere
 - 📁 **CSS/JS separáció** – `static/css/main.css` és `static/js/main.js` kiszervezve a `base.html`-ből
 - 📸 **Snapshot script** – `scripts/snapshot.sh` git commit + tag pillanatképekhez, `git checkout` visszatérés
-- 📜 **Továbbfejlesztett logolás** – stdout StreamHandler a Docker logs láthatóságához, `/api/events` végpont
+-  **Továbbfejlesztett logolás** – stdout StreamHandler a Docker logs láthatóságához, `/api/events` végpont
 - 🐛 **Hibajavítások** – deepseek-reasoner temperature paraméter, deepseek-chat model_source perzisztencia, pszichopg2-binary visszaállítás
 
 ### v11.0.70 újdonságok (2026-08-10):
@@ -337,7 +344,7 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 
 ---
 
-## 🎯 Ajánlott következő lépések (v11.0.72 után)
+## 🎯 Ajánlott következő lépések (v1.0.0 után)
 
 Az alábbi koncepciók a **használhatóságot** és a **fordítási pontosságot** helyezik előtérbe. A korábbi rövid távú célok (kétmenetes fordítás, glosszárium, TM cache, Hunspell, sliding window, batch feltöltés, dark/light téma, PWA, stb.) mind megvalósultak.
 

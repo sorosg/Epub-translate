@@ -1,15 +1,14 @@
 #!/bin/bash
 
-# EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.72
+# EPUB Fordító Rendszer - Telepítő/Frissítő Script v1.0
+# Verzió: 1.0.0
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-08-11
-# Leírás: Profil statisztika áthelyezés, install.sh frissítési hiba javítás,
-#          heredoc base.html Bootstrap Icons + sidebar CSS fix,
+# Leírás: Stabil 1.0.0 kiadás – profil statisztika, install.sh fixek,
+#          heredoc base.html Bootstrap Icons + sidebar CSS,
+#          pip/MutationObserver/DEBIAN_FRONTEND hibajavítások,
 #          DeepSeek Pro multi-model, progress bar live updates,
-#          könyvtár szerkesztő Bootstrap modal, CSS/JS separáció,
-#          snapshot script, sliding window, batch feltöltés, dark/light téma,
-#          PWA + sidebar + mobil optimalizálás, könyvajánló
+#          könyvtár modal, CSS/JS separáció, PWA, mobil optimalizálás
 
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -27,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="11.0.72"
+VERSION="1.0.0"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="9.0.0"
