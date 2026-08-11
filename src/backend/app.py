@@ -7,7 +7,7 @@ from flasgger import Swagger
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
-from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory, UserBookPreference
+from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory, UserBookPreference, ReaderBookmark
 from datetime import datetime
 from functools import wraps
 from packaging import version as pkg_version
@@ -1327,6 +1327,47 @@ def api_reader_chapters(book_id):
     except Exception as e:
         return jsonify({'error': str(e)[:200], 'chapters': []})
 
+@app.route('/api/reader/<int:book_id>/bookmark', methods=['GET', 'POST'])
+@login_required
+def api_reader_bookmark(book_id):
+    """Könyvjelző mentése/betöltése – felhasználónként egy könyvjelző könyvenként"""
+    book = Book.query.get_or_404(book_id)
+    
+    if request.method == 'GET':
+        # Könyvjelző betöltése
+        bm = ReaderBookmark.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+        if bm:
+            return jsonify({
+                'bookmark': {
+                    'chapter_index': bm.chapter_index,
+                    'scroll_position': bm.scroll_position,
+                    'updated_at': bm.updated_at.isoformat() if bm.updated_at else None
+                }
+            })
+        return jsonify({'bookmark': None})
+    
+    # POST: Könyvjelző mentése
+    data = request.get_json() or {}
+    chapter_index = data.get('chapter_index', 0)
+    scroll_position = data.get('scroll_position', 0)
+    
+    bm = ReaderBookmark.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    if bm:
+        bm.chapter_index = chapter_index
+        bm.scroll_position = scroll_position
+        bm.updated_at = datetime.utcnow()
+    else:
+        bm = ReaderBookmark(
+            user_id=current_user.id,
+            book_id=book_id,
+            chapter_index=chapter_index,
+            scroll_position=scroll_position
+        )
+        db.session.add(bm)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Könyvjelző mentve'})
+
 @app.route('/api/reader/<int:book_id>/chapter/<int:idx>')
 @login_required
 def api_reader_chapter(book_id, idx):
@@ -1490,7 +1531,6 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             t.current_stage = 'first_pass'  # első menet: AI fordítás
             db.session.commit()
             translation_logger.info(f"[ID:{translation_id}] 📖 EPUB olvasása: {t.original_filename}")
-            translation_logger.info(f"[ID:{translation_id}] 🔧 Modell forrás: {'DeepSeek Pro' if use_deepseek else 'Helyi Ollama'}, modell: {model}")
             from ebooklib import epub as epub_lib
             from bs4 import BeautifulSoup, NavigableString, Tag
             import hashlib, re
@@ -1499,6 +1539,7 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             ollama_host = app_ref.config['OLLAMA_HOST']
             deepseek_api_key = user.deepseek_api_key if user else ''
             use_deepseek = (model_source == 'remote' and deepseek_api_key)
+            translation_logger.info(f"[ID:{translation_id}] 🔧 Modell forrás: {'DeepSeek Pro' if use_deepseek else 'Helyi Ollama'}, modell: {model}")
             
             if use_deepseek:
                 # A felhasználó által kiválasztott remote modell használata

@@ -9,6 +9,9 @@
       <h6 class="mb-0 text-truncate" id="readerBookTitle">{{ book.title or book.filename }}</h6>
       <small class="text-secondary" id="readerBookAuthor">{{ book.author or '' }}</small>
     </div>
+    <button class="btn btn-sm btn-outline-light me-1" id="btnBookmark" onclick="toggleBookmark()" title="Könyvjelző">
+      <i class="bi bi-bookmark"></i>
+    </button>
     <button class="btn btn-sm btn-outline-light" onclick="toggleToc()" title="Tartalomjegyzék">
       <i class="bi bi-list-ul"></i>
     </button>
@@ -244,6 +247,44 @@ function updateProgress() {
     document.body.appendChild(bar);
   }
   bar.style.width = pct + '%';
+}
+
+let bookmarkData = null;  // { chapter_index, scroll_position }
+
+async function loadBookmark() {
+  try {
+    const resp = await fetch('/api/reader/' + bookId + '/bookmark');
+    const data = await resp.json();
+    if (data.bookmark) {
+      bookmarkData = data.bookmark;
+      document.getElementById('btnBookmark').innerHTML = '<i class="bi bi-bookmark-fill text-warning"></i>';
+    }
+  } catch(e) {}
+}
+
+async function saveBookmark() {
+  const scrollPos = document.getElementById('readerContent').scrollTop;
+  try {
+    await fetch('/api/reader/' + bookId + '/bookmark', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({chapter_index: currentIndex, scroll_position: scrollPos})
+    });
+    document.getElementById('btnBookmark').innerHTML = '<i class="bi bi-bookmark-fill text-warning"></i>';
+  } catch(e) {}
+}
+
+function toggleBookmark() {
+  if (bookmarkData && bookmarkData.chapter_index !== undefined) {
+    // Van könyvjelző – ugorjunk oda
+    loadChapter(bookmarkData.chapter_index);
+    setTimeout(() => {
+      document.getElementById('readerContent').scrollTop = bookmarkData.scroll_position || 0;
+    }, 300);
+  } else {
+    // Nincs könyvjelző – mentsük az aktuális pozíciót
+    saveBookmark();
+  }
 }
 
 function prevChapter() { if (currentIndex > 0) loadChapter(currentIndex - 1); }

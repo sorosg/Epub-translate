@@ -128,6 +128,19 @@ class UserBookPreference(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint('user_id', 'book_id', name='uq_user_book'),)
 
+class ReaderBookmark(db.Model):
+    """Olvasási könyvjelző – felhasználónként egy könyvjelző könyvenként."""
+    __tablename__ = 'reader_bookmarks'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    chapter_index = db.Column(db.Integer, default=0)  # 0-alapú fejezet index
+    scroll_position = db.Column(db.Integer, default=0)  # scroll pozíció pixelben
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = db.relationship('User', backref='bookmarks')
+    book = db.relationship('Book', backref='bookmarks')
+    __table_args__ = (db.UniqueConstraint('user_id', 'book_id', name='uq_user_book_bookmark'),)
+
 class ReferenceBook(db.Model):
     __tablename__ = 'reference_books'
     id = db.Column(db.Integer, primary_key=True)
