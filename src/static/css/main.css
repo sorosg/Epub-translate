@@ -27,8 +27,9 @@
 
 body {
   background: var(--gradient-hero); color: var(--text-primary);
-  min-height: 100vh; display: flex;
+  min-height: 100vh; margin: 0;
 }
+.app-flex-wrapper { display: flex; min-height: 100vh; }
 
 /* === SIDEBAR (asztali) === */
 .sidebar {
