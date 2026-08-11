@@ -53,31 +53,44 @@ app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 db.init_app(app)
 
 # --- LOGOLÁS BEÁLLÍTÁSA ---
+import sys
 LOG_DIR = '/app/logs'
 os.makedirs(LOG_DIR, exist_ok=True)
 
-# Alkalmazás log (összes request, hiba)
+# Közös formatter
+log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+
+# Alkalmazás log (összes request, hiba) – fájlba + stdout-ra (Docker logs)
 app_logger = logging.getLogger('epub_translator')
 app_logger.setLevel(logging.INFO)
-
-# Fájl handler – app.log
+# Fájl handler
 fh_app = logging.FileHandler(os.path.join(LOG_DIR, 'app.log'), encoding='utf-8')
 fh_app.setLevel(logging.INFO)
-fh_app.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+fh_app.setFormatter(log_formatter)
 app_logger.addHandler(fh_app)
+# Stdout handler – azonnali visszajelzés a docker logs-ban
+sh_app = logging.StreamHandler(sys.stdout)
+sh_app.setLevel(logging.INFO)
+sh_app.setFormatter(log_formatter)
+app_logger.addHandler(sh_app)
 
-# Fordítási log – translation.log
+# Fordítási log – translation.log + stdout (Docker logs)
 translation_logger = logging.getLogger('epub_translator.translation')
 translation_logger.setLevel(logging.DEBUG)
+# Fájl handler
 fh_trans = logging.FileHandler(os.path.join(LOG_DIR, 'translation.log'), encoding='utf-8')
 fh_trans.setLevel(logging.DEBUG)
-fh_trans.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+fh_trans.setFormatter(log_formatter)
 translation_logger.addHandler(fh_trans)
+# Stdout handler – azonnali visszajelzés (docker logs epub-backend)
+sh_trans = logging.StreamHandler(sys.stdout)
+sh_trans.setLevel(logging.DEBUG)
+sh_trans.setFormatter(log_formatter)
+translation_logger.addHandler(sh_trans)
 
-# Flask built-in logger is ide irányítjuk
+# Flask built-in logger
 app.logger.handlers.clear()
 app.logger.addHandler(fh_app)
-app.logger.setLevel(logging.INFO)
 
 app_logger.info(f"=== EPUB Translator v{Config.VERSION} indítása ===")
 
@@ -243,6 +256,7 @@ def upload_epub():
     thread = threading.Thread(target=translate_epub, args=(app, translation.id, filepath, [b.file_path for b in all_selected_books], model_source))
     thread.daemon = True
     thread.start()
+    app_logger.info(f"📤 Feltöltés: {file.filename} -> Fordítás #{translation.id} ({model_used})")
     flash(_('Fájl feltöltve, fordítás folyamatban...'),'success')
     return redirect(url_for('dashboard'))
 
@@ -325,6 +339,36 @@ def model_status():
         return jsonify({'error':'Nem érhető el az Ollama'}), resp.status_code
     except Exception as e:
         return jsonify({'error':str(e)[:100]}), 500
+
+@app.route('/api/translations/events')
+@login_required
+def translation_events():
+    """Fordítási események – a dashboard polling-olja.
+    Visszaadja az utolsó 5 eseményt (státuszváltozás, befejezés, hiba).
+    """
+    translations = Translation.query.filter_by(user_id=current_user.id)\
+        .order_by(Translation.created_at.desc()).limit(5).all()
+    events = []
+    for t in translations:
+        if t.status == 'completed':
+            events.append({
+                'id': t.id, 'type': 'success', 
+                'message': f'✅ {t.original_filename} – Fordítás kész! (minőség: {t.quality_score}/100)',
+                'time': t.created_at.isoformat() if t.created_at else ''
+            })
+        elif t.status == 'processing':
+            events.append({
+                'id': t.id, 'type': 'info',
+                'message': f'⏳ {t.original_filename} – Fordítás folyamatban ({t.progress}%)...',
+                'time': t.created_at.isoformat() if t.created_at else ''
+            })
+        elif t.status == 'failed':
+            events.append({
+                'id': t.id, 'type': 'error',
+                'message': f'❌ {t.original_filename} – Fordítás sikertelen',
+                'time': t.created_at.isoformat() if t.created_at else ''
+            })
+    return jsonify({'events': events})
 
 @app.route('/download/<int:translation_id>')
 @login_required
@@ -1320,7 +1364,8 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             t.status = 'processing'; t.progress = 5
             t.current_stage = 'first_pass'  # első menet: AI fordítás
             db.session.commit()
-            translation_logger.info(f"[ID:{translation_id}] EPUB olvasása...")
+            translation_logger.info(f"[ID:{translation_id}] 📖 EPUB olvasása: {t.original_filename}")
+            translation_logger.info(f"[ID:{translation_id}] 🔧 Modell forrás: {'DeepSeek Pro' if use_deepseek else 'Helyi Ollama'}, modell: {model}")
             from ebooklib import epub as epub_lib
             from bs4 import BeautifulSoup, NavigableString, Tag
             import hashlib, re
@@ -1361,7 +1406,8 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             if total > 0:
                 t.total_words = int(total_words_est * (total / min(5, total)))
             db.session.commit()
-            translation_logger.info(f"[ID:{translation_id}] {total} szöveges elem, ~{t.total_words} szó, fordítás kezdése a(z) {model} modellel (struktúra-megőrző mód + 2-menetes utófeldolgozás)...")
+            translation_logger.info(f"[ID:{translation_id}] 📊 {total} szöveges elem, ~{t.total_words} szó, fordítás kezdése a(z) {model} modellel")
+            app_logger.info(f"🚀 Fordítás indult: #{translation_id} '{t.original_filename}' ({model}, {t.total_words} szó)")
             translated_count = 0; failed_items = 0; total_nodes_translated = 0
             
             # Szeparátor a text node-ok batch fordításához
@@ -1661,12 +1707,16 @@ Csak a fordítást add vissza, semmi mást!
                     if nodes_translated_here > 0:
                         translated_count += 1
                     
+                    # Részletes előrehaladás logolás minden 10. elemnél vagy az első 3-nál
+                    if idx < 3 or (idx + 1) % 10 == 0:
+                        pct = t.progress
+                        translation_logger.info(f"[ID:{translation_id}] ⏳ Előrehaladás: {idx+1}/{total} elem ({pct}%), {total_nodes_translated} node lefordítva, {failed_items} hiba")
+                    
                     translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}: {nodes_translated_here}/{len(text_nodes)} node lefordítva (node-onkénti mód)")
                     
                     # === GLOSSZÁRIUM ÉPÍTÉS (1. fejlesztés) ===
                     try:
                         for node, original in text_nodes:
-                            # A fordítást a placeholder-ek listából keressük vissza
                             translated = None
                             for ph, txt, _ in placeholders:
                                 if node.strip()[:20] in original[:20]:
@@ -1682,65 +1732,39 @@ Csak a fordítást add vissza, semmi mást!
                                     source_term=original[:200]
                                 ).first()
                                 if not existing:
-                                    entry = GlossaryEntry(
-                                        user_id=t.user_id,
-                                        source_term=original[:200],
-                                        target_term=translated[:200],
-                                        language_pair='en-hu',
-                                        source_count=1
-                                    )
+                                    entry = GlossaryEntry(user_id=t.user_id, source_term=original[:200], target_term=translated[:200])
                                     db.session.add(entry)
                                 else:
                                     existing.source_count += 1
-                                    existing.target_term = translated[:200]
                         db.session.commit()
-                    except Exception as gloss_err:
-                        pass
+                    except Exception: pass
                     
                     # === FORDÍTÁSI MEMÓRIA MENTÉS (4. fejlesztés) ===
                     try:
                         for node, original in text_nodes:
                             cached = search_tm(original, t.user_id)
                             if not cached:
-                                # A fordítást a placeholder-ek listából keressük
                                 translated = None
                                 for ph, txt, _ in placeholders:
-                                    if node.strip()[:20] in original[:20]:
-                                        translated = txt
-                                        break
+                                    if node.strip()[:20] in original[:20]: translated = txt; break
                                 if translated and translated != original:
                                     import hashlib
                                     tm_hash = hashlib.sha256(original.strip().encode()).hexdigest()
-                                    tm_entry = TranslationMemory(
-                                        user_id=t.user_id,
-                                        source_text=original[:1000],
-                                        translated_text=translated[:1000],
-                                        source_hash=tm_hash
-                                    )
-                                    db.session.add(tm_entry)
+                                    db.session.add(TranslationMemory(user_id=t.user_id, source_text=original[:1000], translated_text=translated[:1000], source_hash=tm_hash))
                         db.session.commit()
-                    except Exception as tm_err:
-                        pass
+                    except Exception: pass
                     
                     # === HUNSPELL HELYESÍRÁS ELLENŐRZÉS (3. fejlesztés) ===
                     if hunspell_available:
                         try:
                             for ph, translated, _ in placeholders:
-                                if not translated or len(translated) < 5:
-                                    continue
+                                if not translated or len(translated) < 5: continue
                                 words = translated.split()
                                 for word in words:
                                     clean_word = word.strip('.,;:!?()[]{}"\'').lower()
                                     if len(clean_word) > 2:
-                                        # CLI hívással ellenőrizzük: echo "word" | hunspell -d hu_HU
-                                        result = _sp.run(['hunspell', '-d', 'hu_HU', '-a'],
-                                                        input=clean_word + '\n', capture_output=True,
-                                                        text=True, timeout=2)
-                                        if result.stdout and '*' not in result.stdout[:5]:
-                                            # Hibás szó, javaslatok kinyerése
-                                            pass  # Csak naplózás, automatikus javítás nélkül
-                        except Exception as spell_err:
-                            pass
+                                        result = _sp.run(['hunspell', '-d', 'hu_HU', '-a'], input=clean_word + '\n', capture_output=True, text=True, timeout=2)
+                        except Exception: pass
                     
                     # === RÉSZLETES PROGRESSZ FRISSÍTÉS (5. fejlesztés) ===
                     t.current_chapter = idx + 1
@@ -1748,15 +1772,13 @@ Csak a fordítást add vissza, semmi mást!
                     t.nodes_failed = failed_items
                     words_here = sum(len(tn[1].split()) for tn in text_nodes if len(tn[1].split()) > 2)
                     t.words_processed = (t.words_processed or 0) + words_here
-                    
-                    # Frissítsük az item tartalmát
                     item.set_content(html_str.encode('utf-8'))
                     
                 except requests.exceptions.ConnectionError as ce:
-                    translation_logger.error(f"[ID:{translation_id}] Ollama kapcsolódási hiba a(z) {idx+1}. elemnél: {ce}")
+                    translation_logger.error(f"[ID:{translation_id}] Kapcsolódási hiba: {ce}")
                     raise
                 except Exception as item_err:
-                    translation_logger.warning(f"[ID:{translation_id}] Hiba a(z) {idx+1}. elem feldolgozásakor: {item_err}")
+                    translation_logger.warning(f"[ID:{translation_id}] Elem feldolgozási hiba: {item_err}")
                     failed_items += 1
                 
                 t.progress = 5 + int(90 * (idx + 1) / total)
