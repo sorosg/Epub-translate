@@ -1,7 +1,12 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.71 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-11 (65 commit, DeepSeek multi-model + UI/UX stabilizálás)  
+**Verzió:** 11.0.72 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-11 (66 commit, profil statisztika áthelyezés + install.sh frissítési hiba javítás)  
+
+### v11.0.72 újdonságok (2026-08-11):
+- 👤 **Profil statisztika áthelyezés**: token, pont, szint, fordítás kompakt kártyák a profil oldalon a sidebar footer helyett
+- 🎨 **Új .stat-card-mini CSS**: kisebb, esztétikus statisztika kártyák hover animációval
+- 🐛 **Install.sh frissítési hiba javítva**: git reset --hard után már nem írja felül a fájlokat a create_all_files() – a GitHub-ról letöltött fájlok maradnak meg
 
 ### v11.0.71 újdonságok (2026-08-11):
 - 🤖 **DeepSeek Pro multi-model** – `deepseek-chat` (V3) és `deepseek-reasoner` (R1) választható távoli modellként, API kulcs kezelés a dashboardon
@@ -332,7 +337,7 @@ A jelenlegi kód **teljes mértékben kompatibilis** a 32b modellel. Nincs szük
 
 ---
 
-## 🎯 Ajánlott következő lépések (v11.0.71 után)
+## 🎯 Ajánlott következő lépések (v11.0.72 után)
 
 Az alábbi koncepciók a **használhatóságot** és a **fordítási pontosságot** helyezik előtérbe. A korábbi rövid távú célok (kétmenetes fordítás, glosszárium, TM cache, Hunspell, sliding window, batch feltöltés, dark/light téma, PWA, stb.) mind megvalósultak.
 

@@ -2,7 +2,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.71-blue)
+![Version](https://img.shields.io/badge/version-11.0.72-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -361,7 +361,7 @@ pip install -r requirements.txt
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
-export VERSION=11.0.71
+export VERSION=11.0.72
 
 # Adatbázis inicializálás
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('✅ DB OK')"
@@ -411,7 +411,7 @@ pip install -r requirements.txt
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
-export VERSION=11.0.71
+export VERSION=11.0.72
 
 # 4. Adatbázis inicializálás (Docker-ben futó PostgreSQL-hez)
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('OK')"
@@ -505,4 +505,4 @@ A snapshot automatikusan commit-ol és tag-et készít. A tag alapján `git chec
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.71
+Készült ❤️-vel Magyarországon – v11.0.72
