@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # EPUB Fordító Rendszer - Telepítő/Frissítő Script v11.0
-# Verzió: 11.0.71
+# Verzió: 11.0.72
 # Kódnév: "Smart Optimizer"
 # Dátum: 2026-08-11
-# Leírás: DeepSeek Pro multi-model (deepseek-chat + deepseek-reasoner),
-#          progress bar live updates becsült idő kijelzéssel,
+# Leírás: Profil statisztika áthelyezés, install.sh frissítési hiba javítás,
+#          heredoc base.html Bootstrap Icons + sidebar CSS fix,
+#          DeepSeek Pro multi-model, progress bar live updates,
 #          könyvtár szerkesztő Bootstrap modal, CSS/JS separáció,
-#          snapshot script (git commit + tag), stdout StreamHandler,
-#          sliding window 800+500, batch könyvtár feltöltés, dark/light téma,
-#          PWA + sidebar + mobil optimalizálás, könyvajánló, profil oldal
+#          snapshot script, sliding window, batch feltöltés, dark/light téma,
+#          PWA + sidebar + mobil optimalizálás, könyvajánló
 
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
