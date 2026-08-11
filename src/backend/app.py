@@ -306,6 +306,14 @@ def translation_status(translation_id):
     t = Translation.query.get_or_404(translation_id)
     if t.user_id != current_user.id:
         return jsonify({'error':'Nincs jogosultságod'}), 403
+    # Eltelt idő és becsült hátralévő idő számítása
+    elapsed_seconds = 0
+    estimated_seconds = 0
+    if t.created_at and t.status == 'processing' and t.progress > 0:
+        elapsed_seconds = int((datetime.utcnow() - t.created_at).total_seconds())
+        if t.progress > 0:
+            estimated_seconds = int(elapsed_seconds * (100 - t.progress) / t.progress)
+    
     return jsonify({
         'id':t.id,
         'status':t.status,
@@ -324,7 +332,10 @@ def translation_status(translation_id):
         'output_filename': t.output_filename,
         'model_used': t.model_used,
         'quality_score': t.quality_score,
-        'created_at': t.created_at.isoformat() if t.created_at else None
+        'created_at': t.created_at.isoformat() if t.created_at else None,
+        # Becsült idő mezők
+        'elapsed_seconds': elapsed_seconds,
+        'estimated_seconds': estimated_seconds
     })
 
 @app.route('/api/model/status')

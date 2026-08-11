@@ -55,10 +55,11 @@
               {% set stage_pct = 5 if t.current_stage == 'first_pass' else (91 if t.current_stage == 'second_pass' else 99 if t.current_stage == 'post_processing' else t.progress) %}
               <div class="progress-bar progress-bar-striped progress-bar-animated bg-gradient" style="width:{{ stage_pct }}%; background:linear-gradient(90deg, var(--accent-blue), var(--accent-purple));"></div>
             </div>
-            <small class="text-secondary mb-2">
+            <small class="text-secondary mb-2 stage-text">
               {% if t.current_stage == 'first_pass' %}🧠 Első menet (AI fordítás){% elif t.current_stage == 'second_pass' %}🔍 Második menet (minőségellenőrzés){% elif t.current_stage == 'post_processing' %}📦 Utófeldolgozás{% else %}Fordítás alatt...{% endif %}
               {% if t.current_chapter and t.total_chapters %}· {{ t.current_chapter }}/{{ t.total_chapters }} fejezet{% endif %}
             </small>
+            <small class="text-secondary time-estimate d-block"><i class="bi bi-hourglass-split me-1"></i>A fordítás folyamatban...</small>
             {% endif %}
             {% if t.status == 'completed' %}
             <div class="d-flex gap-2 align-items-center mb-2">
@@ -219,6 +220,15 @@ function stopLiveUpdates() {
 }
 function toggleLiveUpdates() { if (pollingInterval) stopLiveUpdates(); else startLiveUpdates(); }
 
+function formatTime(seconds) {
+  if (!seconds || seconds < 60) return '<1 perc';
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return mins + ' p';
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return hrs + ' ó ' + remMins + ' p';
+}
+
 async function checkTranslationUpdates() {
   const cards = document.querySelectorAll('.translation-card[data-status="processing"], .translation-card[data-status="pending"]');
   if (cards.length === 0) return;
@@ -229,6 +239,31 @@ async function checkTranslationUpdates() {
       if (resp.ok) {
         const data = await resp.json();
         card.dataset.status = data.status;
+        card.dataset.progress = data.progress;
+        card.dataset.stage = data.current_stage || '';
+        
+        // Progress bar frissítése
+        const progressBar = card.querySelector('.progress-bar');
+        if (progressBar && data.progress > 0) {
+          progressBar.style.width = data.progress + '%';
+          progressBar.textContent = data.progress + '%';
+        }
+        
+        // Státusz szöveg frissítése
+        const stageText = card.querySelector('.stage-text');
+        if (stageText) {
+          stageText.innerHTML = formatStageText(data.current_stage, data.current_chapter, data.total_chapters);
+        }
+        
+        // Becsült idő frissítése
+        const timeEstimate = card.querySelector('.time-estimate');
+        if (timeEstimate) {
+          let timeHtml = '';
+          if (data.elapsed_seconds > 0) timeHtml += '<i class="bi bi-hourglass-split me-1"></i>Eltelt: ' + formatTime(data.elapsed_seconds);
+          if (data.estimated_seconds > 0) timeHtml += ' · Becsült hátra: ' + formatTime(data.estimated_seconds);
+          timeEstimate.innerHTML = timeHtml;
+        }
+        
         if (data.status === 'completed' || data.status === 'failed') { location.reload(); return; }
       }
     } catch(e) {}
@@ -238,6 +273,16 @@ async function checkTranslationUpdates() {
     window._lastReload = now;
     location.reload();
   }
+}
+
+function formatStageText(stage, current, total) {
+  let html = '';
+  if (stage === 'first_pass') html += '🧠 Első menet (AI fordítás)';
+  else if (stage === 'second_pass') html += '🔍 Második menet (minőségellenőrzés)';
+  else if (stage === 'post_processing') html += '📦 Utófeldolgozás';
+  else html += 'Fordítás alatt...';
+  if (current && total) html += ' · ' + current + '/' + total + ' fejezet';
+  return html;
 }
 
 // ============================
