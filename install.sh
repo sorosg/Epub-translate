@@ -570,12 +570,10 @@ perform_update() {
     done
     $DOCKER network prune -f 2>/dev/null || true
     
-    # Port visszaállítás 80-ra (ha korábban 8080-ra volt állítva)
-    if grep -q '"8080:80"' docker-compose.yml 2>/dev/null; then
-        log_info "Port visszaállítás 8080 → 80..."
-        sed -i 's/"8080:80"/"80:80"/' docker-compose.yml
-        sed -i 's/"8443:443"/"443:443"/' docker-compose.yml
-    fi
+    # Port felszabadítás (a konténerek leálltak, de a kernel TIME_WAIT-ben tarthatja)
+    sudo fuser -k 80/tcp 2>/dev/null || true
+    sudo fuser -k 443/tcp 2>/dev/null || true
+    sleep 2
     
     if [ -d .git ]; then
         if git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null; then
@@ -585,32 +583,43 @@ perform_update() {
         fi
     fi
     
-    # create_all_files() mostantól először a helyi ./src/ mappát használja
-    # (amit a git reset --hard épp frissített), így nincs átfedés/felülírás probléma
+    # create_all_files() másolja a fájlokat (felülír docker-compose.yml, stb.)
     create_all_files
-    log_info "Backend újraépítése..."
-    $DOCKER compose build backend
-    log_info "Többi konténer építése..."
-    $DOCKER compose build
     
-    # Port felszabadítás (ha a kernel TIME_WAIT-ben tartaná)
-    if sudo fuser 80/tcp 2>/dev/null; then
-        log_info "80-as port foglalt, felszabadítás..."
-        sudo fuser -k 80/tcp 2>/dev/null || true
-        sleep 2
+    # Port visszaállítás 80-ra (ha korábban 8080-ra volt állítva – a create_all_files után kell!)
+    if grep -q '"8080:80"' docker-compose.yml 2>/dev/null; then
+        log_info "Port visszaállítás 8080 → 80..."
+        sed -i 's/"8080:80"/"80:80"/' docker-compose.yml
+        sed -i 's/"8443:443"/"443:443"/' docker-compose.yml
     fi
-    if sudo fuser 443/tcp 2>/dev/null; then
-        sudo fuser -k 443/tcp 2>/dev/null || true
+    
+    log_info "Backend újraépítése..."
+    if ! $DOCKER compose build backend 2>/tmp/epub-docker-build.log; then
+        log_error "Backend build HIBA! Részletek:"
+        tail -20 /tmp/epub-docker-build.log
+        log_warn "Próba a host Docker daemon újraindításával..."
+        sudo systemctl restart docker 2>/dev/null || true
+        sleep 5
+        if ! $DOCKER compose build backend; then
+            log_error "A backend build másodszorra is hibás."
+            return 1
+        fi
     fi
+    log_info "Többi konténer építése..."
+    $DOCKER compose build 2>/dev/null || true
     
     log_info "Konténerek indítása..."
     if ! $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
-        log_warn "Indítási hiba, próbálkozás felszabadítás után újra..."
+        log_warn "Indítási hiba. Részletek:"
+        tail -20 /tmp/epub-compose-up-err.log 2>/dev/null || true
+        log_info "Újrapróbálkozás Docker daemon újraindítással..."
+        sudo systemctl restart docker 2>/dev/null || true
+        sleep 5
         sudo fuser -k 80/tcp 2>/dev/null || true
-        sudo fuser -k 443/tcp 2>/dev/null || true
-        sleep 3
-        if ! $DOCKER compose up -d 2>/tmp/epub-compose-up-err.log; then
-            log_error "Nem sikerült elindítani a konténereket."
+        sleep 2
+        if ! $DOCKER compose up -d 2>/tmp/epub-compose-up-err2.log; then
+            log_error "A konténerek másodszorra sem indultak el."
+            tail -20 /tmp/epub-compose-up-err2.log 2>/dev/null || true
             return 1
         fi
     fi
