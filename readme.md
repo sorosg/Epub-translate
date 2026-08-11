@@ -2,7 +2,7 @@
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-11.0.70-blue)
+![Version](https://img.shields.io/badge/version-11.0.71-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -336,7 +336,7 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ```bash
 # === EPUB FORDÍTÓ FEJLESZTŐI KÖRNYEZET GYORSINDÍTÁS ===
-# Másold be ezt az egész blokkot egy új terminál ablakba!
+# Ezt a blokkot a TERMINÁLBA másold be (nem a chatbe!), pl. CMD+T új terminál
 
 cd ~/Desktop/Epub-translate
 
@@ -352,7 +352,7 @@ pip install -q -r requirements.txt 2>/dev/null || true
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
-export VERSION=11.0.70
+export VERSION=11.0.71
 
 python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('✅ DB OK')" 2>/dev/null || echo "⚠️ DB nem elérhető (Docker konténerek futnak?)"
 
@@ -463,4 +463,4 @@ python3 app.py
 
 ---
 
-Készült ❤️-vel Magyarországon – v11.0.70
+Készült ❤️-vel Magyarországon – v11.0.71

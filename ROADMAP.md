@@ -1,7 +1,7 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 11.0.70 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-10 (43 commit)  
+**Verzió:** 11.0.71 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-11 (51 commit, DeepSeek API implementáció)  
 
 ### v11.0.70 újdonságok (2026-08-10):
 - 🔤 **#8 Szélesebb sliding window** – előző fejezet 800 + következő 500 karakter
