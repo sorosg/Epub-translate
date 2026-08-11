@@ -119,10 +119,12 @@ detect_installation_mode() {
     log_step "Telepítési mód észlelése"
     
     PROJECT_DIR="$HOME/epub-translator"
+    SCRIPT_VERSION="$VERSION"  # elmentjük a script verzióját, mielőtt a source felülírná
     
     if [ -d "$PROJECT_DIR" ] && { [ -f "$PROJECT_DIR/.install_config" ] || [ -f "$PROJECT_DIR/docker-compose.yml" ]; }; then
         source "$PROJECT_DIR/.install_config" 2>/dev/null || true
         EXISTING_VERSION="${VERSION:-unknown}"
+        VERSION="$SCRIPT_VERSION"  # visszaállítjuk a script saját verzióját
         
         echo ""
         log_header "╔══════════════════════════════════════════════════════════════╗"
