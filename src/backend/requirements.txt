@@ -10,7 +10,7 @@ flasgger==0.9.7.1
 alembic==1.13.1
 Flask-Dance==7.0.0
 SQLAlchemy==2.0.20
-psycopg2-binary==2.9.7
+psycopg2-binary>=2.9.9
 gunicorn==21.2.0
 eventlet==0.33.3
 Werkzeug==2.3.7
