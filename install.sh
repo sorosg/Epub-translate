@@ -596,13 +596,6 @@ perform_update() {
     # create_all_files() másolja a fájlokat (felülír docker-compose.yml, stb.)
     create_all_files
     
-    # Port visszaállítás 80-ra (ha korábban 8080-ra volt állítva – a create_all_files után kell!)
-    if grep -q '"8080:80"' docker-compose.yml 2>/dev/null; then
-        log_info "Port visszaállítás 8080 → 80..."
-        sed -i 's/"8080:80"/"80:80"/' docker-compose.yml
-        sed -i 's/"8443:443"/"443:443"/' docker-compose.yml
-    fi
-    
     log_info "Backend újraépítése..."
     if ! $DOCKER compose build backend 2>/tmp/epub-docker-build.log; then
         log_error "Backend build HIBA! Részletek:"
@@ -1019,8 +1012,8 @@ services:
     image: nginx:alpine
     container_name: epub-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./static:/usr/share/nginx/html/static:ro
