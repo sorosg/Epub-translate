@@ -1,4 +1,4 @@
-// === EPUB FORDÍTÓ JS (v11.0.72) ===
+// === EPUB FORDÍTÓ JS (v1.2.0) ===
 // Toast-ok automatikus megjelenítése
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.toast').forEach(t => new bootstrap.Toast(t).show());
@@ -18,8 +18,12 @@ function closeSidebar() {
 // === TÉMAVÁLTÁS ===
 async function toggleTheme() {
   const html = document.getElementById('htmlRoot');
+  if (!html) return;
+  
   const isDark = html.getAttribute('data-bs-theme') === 'dark';
   const newTheme = isDark ? 'light' : 'dark';
+  
+  // Vizuális váltás azonnal (akkor is, ha a mentés elbukik)
   html.setAttribute('data-bs-theme', newTheme);
   
   const iconClass = 'bi ' + (newTheme === 'dark' ? 'bi-moon-stars-fill' : 'bi-sun-fill');
@@ -28,12 +32,13 @@ async function toggleTheme() {
   const iconBottom = document.getElementById('themeIconBottom');
   if (iconBottom) iconBottom.className = iconClass;
   
+  // Mentés a háttérben (nem blokkol)
   try {
     await fetch('/api/user/settings', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({dark_mode: newTheme === 'dark'})
     });
-  } catch(e) { console.error('Téma mentési hiba:', e); }
+  } catch(e) { /* csendes hiba – a vizuális váltás már megtörtént */ }
 }
 
 // === PWA SERVICE WORKER ===

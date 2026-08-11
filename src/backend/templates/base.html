@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu" data-bs-theme="{{ 'dark' if current_user.is_authenticated and current_user.dark_mode else 'dark' }}" id="htmlRoot">
+<html lang="hu" data-bs-theme="{{ 'light' if (current_user.is_authenticated and not current_user.dark_mode) else 'dark' }}" id="htmlRoot">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
