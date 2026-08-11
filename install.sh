@@ -570,10 +570,20 @@ perform_update() {
     done
     $DOCKER network prune -f 2>/dev/null || true
     
-    # Port felszabadítás (a konténerek leálltak, de a kernel TIME_WAIT-ben tarthatja)
-    sudo fuser -k 80/tcp 2>/dev/null || true
-    sudo fuser -k 443/tcp 2>/dev/null || true
-    sleep 2
+    # Host webszerverek leállítása és maszkolása (systemd újraindítás ellen)
+    log_info "Host webszerverek leállítása..."
+    for svc in nginx apache2 httpd; do
+        sudo systemctl stop "$svc" 2>/dev/null || true
+        sudo systemctl disable "$svc" 2>/dev/null || true
+        sudo systemctl mask "$svc" 2>/dev/null || true
+    done
+    
+    # Port felszabadítás (a konténerek leálltak, de a kernel/systemd tarthatja)
+    for i in $(seq 1 3); do
+        sudo fuser -k 80/tcp 2>/dev/null || true
+        sudo fuser -k 443/tcp 2>/dev/null || true
+        sleep 2
+    done
     
     if [ -d .git ]; then
         if git fetch origin 2>/dev/null && git reset --hard origin/main 2>/dev/null; then
