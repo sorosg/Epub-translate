@@ -451,6 +451,38 @@ python3 app.py
 - **Mobil nézet**: a sidebar 1024px alatt elrejtve, lebegő hamburger gomb + alsó navigációs sáv
 - **Téma váltó**: `User.dark_mode` mező az adatbázisban, CSS változók (`data-bs-theme`)
 
+### Pillanatképek (snapshot) – biztonsági mentés működő állapotról
+
+Amikor egy funkció működik, **készíts pillanatképet** – így ha később elromlik, egy paranccsal vissza tudsz térni:
+
+```bash
+# 🟢 MŰKÖDIK – mentsd el!
+bash scripts/snapshot.sh "sliding-window-kesz"
+
+# Több óra fejlesztés után elromlik valami...
+# 🔴 VISSZATÉRÉS az előző működő verzióhoz:
+git checkout tags/snapshot-sliding-window-kesz
+
+# Pillanatképek listája:
+git tag -l 'snapshot-*'
+
+# Visszatérés a friss verzióra:
+git checkout main
+```
+
+A snapshot automatikusan commit-ol és tag-et készít. A tag alapján `git checkout tags/snapshot-xxx` paranccsal bármikor visszaállítható a projekt.
+
+### Git parancsok gyorsreferencia
+
+| Parancs | Leírás |
+|---------|--------|
+| `git log --oneline -5` | Utolsó 5 commit |
+| `git diff` | Módosítások megtekintése commit előtt |
+| `git stash` | Módosítások ideiglenes elmentése |
+| `git stash pop` | Elmentett módosítások visszaállítása |
+| `git reset --hard HEAD~1` | Utolsó commit törlése (ha még nincs push-olva) |
+| `bash scripts/snapshot.sh "név"` | Pillanatkép készítése |
+
 ### Gyakori hibák és megoldások
 
 | Hiba | Ok | Megoldás |
