@@ -116,6 +116,18 @@
           <input type="password" class="form-control" id="deepseekApiKey" placeholder="sk-...">
           <button class="btn btn-success" type="button" onclick="saveApiKey()"><i class="bi bi-check-lg me-1"></i>Mentés</button>
         </div>
+        <!-- Remote modell választó (csak DeepSeek Pro esetén látszik) -->
+        <div id="remoteModelGroup" class="mt-2" style="display:none;">
+          <label class="form-label small mb-1"><i class="bi bi-cpu me-1"></i>DeepSeek modell</label>
+          <select class="form-select form-select-sm" id="remoteModelSelect" onchange="onRemoteModelChange()">
+            <option value="deepseek-chat" {% if not user.preferred_model or user.preferred_model == 'deepseek-chat' %}selected{% endif %}>
+              🤖 DeepSeek Chat (V3) – általános, gyors
+            </option>
+            <option value="deepseek-reasoner" {% if user.preferred_model == 'deepseek-reasoner' %}selected{% endif %}>
+              🧠 DeepSeek Reasoner (R1) – logikai, pontosabb
+            </option>
+          </select>
+        </div>
       </div>
     </div>
     
@@ -424,6 +436,14 @@ function handleUploadSubmit() {
 
 function onModelSourceChange() {
   document.getElementById('hiddenModelSource').value = document.getElementById('modelSource').value;
+  // Remote modell választó mutatása/rejtése
+  const remoteGroup = document.getElementById('remoteModelGroup');
+  remoteGroup.style.display = document.getElementById('modelSource').value === 'remote' ? 'block' : 'none';
+  saveModelPreference();
+}
+
+function onRemoteModelChange() {
+  document.getElementById('hiddenSelectedModel').value = document.getElementById('remoteModelSelect').value;
   saveModelPreference();
 }
 
@@ -451,9 +471,16 @@ async function saveApiKey() {
 
 async function saveModelPreference() {
   try {
+    const body = {
+      preferred_model_source: document.getElementById('modelSource').value
+    };
+    // Ha remote módban vagyunk, a modell nevet is küldjük
+    if (body.preferred_model_source === 'remote') {
+      body.preferred_model = document.getElementById('remoteModelSelect').value;
+    }
     await fetch('/api/user/settings', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({preferred_model_source: document.getElementById('modelSource').value})
+      body: JSON.stringify(body)
     });
   } catch(e) {}
 }

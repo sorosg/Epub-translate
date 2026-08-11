@@ -214,7 +214,9 @@ def upload_epub():
     model_source = request.form.get('model_source', 'local')
     model_used = app.config['DEFAULT_MODEL']
     if model_source == 'remote' and current_user.deepseek_api_key:
-        model_used = 'deepseek-chat'  # DeepSeek Pro API modell
+        # A felhasználó által kiválasztott remote modell (deepseek-chat vagy deepseek-reasoner)
+        selected_remote = request.form.get('selected_model', '') or current_user.preferred_model or 'deepseek-chat'
+        model_used = selected_remote if selected_remote in ('deepseek-chat', 'deepseek-reasoner') else 'deepseek-chat'
     
     translation = Translation(user_id=current_user.id, original_filename=file.filename, output_filename=None, status='pending', progress=0, model_used=model_used)
     db.session.add(translation)
@@ -1376,8 +1378,10 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             use_deepseek = (model_source == 'remote' and deepseek_api_key)
             
             if use_deepseek:
-                model = 'deepseek-chat'
-                translation_logger.info(f"[ID:{translation_id}] 🌐 DeepSeek Pro API használata (nem helyi Ollama)")
+                # A felhasználó által kiválasztott remote modell használata
+                # (lehet deepseek-chat vagy deepseek-reasoner)
+                model = t.model_used if t.model_used in ('deepseek-chat', 'deepseek-reasoner') else 'deepseek-chat'
+                translation_logger.info(f"[ID:{translation_id}] 🌐 DeepSeek Pro API: {model}")
             else:
                 translation_logger.info(f"[ID:{translation_id}] 🖥️ Helyi Ollama modell: {model}")
             items = list(book.get_items_of_type(9))  # ITEM_DOCUMENT
@@ -1644,16 +1648,22 @@ Csak a fordítást add vissza, semmi mást!
                         try:
                             if use_deepseek:
                                 # DeepSeek Pro API hívás (Chat Completions formátum)
-                                resp = requests.post("https://api.deepseek.com/v1/chat/completions", json={
+                                # DeepSeek API: deepseek-reasoner máshogy kezelendő (nem támogatja a temperature-t)
+                                deepseek_payload = {
                                     'model': model,
                                     'messages': [{'role': 'user', 'content': single_prompt}],
                                     'max_tokens': 1024,
-                                    'temperature': 0.2,
                                     'stream': False
-                                }, headers={
-                                    'Authorization': f'Bearer {deepseek_api_key}',
-                                    'Content-Type': 'application/json'
-                                }, timeout=None)
+                                }
+                                if model == 'deepseek-chat':
+                                    deepseek_payload['temperature'] = 0.2
+                                # deepseek-reasoner nem támogatja a temperature paramétert
+                                
+                                resp = requests.post("https://api.deepseek.com/v1/chat/completions", json=deepseek_payload,
+                                    headers={
+                                        'Authorization': f'Bearer {deepseek_api_key}',
+                                        'Content-Type': 'application/json'
+                                    }, timeout=None)
                                 if resp.status_code == 200:
                                     translated = resp.json()['choices'][0]['message']['content'].strip()
                                 else:
