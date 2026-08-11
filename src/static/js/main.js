@@ -1,4 +1,4 @@
-// === EPUB FORDÍTÓ JS (v11.0.71) ===
+// === EPUB FORDÍTÓ JS (v11.0.72) ===
 // Toast-ok automatikus megjelenítése
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.toast').forEach(t => new bootstrap.Toast(t).show());
@@ -45,10 +45,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Theme color meta tag frissítése
-const themeColorMeta = document.getElementById('themeColorMeta');
-const observer = new MutationObserver(() => {
-  const theme = document.getElementById('htmlRoot').getAttribute('data-bs-theme');
-  themeColorMeta.setAttribute('content', theme === 'dark' ? '#0d1117' : '#f6f8fa');
+// Theme color meta tag frissítése (DOMContentLoaded után, hogy az elemek létezzenek)
+document.addEventListener('DOMContentLoaded', () => {
+  const themeColorMeta = document.getElementById('themeColorMeta');
+  const htmlRoot = document.getElementById('htmlRoot');
+  if (themeColorMeta && htmlRoot) {
+    const observer = new MutationObserver(() => {
+      const theme = htmlRoot.getAttribute('data-bs-theme');
+      themeColorMeta.setAttribute('content', theme === 'dark' ? '#0d1117' : '#f6f8fa');
+    });
+    observer.observe(htmlRoot, { attributes: true, attributeFilter: ['data-bs-theme'] });
+  }
 });
-observer.observe(document.getElementById('htmlRoot'), { attributes: true, attributeFilter: ['data-bs-theme'] });
