@@ -336,25 +336,26 @@ docker exec -it epub-ollama ollama pull deepseek-r1:14b
 
 ```bash
 # === EPUB FORDÍTÓ FEJLESZTŐI KÖRNYEZET GYORSINDÍTÁS ===
-# Ezt a blokkot a TERMINÁLBA másold be (nem a chatbe!), pl. CMD+T új terminál
+# Másold be ezt az egész blokkot egy új TERMINÁL ablakba (CMD+T)!
 
 cd ~/Desktop/Epub-translate
 
-# Fájlok ellenőrzése (ha nincs itt a projekt, klónozd):
-# git clone https://github.com/sorosg/Epub-translate.git ~/Desktop/Epub-translate
-
-# Backend indítása fejlesztői módban
+# Virtualenv létrehozása és aktiválás (ha még nincs)
 cd src/backend
-python3 -m venv venv 2>/dev/null || true
+if [ ! -d venv ]; then python3 -m venv venv; fi
 source venv/bin/activate
-pip install -q -r requirements.txt 2>/dev/null || true
 
+# Függőségek telepítése (látható hibákkal)
+pip install -r requirements.txt
+
+# Környezeti változók
 export DATABASE_URL=postgresql://epub_user:epub_password@localhost:5432/epub_translator
 export OLLAMA_HOST=http://localhost:11434
 export SECRET_KEY=dev-secret-key
 export VERSION=11.0.71
 
-python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('✅ DB OK')" 2>/dev/null || echo "⚠️ DB nem elérhető (Docker konténerek futnak?)"
+# Adatbázis inicializálás
+python3 -c "from app import app, init_db; app.app_context().push(); init_db(); print('✅ DB OK')"
 
 echo ""
 echo "🌐 Backend: http://localhost:5000"
