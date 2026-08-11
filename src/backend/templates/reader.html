@@ -1,0 +1,260 @@
+{% extends "base.html" %}{% block title %}{{ book.title or book.filename }}{% endblock %}{% block content %}
+<div class="reader-container" id="readerApp">
+  <!-- Fejléc: könyv info + navigáció -->
+  <div class="reader-header">
+    <a href="/library" class="btn btn-sm btn-outline-light" title="Vissza a könyvtárba">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div class="flex-grow-1 text-center mx-2" style="min-width:0">
+      <h6 class="mb-0 text-truncate" id="readerBookTitle">{{ book.title or book.filename }}</h6>
+      <small class="text-secondary" id="readerBookAuthor">{{ book.author or '' }}</small>
+    </div>
+    <button class="btn btn-sm btn-outline-light" onclick="toggleToc()" title="Tartalomjegyzék">
+      <i class="bi bi-list-ul"></i>
+    </button>
+  </div>
+
+  <!-- Fejezet navigáció -->
+  <div class="reader-nav">
+    <button class="btn btn-sm btn-outline-light" id="btnPrev" onclick="prevChapter()" disabled title="Előző fejezet">
+      <i class="bi bi-chevron-left"></i> Előző
+    </button>
+    <span class="text-secondary small" id="chapterIndicator">- / -</span>
+    <button class="btn btn-sm btn-outline-light" id="btnNext" onclick="nextChapter()" disabled title="Következő fejezet">
+      Következő <i class="bi bi-chevron-right"></i>
+    </button>
+  </div>
+
+  <!-- Olvasási terület -->
+  <div class="reader-content" id="readerContent">
+    <div class="text-center py-5 text-secondary">
+      <div class="spinner-border mb-3"></div>
+      <p>Könyv betöltése...</p>
+    </div>
+  </div>
+
+  <!-- Lábléc navigáció -->
+  <div class="reader-footer">
+    <button class="btn btn-sm btn-outline-light" onclick="prevChapter()"><i class="bi bi-chevron-left"></i></button>
+    <span class="text-secondary small" id="chapterIndicatorBottom">- / -</span>
+    <button class="btn btn-sm btn-outline-light" onclick="nextChapter()"><i class="bi bi-chevron-right"></i></button>
+  </div>
+
+  <!-- Tartalomjegyzék modal -->
+  <div class="toc-overlay" id="tocOverlay" onclick="toggleToc()"></div>
+  <div class="toc-panel" id="tocPanel">
+    <div class="toc-header">
+      <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Tartalom</h6>
+      <button class="btn btn-sm btn-outline-light" onclick="toggleToc()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="toc-list" id="tocList">
+      <div class="text-center py-3 text-secondary">Betöltés...</div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* === READER STYLES (mobilbarát EPUB olvasó) === */
+.reader-container {
+  display: flex; flex-direction: column; height: calc(100vh - 60px);
+  max-width: 800px; margin: 0 auto;
+}
+.reader-header {
+  display: flex; align-items: center; padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--border-color); gap: 0.5rem;
+}
+.reader-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem; border-bottom: 1px solid var(--border-color);
+}
+.reader-content {
+  flex: 1; overflow-y: auto; padding: 1.5rem 1rem 0.5rem;
+  font-size: 1.1rem; line-height: 1.85; color: var(--text-primary);
+  word-wrap: break-word; -webkit-overflow-scrolling: touch;
+}
+.reader-content h2, .reader-content h3 { font-size: 1.4rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+.reader-content p { margin-bottom: 0.85rem; text-align: justify; }
+.reader-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem; border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+/* Tartalomjegyzék panel */
+.toc-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1060;
+}
+.toc-overlay.open { display: block; }
+.toc-panel {
+  position: fixed; top: 0; right: -320px; width: 300px; height: 100%;
+  background: var(--bg-secondary); border-left: 1px solid var(--border-color);
+  z-index: 1061; transition: right 0.3s ease; display: flex; flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.3);
+}
+.toc-panel.open { right: 0; }
+.toc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem; border-bottom: 1px solid var(--border-color);
+}
+.toc-list {
+  flex: 1; overflow-y: auto; padding: 0.5rem;
+}
+.toc-item {
+  display: block; padding: 0.65rem 0.75rem; border-radius: 8px;
+  color: var(--text-secondary); text-decoration: none; cursor: pointer;
+  transition: all 0.15s ease; font-size: 0.9rem; border-left: 3px solid transparent;
+  margin-bottom: 2px;
+}
+.toc-item:hover, .toc-item.active {
+  background: var(--hover-bg); color: var(--accent-blue);
+  border-left-color: var(--accent-blue);
+}
+.toc-item .toc-length { font-size: 0.7rem; color: var(--text-secondary); margin-left: 0.5rem; }
+
+/* Mobil optimalizálás */
+@media (max-width: 600px) {
+  .reader-content { font-size: 1rem; padding: 1rem 0.75rem 0.5rem; line-height: 1.75; }
+  .reader-content h2, .reader-content h3 { font-size: 1.2rem; }
+  .reader-header { padding: 0.5rem 0.35rem; }
+  .reader-nav { padding: 0.35rem; }
+  .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+}
+
+/* Olvasási progress bar */
+.reader-progress { height: 3px; background: var(--accent-blue); position: fixed; top: 0; left: 0; z-index: 1070; transition: width 0.3s ease; }
+</style>
+
+<script>
+let chapters = [];
+let currentIndex = 0;
+let bookId = {{ book.id }};
+
+async function loadChapters() {
+  try {
+    const resp = await fetch('/api/reader/' + bookId + '/chapters');
+    const data = await resp.json();
+    chapters = data.chapters || [];
+    document.getElementById('readerBookTitle').textContent = data.title || 'Ismeretlen könyv';
+    document.getElementById('readerBookAuthor').textContent = data.author || '';
+    
+    if (chapters.length === 0) {
+      document.getElementById('readerContent').innerHTML = '<div class="text-center py-5 text-secondary"><i class="bi bi-book" style="font-size:3rem"></i><p class="mt-3">Ebben a könyvben nem találhatók olvasható fejezetek.</p></div>';
+      return;
+    }
+    
+    // Tartalomjegyzék renderelése
+    renderToc();
+    // Első fejezet betöltése
+    loadChapter(0);
+  } catch(e) {
+    document.getElementById('readerContent').innerHTML = '<div class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle" style="font-size:3rem"></i><p class="mt-3">Hiba a könyv betöltésekor: ' + e.message + '</p></div>';
+  }
+}
+
+function renderToc() {
+  let html = '';
+  chapters.forEach((ch, i) => {
+    const lenKb = Math.round(ch.length / 1024);
+    html += `<div class="toc-item ${i === currentIndex ? 'active' : ''}" onclick="loadChapter(${i}); toggleToc();">
+      <span>${escHtml(ch.title)}</span>
+      <span class="toc-length">${lenKb} KB</span>
+    </div>`;
+  });
+  document.getElementById('tocList').innerHTML = html;
+}
+
+async function loadChapter(idx) {
+  if (idx < 0 || idx >= chapters.length) return;
+  currentIndex = idx;
+  
+  document.getElementById('readerContent').innerHTML = '<div class="text-center py-5 text-secondary"><div class="spinner-border mb-3"></div><p>Fejezet betöltése...</p></div>';
+  
+  try {
+    const resp = await fetch('/api/reader/' + bookId + '/chapter/' + chapters[idx].index);
+    const data = await resp.json();
+    
+    if (data.error) {
+      document.getElementById('readerContent').innerHTML = '<div class="text-center py-5 text-danger">' + data.error + '</div>';
+      return;
+    }
+    
+    // Szöveg formázása: üres soroknál bekezdés törés
+    const paragraphs = data.text.split('\n\n').filter(p => p.trim());
+    let html = '<h3>' + escHtml(data.title) + '</h3>';
+    paragraphs.forEach(p => {
+      html += '<p>' + escHtml(p.trim()) + '</p>';
+    });
+    
+    document.getElementById('readerContent').innerHTML = html;
+    document.getElementById('readerContent').scrollTop = 0;
+    
+    // Navigáció frissítése
+    updateNav();
+    renderToc();
+    
+    // Progress bar frissítése
+    updateProgress();
+    
+  } catch(e) {
+    document.getElementById('readerContent').innerHTML = '<div class="text-center py-5 text-danger">Hiba: ' + e.message + '</div>';
+  }
+}
+
+function updateNav() {
+  document.getElementById('btnPrev').disabled = currentIndex <= 0;
+  document.getElementById('btnNext').disabled = currentIndex >= chapters.length - 1;
+  const indicator = (currentIndex + 1) + ' / ' + chapters.length;
+  document.getElementById('chapterIndicator').textContent = indicator;
+  document.getElementById('chapterIndicatorBottom').textContent = indicator;
+}
+
+function updateProgress() {
+  if (chapters.length === 0) return;
+  const pct = ((currentIndex + 1) / chapters.length * 100).toFixed(0);
+  let bar = document.querySelector('.reader-progress');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'reader-progress';
+    document.body.appendChild(bar);
+  }
+  bar.style.width = pct + '%';
+}
+
+function prevChapter() { if (currentIndex > 0) loadChapter(currentIndex - 1); }
+function nextChapter() { if (currentIndex < chapters.length - 1) loadChapter(currentIndex + 1); }
+
+function toggleToc() {
+  document.getElementById('tocOverlay').classList.toggle('open');
+  document.getElementById('tocPanel').classList.toggle('open');
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// Billentyűzet navigáció (jobb/bal nyíl)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') nextChapter();
+  else if (e.key === 'ArrowLeft') prevChapter();
+});
+
+// Érintéses lapozás (swipe) mobilon
+let touchStartX = 0;
+document.getElementById('readerContent').addEventListener('touchstart', (e) => {
+  touchStartX = e.touches[0].clientX;
+});
+document.getElementById('readerContent').addEventListener('touchend', (e) => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 60) {
+    if (diff > 0) nextChapter();
+    else prevChapter();
+  }
+});
+
+window.addEventListener('load', loadChapters);
+</script>
+{% endblock %}

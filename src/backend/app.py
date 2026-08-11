@@ -1289,6 +1289,74 @@ def api_update_run():
     except Exception as e:
         return jsonify({'success':False,'error':str(e)[:200]}), 500
 
+# ==== EPUB OLVASÓ ====
+@app.route('/reader/<int:book_id>')
+@login_required
+def book_reader(book_id):
+    """EPUB olvasó oldal a könyvtár könyveihez"""
+    book = Book.query.get_or_404(book_id)
+    return render_template('reader.html', book=book)
+
+@app.route('/api/reader/<int:book_id>/chapters')
+@login_required
+def api_reader_chapters(book_id):
+    """EPUB fejezeteinek listázása (cím + hossz)"""
+    book = Book.query.get_or_404(book_id)
+    if not book.file_path or not os.path.exists(book.file_path):
+        return jsonify({'error': 'A fájl nem található', 'chapters': []})
+    try:
+        from ebooklib import epub as epub_lib
+        from bs4 import BeautifulSoup
+        bk = epub_lib.read_epub(book.file_path)
+        chapters = []
+        items = list(bk.get_items_of_type(9))
+        for idx, item in enumerate(items):
+            soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+            text = soup.get_text().strip()
+            if text and len(text) > 50:
+                # Fejezet cím keresése (h1, h2, h3)
+                title_tag = soup.find(['h1', 'h2', 'h3'])
+                title = title_tag.get_text().strip() if title_tag else f'Fejezet {idx+1}'
+                chapters.append({
+                    'index': idx,
+                    'title': title[:80],
+                    'length': len(text),
+                    'preview': text[:200] + ('...' if len(text) > 200 else '')
+                })
+        return jsonify({'chapters': chapters, 'title': book.title or book.filename, 'author': book.author or ''})
+    except Exception as e:
+        return jsonify({'error': str(e)[:200], 'chapters': []})
+
+@app.route('/api/reader/<int:book_id>/chapter/<int:idx>')
+@login_required
+def api_reader_chapter(book_id, idx):
+    """Egy fejezet teljes szövegének lekérése"""
+    book = Book.query.get_or_404(book_id)
+    if not book.file_path or not os.path.exists(book.file_path):
+        return jsonify({'error': 'A fájl nem található', 'text': ''})
+    try:
+        from ebooklib import epub as epub_lib
+        from bs4 import BeautifulSoup
+        bk = epub_lib.read_epub(book.file_path)
+        items = list(bk.get_items_of_type(9))
+        if idx < 0 or idx >= len(items):
+            return jsonify({'error': 'Érvénytelen fejezet index', 'text': ''})
+        item = items[idx]
+        soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+        # Fejezet cím kinyerése
+        title_tag = soup.find(['h1', 'h2', 'h3'])
+        title = title_tag.get_text().strip() if title_tag else f'Fejezet {idx+1}'
+        text = soup.get_text().strip()
+        return jsonify({
+            'title': title,
+            'text': text,
+            'index': idx,
+            'length': len(text),
+            'total': len(items)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)[:200], 'text': ''})
+
 @app.route('/api/system/containers')
 @login_required
 @admin_required
