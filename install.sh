@@ -1143,6 +1143,8 @@ create_backend_files() {
     
     cat > backend/Dockerfile << 'BACKENDEOF'
 FROM python:3.10-slim
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NOWARNINGS=yes
 WORKDIR /app
 RUN apt-get update && apt-get install -y gcc libxml2-dev libxslt-dev curl git tesseract-ocr espeak ffmpeg hunspell hunspell-hu libhunspell-dev && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
