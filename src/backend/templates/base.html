@@ -116,6 +116,10 @@ body{background:linear-gradient(135deg,#0d1117,#161b22,#1a1a2e);color:var(--text
         <strong>{{ current_user.first_name }}</strong>
         <div class="user-email">{{ current_user.email }}</div>
       </div>
+      <button id="notifToggle" title="Értesítések" onclick="toggleNotifications()" style="background:transparent;border:1px solid var(--border-color);border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.1rem;padding:0;color:var(--text-secondary);position:relative;">
+        <i class="bi bi-bell"></i>
+        <span id="notifBadge" class="badge bg-danger" style="position:absolute;top:-4px;right:-6px;font-size:0.55rem;padding:2px 4px;display:none;">0</span>
+      </button>
       <button id="themeToggle" title="Váltás sötét/világos témára" onclick="toggleTheme()">
         <i id="themeIcon" class="bi {{ 'bi-moon-stars-fill' if current_user.dark_mode else 'bi-sun-fill' }}"></i>
       </button>

@@ -212,6 +212,16 @@ body {
 .upload-zone { border:2px dashed var(--border-color); border-radius:12px; padding:2rem; text-align:center; transition:all 0.3s ease; background:var(--bg-secondary); }
 .upload-zone:hover { border-color:var(--accent-blue); background:var(--hover-bg); }
 
+/* === SKELETON SCREEN (betöltési vázak) === */
+.skeleton{background:linear-gradient(90deg,var(--border-color) 25%,rgba(88,166,255,.08) 50%,var(--border-color) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skeleton-text{height:14px;margin-bottom:8px;width:100%}
+.skeleton-text.short{width:60%}
+.skeleton-title{height:20px;margin-bottom:12px;width:40%}
+.skeleton-card{height:120px;border-radius:12px}
+.skeleton-avatar{width:40px;height:40px;border-radius:50%}
+.skeleton-badge{width:60px;height:20px;border-radius:10px;display:inline-block}
+
 /* === PROFILE STAT MINI KÁRTYÁK === */
 .stat-card-mini {
   border-radius: 12px; padding: 0.85rem 0.6rem; text-align: center;

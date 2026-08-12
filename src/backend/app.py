@@ -1403,6 +1403,26 @@ def api_reader_chapter(book_id, idx):
     except Exception as e:
         return jsonify({'error': str(e)[:200], 'text': ''})
 
+@app.route('/api/notifications')
+@login_required
+def api_notifications():
+    """Legutóbbi fordítási események a felhasználónak (értesítési központ)"""
+    translations = Translation.query.filter_by(user_id=current_user.id)\
+        .order_by(Translation.created_at.desc()).limit(10).all()
+    events = []
+    for t in translations:
+        status_icon = {'pending':'⏳','processing':'🔄','completed':'✅','failed':'❌'}.get(t.status,'📋')
+        events.append({
+            'id':t.id,
+            'type':t.status,
+            'icon':status_icon,
+            'message':f'{status_icon} {t.original_filename} – {"Fordítás kész!" if t.status=="completed" else "Folyamatban..." if t.status=="processing" else "Várakozik..." if t.status=="pending" else "Hiba történt"}',
+            'time':t.created_at.isoformat() if t.created_at else '',
+            'progress':t.progress,
+            'quality_score':t.quality_score
+        })
+    return jsonify({'events':events})
+
 @app.route('/api/system/containers')
 @login_required
 @admin_required
