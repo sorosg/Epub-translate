@@ -79,6 +79,74 @@
   </div>
 </div>
 
+<!-- SZERKESZTŐ MODAL -->
+<div class="modal fade" id="editBookModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Könyv szerkesztése</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Cím <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="editBookTitle" placeholder="Könyv címe" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Szerző</label>
+            <input type="text" class="form-control" id="editBookAuthor" placeholder="Szerző neve">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Műfaj</label>
+            <select class="form-select" id="editBookGenre">
+              <option value="">Válassz...</option>
+              <option value="sci-fi">Sci-Fi</option>
+              <option value="fantasy">Fantasy</option>
+              <option value="adventure">Kaland</option>
+              <option value="mystery">Krimi</option>
+              <option value="romance">Romantikus</option>
+              <option value="horror">Horror</option>
+              <option value="historical">Történelmi</option>
+              <option value="biography">Életrajz</option>
+              <option value="science">Tudományos</option>
+              <option value="other">Egyéb</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Sorozat</label>
+            <input type="text" class="form-control" id="editBookSeries" placeholder="Sorozat neve">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Sorozat #</label>
+            <input type="number" class="form-control" id="editBookSeriesNum" placeholder="pl. 3" min="1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Nyelv</label>
+            <select class="form-select" id="editBookLang">
+              <option value="en">Angol</option>
+              <option value="hu">Magyar</option>
+              <option value="de">Német</option>
+              <option value="fr">Francia</option>
+              <option value="es">Spanyol</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Új fájl <small class="text-muted">(opcionális, EPUB csere)</small></label>
+            <input type="file" class="form-control" id="editBookFile" accept=".epub">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Mégse</button>
+        <button type="button" class="btn btn-success" onclick="saveBookEdit()"><i class="bi bi-check-lg me-1"></i>Mentés</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 // ============================
 // ÁLLAPOT
@@ -266,9 +334,7 @@ async function saveAllBooks() {
     
     try {
       // Fájl feltöltése - az extract végpont már nem menti el,
-      // ezért az upload végpontot használjuk, de nem commit-oljuk
-      // egyenként, hanem a batch-upload végpont fogja.
-      // Először mentsük el a fájlt ideiglenesen
+      // ezért az upload végpontot használjuk
       const fd = new FormData();
       fd.append('file', bf.file);
       fd.append('title', bf.metadata.title);
@@ -624,70 +690,4 @@ async function toggleBook(id) {
 
 window.addEventListener('load', () => loadBooks());
 </script>
-<!-- SZERKESZTŐ MODAL -->
-<div class="modal fade" id="editBookModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content bg-dark text-light border-secondary">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Könyv szerkesztése</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-3">
-          <div class="col-12">
-            <label class="form-label">Cím <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="editBookTitle" placeholder="Könyv címe" required>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Szerző</label>
-            <input type="text" class="form-control" id="editBookAuthor" placeholder="Szerző neve">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Műfaj</label>
-            <select class="form-select" id="editBookGenre">
-              <option value="">Válassz...</option>
-              <option value="sci-fi">Sci-Fi</option>
-              <option value="fantasy">Fantasy</option>
-              <option value="adventure">Kaland</option>
-              <option value="mystery">Krimi</option>
-              <option value="romance">Romantikus</option>
-              <option value="horror">Horror</option>
-              <option value="historical">Történelmi</option>
-              <option value="biography">Életrajz</option>
-              <option value="science">Tudományos</option>
-              <option value="other">Egyéb</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Sorozat</label>
-            <input type="text" class="form-control" id="editBookSeries" placeholder="Sorozat neve">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Sorozat #</label>
-            <input type="number" class="form-control" id="editBookSeriesNum" placeholder="pl. 3" min="1">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Nyelv</label>
-            <select class="form-select" id="editBookLang">
-              <option value="en">Angol</option>
-              <option value="hu">Magyar</option>
-              <option value="de">Német</option>
-              <option value="fr">Francia</option>
-              <option value="es">Spanyol</option>
-            </select>
-          </div>
-          <div class="col-12">
-            <label class="form-label">Új fájl <small class="text-muted">(opcionális, EPUB csere)</small></label>
-            <input type="file" class="form-control" id="editBookFile" accept=".epub">
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Mégse</button>
-        <button type="button" class="btn btn-success" onclick="saveBookEdit()"><i class="bi bi-check-lg me-1"></i>Mentés</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}

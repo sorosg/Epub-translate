@@ -1,4 +1,4 @@
-// === EPUB FORDÍTÓ JS (v1.3.2) ===
+// === EPUB FORDÍTÓ JS (v1.3.5) ===
 
 // Bootstrap elérhetőség ellenőrzése (globális scope-ban)
 const bootstrapAvailable = typeof bootstrap !== 'undefined' && bootstrap && bootstrap.Toast;
