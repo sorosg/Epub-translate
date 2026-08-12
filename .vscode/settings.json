@@ -1,0 +1,22 @@
+{
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "[python]": { "editor.formatOnSave": true, "editor.tabSize": 4 },
+  "[html]": { "editor.formatOnSave": false },
+  "[javascript]": { "editor.tabSize": 2 },
+  "[shellscript]": { "editor.tabSize": 2 },
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    ".venv": false
+  },
+  "files.watcherExclude": {
+    "**/logs/**": true,
+    "**/uploads/**": true,
+    "**/output/**": true,
+    "**/ollama_data/**": true
+  },
+  "editor.rulers": [120],
+  "terminal.integrated.defaultProfile.linux": "bash"
+}

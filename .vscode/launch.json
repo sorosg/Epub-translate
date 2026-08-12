@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flask Backend (Lokális)",
+      "type": "python",
+      "request": "launch",
+      "module": "flask",
+      "env": {
+        "FLASK_APP": "app.py",
+        "FLASK_DEBUG": "1",
+        "DATABASE_URL": "postgresql://epub_user:epub_password@localhost:5432/epub_translator",
+        "OLLAMA_HOST": "http://localhost:11434",
+        "SECRET_KEY": "dev-secret-key",
+        "VERSION": "1.3.0"
+      },
+      "args": ["run", "--host=0.0.0.0", "--port=5000"],
+      "jinja": true,
+      "cwd": "${workspaceFolder}/src/backend"
+    },
+    {
+      "name": "Flask Backend (Docker Attach)",
+      "type": "python",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5678 },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src/backend",
+          "remoteRoot": "/app"
+        }
+      ]
+    }
+  ]
+}
