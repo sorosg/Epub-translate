@@ -1,7 +1,15 @@
-// === EPUB FORDÍTÓ JS (v1.3.0) ===
-// Toast-ok automatikus megjelenítése
+// === EPUB FORDÍTÓ JS (v1.3.2) ===
+
+// Bootstrap elérhetőség ellenőrzése (globális scope-ban)
+const bootstrapAvailable = typeof bootstrap !== 'undefined' && bootstrap && bootstrap.Toast;
+
+// Toast-ok automatikus megjelenítése (biztonságos)
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.toast').forEach(t => new bootstrap.Toast(t).show());
+  if (bootstrapAvailable) {
+    try {
+      document.querySelectorAll('.toast').forEach(t => new bootstrap.Toast(t).show());
+    } catch(e) { console.warn('Toast init hiba:', e); }
+  }
 });
 
 // === SIDEBAR MOBIL TOGGLE ===
@@ -9,7 +17,6 @@ function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebarOverlay').classList.toggle('open');
 }
-
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
@@ -19,26 +26,20 @@ function closeSidebar() {
 async function toggleTheme() {
   const html = document.getElementById('htmlRoot');
   if (!html) return;
-  
   const isDark = html.getAttribute('data-bs-theme') === 'dark';
   const newTheme = isDark ? 'light' : 'dark';
-  
-  // Vizuális váltás azonnal (akkor is, ha a mentés elbukik)
   html.setAttribute('data-bs-theme', newTheme);
-  
   const iconClass = 'bi ' + (newTheme === 'dark' ? 'bi-moon-stars-fill' : 'bi-sun-fill');
   const icon = document.getElementById('themeIcon');
   if (icon) icon.className = iconClass;
   const iconBottom = document.getElementById('themeIconBottom');
   if (iconBottom) iconBottom.className = iconClass;
-  
-  // Mentés a háttérben (nem blokkol)
   try {
     await fetch('/api/user/settings', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({dark_mode: newTheme === 'dark'})
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dark_mode: newTheme === 'dark' })
     });
-  } catch(e) { /* csendes hiba – a vizuális váltás már megtörtént */ }
+  } catch (e) { /* csendes hiba */ }
 }
 
 // === PWA SERVICE WORKER ===
@@ -64,45 +65,37 @@ function ensureNotifPanel() {
 
 async function loadNotifications() {
   try {
-    const resp = await fetch('/api/notifications', {credentials:'same-origin'});
+    const resp = await fetch('/api/notifications', { credentials: 'same-origin' });
     const data = await resp.json();
     const events = data.events || [];
     const badge = document.getElementById('notifBadge');
+    if (!badge) return events;
     const active = events.filter(e => e.type === 'pending' || e.type === 'processing').length;
-    if (active > 0) {
-      badge.style.display = 'block';
-      badge.textContent = active;
-    } else {
-      badge.style.display = 'none';
-    }
+    badge.style.display = active > 0 ? 'block' : 'none';
+    badge.textContent = active;
     return events;
-  } catch(e) { return []; }
+  } catch (e) { return []; }
 }
 
 async function toggleNotifications() {
   const panel = ensureNotifPanel();
-  if (panel.style.display === 'block') {
-    panel.style.display = 'none';
-    return;
-  }
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
   const events = await loadNotifications();
   let html = '<div style="padding:.5rem 1rem;border-bottom:1px solid var(--border-color);font-weight:600;font-size:.9rem;"><i class="bi bi-bell-fill me-2"></i>Értesítések</div>';
   if (events.length === 0) {
     html += '<div class="text-center py-4 text-secondary"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2 mb-0 small">Nincsenek értesítéseid</p></div>';
   } else {
     events.forEach(e => {
-      html += `<div style="padding:.6rem 1rem;border-bottom:1px solid rgba(48,54,61,.4);cursor:pointer;" onclick="window.location='/download/${e.id}'">
-        <div style="font-size:.85rem;">${e.message}</div>
-        <small class="text-secondary">${e.time ? new Date(e.time).toLocaleString('hu-HU') : ''}${e.progress > 0 && e.progress < 100 ? ' · '+e.progress+'%' : ''}</small>
-      </div>`;
+      const timeStr = e.time ? new Date(e.time).toLocaleString('hu-HU') : '';
+      const progressStr = e.progress > 0 && e.progress < 100 ? ' · ' + e.progress + '%' : '';
+      html += `<div style="padding:.6rem 1rem;border-bottom:1px solid rgba(48,54,61,.4);cursor:pointer;" onclick="window.location='/download/${e.id}'"><div style="font-size:.85rem;">${e.message}</div><small class="text-secondary">${timeStr}${progressStr}</small></div>`;
     });
   }
   panel.innerHTML = html;
   panel.style.display = 'block';
-  // Kattintás máshova bezárja
   setTimeout(() => {
-    document.addEventListener('click', function closeNotif(e) {
-      if (!panel.contains(e.target) && e.target.id !== 'notifToggle' && !e.target.closest('#notifToggle')) {
+    document.addEventListener('click', function closeNotif(ev) {
+      if (!panel.contains(ev.target) && ev.target.id !== 'notifToggle' && !ev.target.closest('#notifToggle')) {
         panel.style.display = 'none';
         document.removeEventListener('click', closeNotif);
       }
@@ -138,8 +131,8 @@ function toggleQuickActions() {
   });
   document.body.appendChild(menu);
   setTimeout(() => {
-    document.addEventListener('click', function closeQA(e) {
-      if (!menu.contains(e.target) && e.target.id !== 'quickActionsBtn' && !e.target.closest('#quickActionsBtn')) {
+    document.addEventListener('click', function closeQA(ev) {
+      if (!menu.contains(ev.target) && ev.target.id !== 'quickActionsBtn' && !ev.target.closest('#quickActionsBtn')) {
         menu.remove();
         document.removeEventListener('click', closeQA);
       }
@@ -147,7 +140,6 @@ function toggleQuickActions() {
   }, 100);
 }
 
-// Gyorsműveletek gomb csak mobilon jelenik meg (asztali gépen a sidebar elég)
 function updateQuickActionsVisibility() {
   const btn = document.getElementById('quickActionsBtn');
   if (!btn) return;
@@ -155,15 +147,13 @@ function updateQuickActionsVisibility() {
 }
 window.addEventListener('resize', updateQuickActionsVisibility);
 
-// Oldal betöltésekor inicializálás
+// === INICIALIZÁLÁS OLDAL BETÖLTÉSEKOR ===
 document.addEventListener('DOMContentLoaded', () => {
-  loadNotifications();
-  ensureQuickActions();
-  updateQuickActionsVisibility();
-});
-
-// Theme color meta tag frissítése (DOMContentLoaded után, hogy az elemek létezzenek)
-document.addEventListener('DOMContentLoaded', () => {
+  // Értesítések betöltése
+  loadNotifications().catch(() => {});
+  // Gyorsműveletek gomb (csak mobilon látszik)
+  try { ensureQuickActions(); updateQuickActionsVisibility(); } catch (e) {}
+  // Theme color meta tag frissítése
   const themeColorMeta = document.getElementById('themeColorMeta');
   const htmlRoot = document.getElementById('htmlRoot');
   if (themeColorMeta && htmlRoot) {
