@@ -162,6 +162,52 @@ body {
   .card:hover, .stat-card:hover, .btn:hover { transform: none; }
 }
 
+/* === TÉMAVÁLTÓ FIX: FIX BOOTSTRAP OSZTÁLYOK FELÜLÍRÁSA === */
+/* Light módban a fix bg-dark, text-light, table-dark osztályokat
+   a CSS változókra cseréljük, hogy reagáljanak a téma váltásra */
+[data-bs-theme="light"] .bg-dark {
+  background-color: var(--bg-card) !important;
+}
+[data-bs-theme="light"] .text-light {
+  color: var(--text-primary) !important;
+}
+[data-bs-theme="light"] .table-dark {
+  --bs-table-bg: var(--bg-card);
+  --bs-table-color: var(--text-primary);
+  --bs-table-color-state: var(--text-primary);
+  --bs-table-striped-bg: rgba(0,0,0,0.03);
+  --bs-table-striped-color: var(--text-primary);
+  --bs-table-hover-bg: var(--hover-bg);
+  --bs-table-hover-color: var(--text-primary);
+  --bs-table-border-color: var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+[data-bs-theme="light"] .table-dark thead th {
+  color: var(--text-secondary);
+}
+[data-bs-theme="light"] .border-secondary {
+  border-color: var(--border-color) !important;
+}
+[data-bs-theme="light"] .text-muted {
+  color: var(--text-secondary) !important;
+}
+[data-bs-theme="light"] .text-secondary {
+  color: var(--text-secondary) !important;
+}
+/* Light módban a modal-content bg-dark felülírása */
+[data-bs-theme="light"] .modal-content.bg-dark {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+/* Light módban a form-control és form-select (ha bg-dark van rajtuk) */
+[data-bs-theme="light"] .form-control.bg-dark,
+[data-bs-theme="light"] .form-select.bg-dark {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
 /* === EGYÉNI SCROLLBAR === */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-secondary); border-radius: 4px; }

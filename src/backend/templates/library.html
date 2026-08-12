@@ -552,8 +552,25 @@ function editBook(id) {
   document.getElementById('editBookSeriesNum').value = b.series_number || '';
   document.getElementById('editBookLang').value = b.language || 'en';
   document.getElementById('editBookFile').value = ''; // fájlváltás törlése
-  // Modal megnyitása
-  new bootstrap.Modal(document.getElementById('editBookModal')).show();
+  // Modal megnyitása – bootstrap elérhetőség ellenőrzéssel
+  const modalEl = document.getElementById('editBookModal');
+  if (typeof bootstrap !== 'undefined' && bootstrap && bootstrap.Modal) {
+    new bootstrap.Modal(modalEl).show();
+  } else {
+    // Fallback: natív modal megjelenítés (ha a Bootstrap JS még nem töltődött be)
+    modalEl.classList.add('show');
+    modalEl.style.display = 'block';
+    modalEl.setAttribute('aria-modal', 'true');
+    modalEl.setAttribute('role', 'dialog');
+    document.body.classList.add('modal-open');
+    // Backdrop
+    let backdrop = document.querySelector('.modal-backdrop');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop fade show';
+      document.body.appendChild(backdrop);
+    }
+  }
 }
 
 async function saveBookEdit() {
@@ -572,9 +589,21 @@ async function saveBookEdit() {
   
   const resp = await fetch('/api/library/edit/'+editingBookId, {method:'POST', credentials:'same-origin', body:fd});
   const data = await resp.json();
-  if (data.error) { alert(data.error); } else { 
-    bootstrap.Modal.getInstance(document.getElementById('editBookModal')).hide();
-    loadBooks(); 
+  if (data.error) { alert(data.error); } else {
+    // Modal bezárása – bootstrap elérhetőség ellenőrzéssel
+    const modalEl = document.getElementById('editBookModal');
+    if (typeof bootstrap !== 'undefined' && bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    } else {
+      // Fallback: natív modal elrejtés
+      modalEl.classList.remove('show');
+      modalEl.style.display = 'none';
+      modalEl.removeAttribute('aria-modal');
+      document.body.classList.remove('modal-open');
+      const backdrop = document.querySelector('.modal-backdrop');
+      if (backdrop) backdrop.remove();
+    }
+    loadBooks();
   }
 }
 
