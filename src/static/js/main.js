@@ -1,4 +1,4 @@
-// === EPUB FORDÍTÓ JS (v1.2.0) ===
+// === EPUB FORDÍTÓ JS (v1.3.0) ===
 // Toast-ok automatikus megjelenítése
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.toast').forEach(t => new bootstrap.Toast(t).show());
