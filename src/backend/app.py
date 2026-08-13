@@ -114,6 +114,16 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["5000 per day", "2000 per hour"])
 
+# A React SPA-hitelesítéshez: amikor egy /api/ végpont login_required miatt
+# 401-el térne vissza, JSON választ adjunk a HTML-es 302 redirect helyett.
+# Ellenkező esetben a frontend authStore.fetchUser() HTML-t kapna, és az SPA
+# betöltése "blank page"-nél állna meg.
+@login_manager.unauthorized_handler
+def api_unauthorized():
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Nincs bejelentkezve', 'authenticated': False}), 401
+    return redirect(url_for('login', next=request.url))
+
 ALLOWED_EXTENSIONS = {'epub'}
 
 def allowed_file(filename):
