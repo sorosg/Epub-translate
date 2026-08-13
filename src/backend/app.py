@@ -1770,6 +1770,137 @@ def api_admin_users():
         'created_at': u.created_at.isoformat() if u.created_at else None,
     } for u in users]})
 
+
+@app.route('/api/admin/users', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_users_create():
+    """Új felhasználó létrehozása (JSON) – admin jogosultsággal."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    password = data.get('password') or ''
+    first_name = (data.get('first_name') or '').strip()
+    last_name = (data.get('last_name') or '').strip()
+    tokens = data.get('tokens', 5)
+    is_admin = bool(data.get('is_admin', False))
+
+    if not email or not password:
+        return jsonify({'error': 'Az email és a jelszó kötelező'}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'Ez az email cím már használatban van'}), 409
+
+    try:
+        tokens_int = int(tokens) if str(tokens).isdigit() else 5
+    except (TypeError, ValueError):
+        tokens_int = 5
+
+    user = User(
+        username=email.split('@')[0],
+        email=email,
+        password_hash=generate_password_hash(password),
+        first_name=first_name,
+        last_name=last_name,
+        tokens=tokens_int,
+        is_admin=is_admin,
+    )
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({'success': True, 'id': user.id, 'message': 'Felhasználó létrehozva'})
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+@login_required
+@admin_required
+def api_admin_users_update(user_id):
+    """Felhasználó szerkesztése (JSON) – admin jogosultsággal."""
+    user = User.query.get_or_404(user_id)
+    data = request.get_json(silent=True) or {}
+
+    if 'email' in data:
+        new_email = (data['email'] or '').strip()
+        if new_email:
+            existing = User.query.filter_by(email=new_email).first()
+            if existing and existing.id != user.id:
+                return jsonify({'error': 'Ez az email cím már használatban van'}), 409
+            user.email = new_email
+
+    if 'first_name' in data:
+        user.first_name = (data['first_name'] or '').strip()
+    if 'last_name' in data:
+        user.last_name = (data['last_name'] or '').strip()
+    if 'tokens' in data:
+        try:
+            user.tokens = int(data['tokens']) if str(data['tokens']).isdigit() else user.tokens
+        except (TypeError, ValueError):
+            pass
+    if 'is_admin' in data:
+        user.is_admin = bool(data['is_admin'])
+    if data.get('password'):
+        user.password_hash = generate_password_hash(data['password'])
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Felhasználó módosítva'})
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def api_admin_users_delete(user_id):
+    """Felhasználó törlése (JSON) – admin jogosultsággal."""
+    if user_id == current_user.id:
+        return jsonify({'error': 'Saját magadat nem törölheted'}), 400
+    user = User.query.get_or_404(user_id)
+    Translation.query.filter_by(user_id=user.id).delete()
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Felhasználó törölve'})
+
+
+@app.route('/api/profile', methods=['POST'])
+@login_required
+def api_profile_update():
+    """A felhasználó saját alapadatainak módosítása (név, jelszó, API kulcs)."""
+    data = request.get_json(silent=True) or {}
+
+    # Személyes adatok frissítése
+    if 'first_name' in data:
+        current_user.first_name = (data['first_name'] or '').strip()
+    if 'last_name' in data:
+        current_user.last_name = (data['last_name'] or '').strip()
+    if 'email' in data and data['email']:
+        new_email = data['email'].strip()
+        existing = User.query.filter_by(email=new_email).first()
+        if existing and existing.id != current_user.id:
+            return jsonify({'error': 'Ez az email cím már használatban van'}), 409
+        current_user.email = new_email
+
+    # API kulcs módosítása (csak akkor, ha nem a maszkolt *** érték érkezik)
+    if 'deepseek_api_key' in data and data['deepseek_api_key'] and not data['deepseek_api_key'].startswith('***'):
+        current_user.deepseek_api_key = data['deepseek_api_key'].strip()
+
+    # Jelszó módosítása
+    if data.get('password'):
+        current_user.password_hash = generate_password_hash(data['password'])
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Profil mentve'})
+
+
+@app.route('/api/translations/<int:translation_id>/stop', methods=['POST'])
+@login_required
+def api_translation_stop(translation_id):
+    """Fordítás leállításának kérése. A háttérszál a következő iterációnál
+    észleli a stop_requested flag-et, és 'stopped' státusszal leáll."""
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        return jsonify({'error': 'Nincs jogosultságod'}), 403
+    if t.status not in ('pending', 'processing'):
+        return jsonify({'error': 'Csak folyamatban lévő fordítás állítható le'}), 400
+
+    t.stop_requested = True
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Leállítási kérés rögzítve'})
+
 @app.route('/api/admin/logs')
 @login_required
 @admin_required
@@ -1990,6 +2121,13 @@ Minták a kívánt stílushoz:
                 translation_logger.debug(f"[ID:{translation_id}] Terminológia gyűjtés nem sikerült: {term_err}")
             
             for idx, item in enumerate(items):
+                # Leállítási kérés ellenőrzése (a felhasználó a /stop végponttal kéri)
+                if t.stop_requested:
+                    translation_logger.info(f"[ID:{translation_id}] ⏹️ Leállítási kérés észlelve, fordítás megszakítva (elem {idx+1}/{total})")
+                    t.status = 'stopped'
+                    t.current_stage = 'stopped'
+                    db.session.commit()
+                    return
                 try:
                     soup = BeautifulSoup(item.get_body_content(), 'html.parser')
                     
@@ -2262,6 +2400,13 @@ Csak a fordítást add vissza, semmi mást!
             translation_logger.info(f"[ID:{translation_id}] 🔍 Második menet indítása – minőségellenőrzés (modell: {model})...")
             review_count = 0; review_improvements = 0
             for idx, item in enumerate(items):
+                # Leállítási kérés ellenőrzése a második menetben is
+                if t.stop_requested:
+                    translation_logger.info(f"[ID:{translation_id}] ⏹️ Leállítási kérés észlelve a második menetben (elem {idx+1}/{total})")
+                    t.status = 'stopped'
+                    t.current_stage = 'stopped'
+                    db.session.commit()
+                    return
                 try:
                     # Csak azokat az elemeket ellenőrizzük, amikben van lefordított szöveg
                     soup = BeautifulSoup(item.get_body_content(), 'html.parser')

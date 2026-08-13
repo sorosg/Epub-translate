@@ -65,6 +65,21 @@ export async function apiPostForm<T>(url: string, formData: FormData): Promise<T
 }
 
 /**
+ * PUT kérés JSON body-val.
+ * @param url a végpont
+ * @param body a JSON body
+ */
+export async function apiPut<T>(url: string, body?: unknown): Promise<T> {
+  const resp = await fetch(url, {
+    ...BASE_OPTIONS,
+    method: 'PUT',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return handleResponse<T>(resp);
+}
+
+/**
  * DELETE kérés.
  * @param url a végpont
  */

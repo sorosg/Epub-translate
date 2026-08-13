@@ -5,7 +5,7 @@
 // ============================================================
 
 /** Fordítási státusz enum – megfelel a backend értékeinek */
-export type TranslationStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TranslationStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stopped';
 
 /** Fordítási szakasz (stage) – a részletes progresszhez */
 export type TranslationStage =

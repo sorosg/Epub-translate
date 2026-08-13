@@ -1,11 +1,15 @@
 // EPUB Fordító – Fordítás kártya (Dashboard listaelem)
+import { useState } from 'react';
 import type { Translation } from '../../api/types';
 import { useTranslation } from 'react-i18next';
-import { Download, Trash2, FileText } from 'lucide-react';
+import { Download, Trash2, FileText, Square } from 'lucide-react';
+import { stopTranslation } from '../../api/translations';
+import { useUiStore } from '../../stores/uiStore';
 
 interface Props {
   translation: Translation;
   onDelete?: (id: number) => void;
+  onStopped?: () => void;
 }
 
 /** A fordítási szakasz magyar címkéje */
@@ -19,10 +23,28 @@ function stageLabel(stage: string, t: (k: string) => string): string {
   }
 }
 
-export function TranslationCard({ translation: t_data, onDelete }: Props) {
+export function TranslationCard({ translation: t_data, onDelete, onStopped }: Props) {
   const { t } = useTranslation();
+  const addToast = useUiStore((s) => s.addToast);
+  const [stopping, setStopping] = useState(false);
+
   const isProcessing = t_data.status === 'processing';
   const isCompleted = t_data.status === 'completed';
+  const isStopped = t_data.status === 'stopped';
+
+  const handleStop = async () => {
+    if (!window.confirm('Biztosan leállítod a fordítást?')) return;
+    setStopping(true);
+    try {
+      await stopTranslation(t_data.id);
+      addToast('success', 'Leállítási kérés elküldve');
+      onStopped?.();
+    } catch {
+      addToast('error', 'Nem sikerült leállítani');
+    } finally {
+      setStopping(false);
+    }
+  };
 
   return (
     <div className="card p-4">
@@ -62,6 +84,11 @@ export function TranslationCard({ translation: t_data, onDelete }: Props) {
               ⭐ {t_data.quality_score}/100 minőség
             </div>
           )}
+
+          {/* Leállított állapot */}
+          {isStopped && (
+            <div className="text-xs text-accent-yellow">⏹️ Leállítva</div>
+          )}
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -74,6 +101,19 @@ export function TranslationCard({ translation: t_data, onDelete }: Props) {
               <Download className="w-4 h-4" />
             </a>
           )}
+
+          {/* Leállítás gomb folyamatban lévő (vagy még pending) fordításnál */}
+          {isProcessing && (
+            <button
+              onClick={() => void handleStop()}
+              disabled={stopping}
+              className="btn-ghost min-w-[40px] min-h-[40px] p-2 text-accent-red hover:bg-accent-red/10"
+              title="Leállítás"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+          )}
+
           {onDelete && (
             <button
               onClick={() => onDelete(t_data.id)}

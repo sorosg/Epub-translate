@@ -1,32 +1,40 @@
 // ============================================================
 // EPUB Fordító – Beállítások oldal
-// 4. fázis: modellválasztás EGY HELYEN (a dashboard + admin
-// duplikáció megszüntetve), API kulcs kezelés.
+// 4. fázis: modellválasztás EGY HELYEN + API kulcs + saját adatok.
 // ============================================================
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Settings, Cpu, Key } from 'lucide-react';
+import { Settings, Cpu, Key, User as UserIcon } from 'lucide-react';
 import type { ModelInfo, RemoteModel } from '../api/types';
 import { fetchModels, fetchUserSettings, saveUserSettings } from '../api/settings';
+import { apiPost } from '../api/client';
+import { useAuthStore } from '../stores/authStore';
 import { useUiStore } from '../stores/uiStore';
 
 export function SettingsPage() {
   const { t } = useTranslation();
   const addToast = useUiStore((s) => s.addToast);
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
 
   const [source, setSource] = useState<'local' | 'remote'>('local');
   const [selectedModel, setSelectedModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Elérhető modellek + jelenlegi beállítások
+  // Saját adatok (profil)
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+
   const { data: models, isLoading: modelsLoading } = useQuery({
     queryKey: ['models'],
     queryFn: fetchModels,
   });
 
-  // Jelenlegi beállítások betöltése
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -37,12 +45,21 @@ export function SettingsPage() {
         setSelectedModel(s.preferred_model || '');
         setApiKey(s.deepseek_api_key || '');
       } catch {
-        // csendben marad, ha nem sikerül (pl. nincs bejelentkezve)
+        // csendben marad
       }
     };
     void load();
     return () => { cancelled = true; };
   }, []);
+
+  // Saját adatok betöltése a bejelentkezett felhasználóból
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.first_name || '');
+      setLastName(user.last_name || '');
+      setEmail(user.email || '');
+    }
+  }, [user]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -60,12 +77,56 @@ export function SettingsPage() {
     }
   };
 
+  const handleProfileSave = async () => {
+    setProfileSaving(true);
+    try {
+      await apiPost('/api/profile', {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        password: password || undefined,
+        deepseek_api_key: apiKey || undefined,
+      });
+      // Frissítjük a lokális user állapotot
+      if (user) {
+        setUser({ ...user, first_name: firstName, last_name: lastName, email });
+      }
+      setPassword('');
+      addToast('success', 'Profil mentve');
+    } catch (e) {
+      addToast('error', (e as Error).message || t('common.errorOccurred'));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
         <Settings className="w-6 h-6" />
         {t('nav.settings')}
       </h1>
+
+      {/* Saját adatok */}
+      <div className="card card-body space-y-3">
+        <div className="flex items-center gap-2 text-text-primary">
+          <UserIcon className="w-5 h-5" />
+          <h2 className="font-semibold">Saját adatok</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input className="form-input" placeholder="Vezetéknév" value={lastName}
+            onChange={(e) => setLastName(e.target.value)} />
+          <input className="form-input" placeholder="Keresztnév" value={firstName}
+            onChange={(e) => setFirstName(e.target.value)} />
+          <input className="form-input" placeholder="Email" type="email" value={email}
+            onChange={(e) => setEmail(e.target.value)} />
+          <input className="form-input" placeholder="Új jelszó (opcionális)" type="password" value={password}
+            onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <button onClick={() => void handleProfileSave()} disabled={profileSaving} className="btn-primary">
+          {profileSaving ? t('common.loading') : 'Profil mentése'}
+        </button>
+      </div>
 
       {/* Modellforrás */}
       <div className="card card-body space-y-4">
@@ -89,7 +150,6 @@ export function SettingsPage() {
           </button>
         </div>
 
-        {/* Helyi modellek listája */}
         {source === 'local' && (
           <div className="space-y-2">
             {modelsLoading ? (
@@ -114,7 +174,6 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Remote modellek listája */}
         {source === 'remote' && (
           <div className="space-y-2">
             <div className="flex items-start gap-2">
@@ -144,7 +203,6 @@ export function SettingsPage() {
         )}
       </div>
 
-      {/* Mentés */}
       <button onClick={handleSave} disabled={saving} className="btn-primary w-full">
         {saving ? t('common.loading') : t('common.save')}
       </button>

@@ -49,6 +49,9 @@ class Translation(db.Model):
     # Kétmenetes fordítás mezők
     first_pass_model = db.Column(db.String(100))  # első menet modellje (pl. 7b)
     second_pass_model = db.Column(db.String(100))  # második menet modellje (pl. 14b)
+    # A felhasználó által kért leállítás jelzése – a fordítási ciklus ezt
+    # ellenőrzi minden iterációnál, és ha True, a lehető leggyorsabban leáll.
+    stop_requested = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ---- 1. GLOSSZÁRIUM (automatikus terminológia építés) ----

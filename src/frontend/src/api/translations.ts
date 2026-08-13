@@ -27,6 +27,14 @@ export async function fetchStatsSummary(): Promise<StatsSummary> {
   return apiGet<StatsSummary>('/api/stats/summary');
 }
 
+/** Folyamatban lévő fordítás leállítása */
+export async function stopTranslation(id: number): Promise<void> {
+  await fetch(`/api/translations/${id}/stop`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  });
+}
+
 /**
  * EPUB fájl feltöltése fordításra.
  * A backend form-encoded választ ad redirect-el, ezért itt FormData-t használunk.
