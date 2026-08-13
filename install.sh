@@ -121,10 +121,20 @@ detect_installation_mode() {
     PROJECT_DIR="$HOME/epub-translator"
     SCRIPT_VERSION="$VERSION"  # elmentjük a script verzióját, mielőtt a source felülírná
     
-    # Önfrissítés: ha a projektkönyvtárban van frissebb install.sh, használjuk azt
+    # Önfrissítés: ha a projektkönyvtárban van ÚJABB install.sh, használjuk azt.
+    # FONTOS: csak akkor váltsunk, ha a projekt verziója TÉNYLEGESEN nagyobb
+    # a futó script verziójánál. A korábbi `!=` összehasonlítás hibás volt,
+    # mert kisebb/régebbi verzióra is átváltott (pl. a friss klón 2.0.2-ből
+    # átadta a vezérlést a futó példány elavult 1.3.5-ös scriptjének).
+    version_gt() {
+        # 0-val tér vissza, ha $1 (A) nagyobb, mint $2 (B)
+        [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
+    }
     if [ -f "$PROJECT_DIR/install.sh" ] && [ "$PROJECT_DIR/install.sh" != "$(realpath "$0" 2>/dev/null || echo "$0")" ]; then
-        PROJECT_VERSION=$(grep -m1 '^VERSION=' "$PROJECT_DIR/install.sh" 2>/dev/null | cut -d'"' -f2)
-        if [ -n "$PROJECT_VERSION" ] && [ "$PROJECT_VERSION" != "$VERSION" ]; then
+        # A verziószámból eltávolítjuk az esetleges 'v' előtagot
+        PROJECT_VERSION=$(grep -m1 '^VERSION=' "$PROJECT_DIR/install.sh" 2>/dev/null | cut -d'"' -f2 | tr -d 'v')
+        CUR_VERSION="$(printf '%s' "$VERSION" | tr -d 'v')"
+        if [ -n "$PROJECT_VERSION" ] && version_gt "$PROJECT_VERSION" "$CUR_VERSION"; then
             log_info "A projektkönyvtárban lévő install.sh újabb (v$PROJECT_VERSION), átváltás..."
             exec bash "$PROJECT_DIR/install.sh"
         fi
