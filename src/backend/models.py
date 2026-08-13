@@ -141,6 +141,22 @@ class ReaderBookmark(db.Model):
     book = db.relationship('Book', backref='bookmarks')
     __table_args__ = (db.UniqueConstraint('user_id', 'book_id', name='uq_user_book_bookmark'),)
 
+class ReadingHistory(db.Model):
+    """Olvasási előzmény – a felhasználó által megnyitott könyvek és
+    az utolsó olvasási pozíció követése (az UI-redesign 3. fázisához).
+    A ReaderBookmark-tól abban különbözik, hogy időrendi előzményeket
+    is tárol, nem csak egyetlen könyvjelzőt könyvenként."""
+    __tablename__ = 'reading_history'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    chapter_index = db.Column(db.Integer, default=0)  # 0-alapú fejezet index
+    scroll_position = db.Column(db.Integer, default=0)  # scroll pozíció pixelben
+    last_read_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = db.relationship('User', backref='reading_history')
+    book = db.relationship('Book', backref='reading_history')
+    __table_args__ = (db.UniqueConstraint('user_id', 'book_id', name='uq_user_book_history'),)
+
 class ReferenceBook(db.Model):
     __tablename__ = 'reference_books'
     id = db.Column(db.Integer, primary_key=True)

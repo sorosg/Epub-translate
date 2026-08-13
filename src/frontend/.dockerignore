@@ -1,0 +1,13 @@
+# A Docker build context-ből kizárandó fájlok/mappák
+# (a multi-stage build a saját node_modules-át és dist-jét készíti el)
+
+node_modules
+dist
+.git
+.gitignore
+.vscode
+*.log
+.env
+.env.local
+.DS_Store
+Thumbs.db

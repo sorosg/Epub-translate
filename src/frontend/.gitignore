@@ -1,0 +1,17 @@
+# Függőségek – soha ne kerüljenek verziókezelésbe
+node_modules/
+
+# Build kimenet – a dist mappát az Nginx szolgálja ki, nem a git
+dist/
+
+# Naplók
+*.log
+
+# Szerkesztő/OS fájlok
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Környezeti változók
+.env
+.env.local

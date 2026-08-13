@@ -1,13 +1,13 @@
 services:
   nginx:
-    image: nginx:alpine
+    # A React frontend multi-stage build-je (node:20-alpine -> nginx:alpine).
+    # A build a Dockerben történik, így a hostra NEM kell Node.js.
+    build: ./frontend
     container_name: epub-nginx
     ports:
       - "8080:80"
       - "8443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static:/usr/share/nginx/html/static:ro
       - ./logs/nginx:/var/log/nginx
       # SSL tanúsítványok (Let's Encrypt)
       - ./nginx/ssl:/etc/letsencrypt:ro

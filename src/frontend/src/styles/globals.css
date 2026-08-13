@@ -1,0 +1,113 @@
+/* ============================================================
+   EPUB Fordító – Globális stílusok
+   Tailwind alapok + egyedi design tokenek (modern sötét téma)
+   ============================================================ */
+
+/* Tailwind direktívák */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Alap test stílus – egységes sötét háttér, itt nincs témaváltó */
+@layer base {
+  html {
+    @apply antialiased;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-bg-primary text-text-primary min-h-screen;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Görgetősáv – sötét témához illeszkedő */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #161b22;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+  }
+}
+
+/* Hasznos komponens-osztályok a gyors fejlesztéshez */
+@layer components {
+  /* Kártya – a korábbi design bg-card színével és border-rel */
+  .card {
+    @apply bg-bg-card border border-border-color rounded-2xl overflow-hidden;
+  }
+
+  .card-header {
+    @apply bg-bg-secondary border-b border-border-color px-5 py-4 font-semibold;
+  }
+
+  .card-body {
+    @apply p-5;
+  }
+
+  /* Gombok – nagyobb érintési célterület mobilon (min 44px) */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all
+           px-4 py-2.5 text-sm min-h-[44px] select-none;
+  }
+  .btn-primary {
+    @apply btn bg-accent-blue text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-success {
+    @apply btn bg-accent-green text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply btn bg-accent-red text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-outline {
+    @apply btn border border-border-color text-text-secondary hover:text-text-primary hover:bg-bg-secondary;
+  }
+  .btn-ghost {
+    @apply btn text-text-secondary hover:text-accent-blue hover:bg-bg-secondary;
+  }
+
+  /* Form elemek */
+  .form-input {
+    @apply w-full bg-bg-secondary border border-border-color text-text-primary rounded-xl
+           px-4 py-2.5 min-h-[44px] focus:outline-none focus:border-accent-blue
+           focus:ring-2 focus:ring-accent-blue/20 transition-colors;
+  }
+  .form-label {
+    @apply block text-sm font-medium text-text-primary mb-1.5;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* Animációk */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fadeInUp 0.3s ease forwards;
+}
+
+/* Skeleton betöltési effekt */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #30363d 25%, rgba(88,166,255,0.08) 50%, #30363d 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}

@@ -1,8 +1,8 @@
--as port problémájával nem tudunk va# EPUB Fordító Rendszer v1.0
+# EPUB Fordító Rendszer v2.0
 
 ## 🧠 "Smart Optimizer" - Intelligens Optimalizáló
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2022.04+-orange)
@@ -92,6 +92,9 @@ A rendszer **kétmenetes fordítást** végez (első menet: AI fordítás, máso
 - **Operációs Rendszer:** Ubuntu 22.04 LTS vagy újabb (64 bit)
 - **Docker:** 24.0+
 - **Docker Compose:** 2.20+
+- **Node.js:** NEM szükséges a gépre (a React frontend a Dockerben épül meg)
+
+> **Megjegyzés:** A React frontend multi-stage Docker build segítségével épül meg (`node:20-alpine` → `nginx:alpine`), így a production telepítéshez nem kell Node.js a host gépre. Fejlesztéshez (fakultatív) Node.js 18+ ajánlott a `npm run dev` futtatásához.
 
 ### Automatikus Modell Ajánlás (RAM alapú, GPU nélkül)
 
@@ -510,4 +513,4 @@ A snapshot automatikusan commit-ol és tag-et készít. A tag alapján `git chec
 
 ---
 
-Készült ❤️-vel Magyarországon – v1.3.0
+Készült ❤️-vel Magyarországon – v2.0.0

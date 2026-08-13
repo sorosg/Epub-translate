@@ -1,0 +1,51 @@
+{
+  "app": {
+    "title": "EPUB Translator",
+    "tagline": "Translate books from English to Hungarian"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "library": "Library",
+    "settings": "Settings",
+    "history": "Reading History",
+    "stats": "Statistics",
+    "admin": "Admin",
+    "logout": "Log out"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "email": "Email address",
+    "password": "Password",
+    "submit": "Sign in",
+    "error": "Invalid email or password",
+    "success": "Signed in successfully"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "upload": "Upload",
+    "search": "Search",
+    "confirm": "Confirm",
+    "notFound": "No results",
+    "errorOccurred": "An error occurred"
+  },
+  "dashboard": {
+    "welcome": "Welcome, {{name}}!",
+    "activeTranslations": "Active translations",
+    "uploadTitle": "Upload a new EPUB",
+    "uploadHint": "Drag a file here, or click to browse",
+    "noTranslations": "You have no translations yet",
+    "model": "Model",
+    "status": "Status",
+    "progress": "Progress"
+  },
+  "status": {
+    "pending": "Pending",
+    "processing": "Processing",
+    "completed": "Completed",
+    "failed": "Failed"
+  }
+}

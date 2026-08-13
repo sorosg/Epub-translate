@@ -1,0 +1,83 @@
+# 🏗️ EPUB Fordító – Új Architektúra (React SPA)
+
+> A frontend UI-redesign projekt célja, hogy a monolit Jinja2 template-ek helyett egy modern, komponens-alapú React SPA-t használjunk, a Flask backendet pedig JSON API-ként.
+
+## 1. Rétegdiagram
+
+```
+┌─────────────────────────────────────────────────┐
+│  Böngésző (React SPA – Vite build)              │
+│  – komponensek, state (Zustand), query (TanStack)│
+└────────────────┬────────────────────────────────┘
+                 │ HTTP/JSON (same-origin session cookie)
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  Nginx (80/443)                                 │
+│  – SPA statikus fájlok (dist/)                  │
+│  – /api proxy → backend:5000                    │
+└────────────────┬────────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  Flask Backend (Gunicorn :5000)                 │
+│  – auth (session), fordítási logika, könyvtár   │
+└───────┬─────────────┬──────────────┬────────────┘
+        │             │              │
+   ┌────▼────┐  ┌─────▼─────┐  ┌────▼─────┐
+   │PostgreSQL│  │  Ollama   │  │  Redis    │
+   └─────────┘  └───────────┘  └──────────┘
+```
+
+## 2. Folyamat (bejelentkezés + adatlekérés)
+
+1. A SPA betölt, a `useAuthStore.fetchUser()` meghívja a `GET /api/profile` végpontot.
+2. Ha nincs session (401), a `RequireAuth` őr átirányít a `/login` oldalra.
+3. A login `POST /login` (form-encoded) után session cookie-t kap.
+4. Minden további kérés a `client.ts` `same-origin` fetch-csel megy, ami a cookie-t küldi.
+
+## 3. Frontend mappa struktúra
+
+```
+frontend/
+├── src/
+│   ├── main.tsx            # React root + Query provider
+│   ├── App.tsx             # útvonaltérkép + auth őr
+│   ├── api/                # fetch réteg + típusok
+│   ├── stores/             # Zustand (auth, UI)
+│   ├── components/
+│   │   ├── layout/         # AppShell, Topbar, Sidebar, MobileNav
+│   │   └── ui/             # Toast, Modal, Skeleton, ...
+│   ├── pages/              # oldal komponensek
+│   ├── locales/            # i18n (hu/en)
+│   └── styles/             # Tailwind + tokenek
+└── dist/                   # Vite production build (git-ignorált)
+```
+
+## 4. Kapcsolat a backenddel
+
+- **Session cookie** a hitelesítéshez (a Flask `flask-login` továbbra is működik).
+- **Vite dev proxy**: fejlesztésben a `vite.config.ts` a `/api`, `/login`, `/logout`, `/upload`, `/download` útvonalakat a `localhost:5000`-re irányítja.
+- **Production**: az Nginx a SPA `dist/` mappáját szolgálja, a `/api`-t pedig a backendre proxizza.
+
+## 5. Új backend végpontok (a bővítésekhez)
+
+| Végpont | Cél |
+|---------|-----|
+| `GET /api/profile` | profil adat |
+| `GET /api/review/:id` | fejezetek JSON-ban |
+| `GET /api/admin/users` | felhasználók listája |
+| `GET /api/admin/logs` | log tartalom |
+| `GET /api/history` / `POST /api/history` | olvasási előzmény |
+| `GET /api/stats/summary` | statisztika |
+| `GET /api/library/:id/toc` | címtáblázat |
+| `GET /api/user/settings` | beállítások olvasása |
+
+## 6. Követelmények
+
+- **Node.js 18+** (ajánlott 20 LTS) a frontend build-hez
+- **npm** (a Node.js-szel együtt települ)
+- A backend változatlanul Docker konténerben fut (Flask + Gunicorn)
+
+---
+
+*Kapcsolódó: `UI_REDESIGN_PLAN.md`, `DEVELOPMENT_LOG.md`, `frontend/README.md`*

@@ -1,0 +1,51 @@
+{
+  "app": {
+    "title": "EPUB Fordító",
+    "tagline": "Könyvek fordítása angolról magyarra"
+  },
+  "nav": {
+    "dashboard": "Vezérlőpult",
+    "library": "Könyvtár",
+    "settings": "Beállítások",
+    "history": "Olvasási előzmények",
+    "stats": "Statisztika",
+    "admin": "Admin",
+    "logout": "Kijelentkezés"
+  },
+  "auth": {
+    "loginTitle": "Bejelentkezés",
+    "email": "Email cím",
+    "password": "Jelszó",
+    "submit": "Bejelentkezés",
+    "error": "Hibás email vagy jelszó",
+    "success": "Sikeres bejelentkezés"
+  },
+  "common": {
+    "loading": "Betöltés...",
+    "save": "Mentés",
+    "cancel": "Mégse",
+    "edit": "Szerkesztés",
+    "delete": "Törlés",
+    "upload": "Feltöltés",
+    "search": "Keresés",
+    "confirm": "Megerősítés",
+    "notFound": "Nincs találat",
+    "errorOccurred": "Hiba történt"
+  },
+  "dashboard": {
+    "welcome": "Üdv, {{name}}!",
+    "activeTranslations": "Aktív fordítások",
+    "uploadTitle": "Új EPUB feltöltése",
+    "uploadHint": "Húzd ide a fájlt, vagy kattints a tallózáshoz",
+    "noTranslations": "Még nincsenek fordításaid",
+    "model": "Modell",
+    "status": "Státusz",
+    "progress": "Haladás"
+  },
+  "status": {
+    "pending": "Várakozik",
+    "processing": "Folyamatban",
+    "completed": "Kész",
+    "failed": "Hiba"
+  }
+}

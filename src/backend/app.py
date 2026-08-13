@@ -7,7 +7,7 @@ from flasgger import Swagger
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
-from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory, UserBookPreference, ReaderBookmark
+from models import db, User, Translation, SystemSettings, OptimizationLog, ReferenceBook, Book, GlossaryEntry, TranslationMemory, UserBookPreference, ReaderBookmark, ReadingHistory
 from datetime import datetime
 from functools import wraps
 from packaging import version as pkg_version
@@ -164,6 +164,32 @@ def login():
 def internal_server_error(e):
     app.logger.error(f"500 error: {_traceback.format_exc()}")
     return f"<h2>500 Internal Server Error</h2><pre>{_traceback.format_exc()}</pre>", 500
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    """JSON alapú bejelentkezés a React SPA számára.
+    Sikeres belépéskor a felhasználó adatait adja vissza JSON-ban,
+    hibás adatnál 401-es hibát JSONban."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    password = data.get('password') or ''
+    user = User.query.filter_by(email=email).first()
+    if user and user.password_hash and check_password_hash(user.password_hash, password):
+        login_user(user)
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name or '',
+                'last_name': user.last_name or '',
+                'tokens': user.tokens,
+                'is_admin': user.is_admin,
+                'preferred_model_source': user.preferred_model_source or 'local',
+                'preferred_model': user.preferred_model or '',
+            }
+        })
+    return jsonify({'success': False, 'error': 'Hibás email vagy jelszó'}), 401
 
 @app.route('/logout')
 @login_required
@@ -352,6 +378,27 @@ def model_status():
         return jsonify({'error':'Nem érhető el az Ollama'}), resp.status_code
     except Exception as e:
         return jsonify({'error':str(e)[:100]}), 500
+
+@app.route('/api/translations', methods=['GET'])
+@login_required
+def api_translations():
+    """A felhasználó összes fordításának lekérése (a React Dashboard listához)."""
+    translations = Translation.query.filter_by(user_id=current_user.id)\
+        .order_by(Translation.created_at.desc()).all()
+    return jsonify({'translations': [{
+        'id': t.id,
+        'status': t.status,
+        'progress': t.progress,
+        'original_filename': t.original_filename,
+        'current_stage': t.current_stage,
+        'current_chapter': t.current_chapter,
+        'total_chapters': t.total_chapters,
+        'words_processed': t.words_processed,
+        'total_words': t.total_words,
+        'model_used': t.model_used,
+        'quality_score': t.quality_score,
+        'created_at': t.created_at.isoformat() if t.created_at else None,
+    } for t in translations]})
 
 @app.route('/api/translations/events')
 @login_required
@@ -1536,6 +1583,213 @@ def admin_logs_clear():
     except Exception as e:
         return jsonify({'error': str(e)[:200]}), 500
 
+# ==== ÚJ JSON VÉGPONTOK (UI-redesign React SPA-hoz) ====
+
+@app.route('/api/profile', methods=['GET'])
+@login_required
+def api_profile():
+    """A bejelentkezett felhasználó profiljának lekérése JSON formátumban.
+    A React SPA authStore-ja ezt hívja a session ellenőrzéséhez."""
+    translations_count = Translation.query.filter_by(user_id=current_user.id).count()
+    return jsonify({
+        'id': current_user.id,
+        'email': current_user.email,
+        'first_name': current_user.first_name or '',
+        'last_name': current_user.last_name or '',
+        'tokens': current_user.tokens,
+        'points': current_user.points,
+        'level': current_user.level,
+        'is_admin': current_user.is_admin,
+        'language': current_user.language or 'hu',
+        'preferred_model_source': current_user.preferred_model_source or 'local',
+        'preferred_model': current_user.preferred_model or '',
+        'deepseek_api_key': ('***' + current_user.deepseek_api_key[-4:]) if current_user.deepseek_api_key else '',
+        'translations_count': translations_count,
+    })
+
+@app.route('/api/user/settings', methods=['GET'])
+@login_required
+def api_get_user_settings():
+    """A felhasználó beállításainak lekérése (a React Beállítások oldalhoz)."""
+    return jsonify({
+        'success': True,
+        'deepseek_api_key': ('***' + current_user.deepseek_api_key[-4:]) if current_user.deepseek_api_key else '',
+        'preferred_model_source': current_user.preferred_model_source or 'local',
+        'preferred_model': current_user.preferred_model or '',
+        'dark_mode': current_user.dark_mode,
+    })
+
+@app.route('/api/library/<int:book_id>/toc')
+@login_required
+def api_library_toc(book_id):
+    """Egy könyv címtáblázatának (TOC) lekérése – csak a fejezet címek és indexek."""
+    book = Book.query.get_or_404(book_id)
+    if not book.file_path or not os.path.exists(book.file_path):
+        return jsonify({'error': 'A fájl nem található', 'chapters': []})
+    try:
+        from ebooklib import epub as epub_lib
+        from bs4 import BeautifulSoup
+        bk = epub_lib.read_epub(book.file_path)
+        chapters = []
+        items = list(bk.get_items_of_type(9))
+        for idx, item in enumerate(items):
+            soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+            text = soup.get_text().strip()
+            if text and len(text) > 50:
+                title_tag = soup.find(['h1', 'h2', 'h3'])
+                title = title_tag.get_text().strip() if title_tag else f'Fejezet {idx+1}'
+                chapters.append({'index': idx, 'title': title[:80]})
+        return jsonify({'chapters': chapters, 'title': book.title or book.filename})
+    except Exception as e:
+        return jsonify({'error': str(e)[:200], 'chapters': []})
+
+@app.route('/api/review/<int:translation_id>')
+@login_required
+def api_review(translation_id):
+    """A lefordított fejezetek lekérése JSON-ban (a React Review oldalhoz)."""
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        return jsonify({'error': 'Nincs jogosultságod'}), 403
+    if t.status != 'completed':
+        return jsonify({'error': 'Csak befejezett fordításokat lehet átnézni'}), 400
+    
+    from ebooklib import epub as epub_lib
+    from bs4 import BeautifulSoup
+    chapters = []
+    try:
+        output_path = os.path.join(app.config['OUTPUT_FOLDER'], t.output_filename)
+        if os.path.exists(output_path):
+            book = epub_lib.read_epub(output_path)
+            items = list(book.get_items_of_type(9))
+            for idx, item in enumerate(items):
+                soup = BeautifulSoup(item.get_body_content(), 'html.parser')
+                text = soup.get_text().strip()
+                if text and len(text) > 30:
+                    chapters.append({'index': idx, 'text': text, 'length': len(text)})
+    except Exception as e:
+        return jsonify({'error': f'Nem sikerült beolvasni: {str(e)[:100]}', 'chapters': []})
+    
+    return jsonify({
+        'translation': {
+            'id': t.id,
+            'original_filename': t.original_filename,
+            'quality_score': t.quality_score,
+            'model_used': t.model_used,
+        },
+        'chapters': chapters,
+    })
+
+@app.route('/api/history', methods=['GET'])
+@login_required
+def api_history():
+    """A felhasználó olvasási előzményeinek lekérése (a React History oldalhoz)."""
+    entries = ReadingHistory.query.filter_by(user_id=current_user.id)\
+        .order_by(ReadingHistory.last_read_at.desc()).all()
+    return jsonify({'history': [{
+        'id': e.id,
+        'book_id': e.book_id,
+        'book_title': e.book.title if e.book else '',
+        'book_author': e.book.author if e.book else '',
+        'chapter_index': e.chapter_index,
+        'scroll_position': e.scroll_position,
+        'last_read_at': e.last_read_at.isoformat() if e.last_read_at else None,
+    } for e in entries]})
+
+@app.route('/api/history', methods=['POST'])
+@login_required
+def api_history_save():
+    """Olvasási pozíció mentése az előzményekbe (könyv és fejezet megnyitásakor)."""
+    data = request.get_json() or {}
+    book_id = data.get('book_id')
+    chapter_index = data.get('chapter_index', 0)
+    scroll_position = data.get('scroll_position', 0)
+    if not book_id:
+        return jsonify({'error': 'Hiányzó book_id'}), 400
+    
+    # Meglévő bejegyzés frissítése, vagy új létrehozása
+    entry = ReadingHistory.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    if entry:
+        entry.chapter_index = chapter_index
+        entry.scroll_position = scroll_position
+        entry.last_read_at = datetime.utcnow()
+    else:
+        entry = ReadingHistory(
+            user_id=current_user.id,
+            book_id=book_id,
+            chapter_index=chapter_index,
+            scroll_position=scroll_position,
+        )
+        db.session.add(entry)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/stats/summary')
+@login_required
+def api_stats_summary():
+    """Fordítási statisztika összefoglaló a React Stats oldalhoz."""
+    translations = Translation.query.filter_by(user_id=current_user.id).all()
+    total_translations = len(translations)
+    completed = [t for t in translations if t.status == 'completed']
+    completed_translations = len(completed)
+    total_words = sum(t.total_words or 0 for t in translations)
+    active_translations = sum(1 for t in translations if t.status == 'processing')
+    quality_scores = [t.quality_score for t in completed if t.quality_score is not None]
+    average_quality = round(sum(quality_scores) / len(quality_scores), 1) if quality_scores else None
+    
+    return jsonify({
+        'total_translations': total_translations,
+        'completed_translations': completed_translations,
+        'total_words': total_words,
+        'average_quality': average_quality,
+        'active_translations': active_translations,
+    })
+
+@app.route('/api/admin/users')
+@login_required
+@admin_required
+def api_admin_users():
+    """Felhasználók listájának lekérése JSON-ban (a React Admin oldalhoz)."""
+    users = User.query.order_by(User.created_at.desc()).all()
+    return jsonify({'users': [{
+        'id': u.id,
+        'email': u.email,
+        'first_name': u.first_name or '',
+        'last_name': u.last_name or '',
+        'tokens': u.tokens,
+        'is_admin': u.is_admin,
+        'created_at': u.created_at.isoformat() if u.created_at else None,
+    } for u in users]})
+
+@app.route('/api/admin/logs')
+@login_required
+@admin_required
+def api_admin_logs():
+    """Log tartalmak lekérése JSON-ban (a React Admin Logs oldalhoz)."""
+    log_type = request.args.get('type', 'translation')
+    lines = request.args.get('lines', 200, type=int)
+    lines = min(max(lines, 10), 5000)
+    
+    log_file_map = {
+        'translation': os.path.join(LOG_DIR, 'translation.log'),
+        'app': os.path.join(LOG_DIR, 'app.log'),
+    }
+    log_file = log_file_map.get(log_type, log_file_map['translation'])
+    log_content = ''
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                log_content = ''.join(f.readlines()[-lines:])
+        except Exception as e:
+            log_content = f'[HIBA] {e}'
+    
+    available_logs = [
+        {'name': name, 'label': 'Fordítási log' if name == 'translation' else 'Alkalmazás log',
+         'size_mb': round(os.path.getsize(path) / (1024*1024), 2) if os.path.exists(path) else 0,
+         'exists': os.path.exists(path)}
+        for name, path in log_file_map.items()
+    ]
+    return jsonify({'log_content': log_content, 'log_type': log_type, 'available_logs': available_logs})
+
 def translate_epub(app_ref, translation_id, filepath, context_files=None, model_source='local'):
     with app_ref.app_context():
         t = Translation.query.get(translation_id)
@@ -2205,6 +2459,12 @@ def init_db():
                 db.session.execute(db.text(f"ALTER TABLE translations ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             db.session.commit()
         except Exception as e: db.session.rollback()
+        # Új táblák létrehozása (pl. reading_history) – a db.create_all() csak
+        # a hiányzó táblákat hozza létre, a meglévőket nem bántja.
+        # Az Alembic migráció után is szükséges, mert az új modellek
+        # nincsenek feltétlenül a migrációs szkriptekben.
+        db.create_all()
+        
         admin = User.query.filter_by(email=Config.ADMIN_EMAIL).first()
         if not admin:
             admin = User(username='admin', email=Config.ADMIN_EMAIL, password_hash=generate_password_hash(Config.ADMIN_PASSWORD),
