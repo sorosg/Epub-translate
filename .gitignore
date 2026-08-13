@@ -1,0 +1,55 @@
+# ============================================================
+# EPUB Fordító – .gitignore
+# macOS/Windows szinkron-maradványok és felesleges fájlok kizárása
+# ============================================================
+
+# ---------- macOS (AppleDouble / szinkronmeta) ----------
+.DS_Store
+.AppleDouble
+.LSOverride
+:Zone.Identifier
+:com.apple.*
+com.apple.*
+*:Zone.Identifier
+*:com.apple.*
+
+# ---------- Windows ----------
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ---------- Szerkesztők ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# ---------- Node ----------
+node_modules/
+dist/
+*.log
+
+# ---------- Környezeti titkok (sosem kerülhetnek a gitbe) ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Futás közben keletkező adatok ----------
+logs/
+book_database/
+translation_memory/
+glossaries/
+community_library/
+achievements/
+fine_tuning/
+optimization_profiles/
+backups/
+updates.log

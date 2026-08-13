@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = os.environ.get('VERSION', '2.0.0')
+    VERSION = os.environ.get('VERSION', '2.0.2')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-08-12')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')
