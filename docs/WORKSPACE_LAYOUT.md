@@ -11,7 +11,8 @@ Ez a dokumentum pontosan leírja, hogy **melyik mappa mire való**, hogy ne keve
 |---|-----------|--------|----------------|
 | 1 | `/mnt/c/Users/soros/Desktop/Epub-translate` | **FORRÁS-repo** (a GitHub tükre) | Ezt **szerkeszted**, innen commitolsz + pusholsz |
 | 2 | `/home/sorosg/epub-translator` | **TELEPÍTETT példány** (futó rendszer) | Ezt **indítod / nézed / frissíted** – ide ne írj kódot |
-| 3 | `github.com/sorosg/Epub-translate` | **GITHUB** | A `1`-es repo nyilvános mása (a `git push` ide küld) |
+| 3 | `/home/sorosg/epub-translator-src` | **TISZTA KLÓN** (pull + install.sh) | Innen **pullolsz**, itt futtatod az `./install.sh`-t |
+| 4 | `github.com/sorosg/Epub-translate` | **GITHUB** | A `1`-es repo nyilvános mása (a `git push` ide küld) |
 
 > ⚠️ **A legfontosabb szabály:** a kódot **csak az `1`-es mappában** szerkeszd.
 > A `2`-es mappa a telepítő által **generált futtató példány** – ha ott javítasz,
@@ -95,14 +96,23 @@ cd /mnt/c/Users/soros/Desktop/Epub-translate
 
 ### Gyors fordulat, ha dolgozol
 ```bash
-# Szerkesztés után a forrás-repóban:
+# 1) Szerkesztés a forrás-repóban:
 cd /mnt/c/Users/soros/Desktop/Epub-translate
 git add -A
 git commit -m "leírás"
 git push origin main
 
-# Friss telepítés teszt:
-cd /mnt/c/Users/soros/Desktop/Epub-translate
+# 2) A WSL tiszta klónnal pullolj + indítsd az install.sh-t:
+cd /home/sorosg/epub-translator-src
+git pull origin main
+./install.sh
+```
+
+### Tiszta klón létrehozása (első alkalommal)
+```bash
+cd /home/sorosg
+git clone https://github.com/sorosg/Epub-translate.git epub-translator-src
+cd epub-translator-src
 ./install.sh
 ```
 
