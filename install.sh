@@ -26,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="2.0.0"
+VERSION="1.3.5"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="1.0.0"
@@ -656,8 +656,10 @@ perform_fresh_install() {
     create_directory_structure
     
     # Port detektálás és beállítás
-    HTTP_PORT=80
-    HTTPS_PORT=443
+    # A docker-compose.yml a 8080->80 és 8443->443 mappinget használja,
+    # így a webes felület a gazdagépen a 8080-as (és HTTPS esetén 8443-as) porton érhető el.
+    HTTP_PORT=8080
+    HTTPS_PORT=8443
     
     create_all_files
     apply_optimization
@@ -1015,14 +1017,14 @@ create_docker_compose() {
     cat > docker-compose.yml << DOCKEREOF
 services:
   nginx:
-    image: nginx:alpine
+    # React SPA multi-stage build (node:20-alpine -> nginx:alpine).
+    # A build a Dockerben történik, így a hostra NEM kell Node.js.
+    build: ./frontend
     container_name: epub-nginx
     ports:
       - "8080:80"
       - "8443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static:/usr/share/nginx/html/static:ro
       - ./logs/nginx:/var/log/nginx
     depends_on:
       backend:
@@ -1142,6 +1144,10 @@ DOCKEREOF
 }
 
 create_nginx_config() {
+    # Megjegyzés: ez a függvény már nem kerül aktív használatra a React SPA
+    # telepítésénél (a frontend/nginx.conf a mérvadó). Megtartjuk a független
+    # átmeneti HTTP proxy-ként tesztelési célokra, de a gyökér mostantól a
+    # SPA index.html-re irányul (try_files fallback).
     cat > nginx/nginx.conf << 'NGINXEOF'
 events { worker_connections 1024; }
 http {
@@ -1152,8 +1158,8 @@ http {
         listen 80;
         location /health { return 200 "OK"; }
         location /api/ { proxy_pass http://backend:5000; }
-        location /static { alias /usr/share/nginx/html/static; expires 30d; }
-        location / { proxy_pass http://backend:5000; proxy_set_header Host $host; }
+        location /assets/ { root /usr/share/nginx/html; expires 30d; }
+        location / { root /usr/share/nginx/html; try_files $uri $uri/ /index.html; }
     }
 }
 NGINXEOF
@@ -2362,7 +2368,7 @@ UPDATEEOF
 #!/bin/bash
 echo "EPUB Fordító v11.0 Smart Optimizer"
 docker compose ps
-echo "Web: http://localhost | Email: http://localhost:8025"
+echo "Web: http://localhost:8080 | MailHog (email teszt): http://localhost:8025"
 echo "Rendszer: CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}')% | RAM: $(free -h | awk '/^Mem:/{print $3"/"$2}')"
 STATUSEOF
 
@@ -2395,9 +2401,9 @@ show_summary() {
     log_header "║   \"${CODENAME}\"                            ║"
     log_header "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "🌐 Web:        http://localhost:${HTTP_PORT:-80}"
-    echo "📧 Email:      http://localhost:8025"
-    echo "📊 Monitor:    http://localhost/admin (rendszer infók)"
+    echo "🌐 Web:        http://localhost:${HTTP_PORT:-8080}"
+    echo "📧 MailHog:    http://localhost:8025 (email teszt)"
+    echo "📊 Monitor:    http://localhost:${HTTP_PORT:-8080}/admin (rendszer infók)"
     echo ""
     echo "🆕 v11.0 Újdonságok:"
     echo "   🧠 Automatikus modell optimalizálás"

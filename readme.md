@@ -92,9 +92,6 @@ A rendszer **kétmenetes fordítást** végez (első menet: AI fordítás, máso
 - **Operációs Rendszer:** Ubuntu 22.04 LTS vagy újabb (64 bit)
 - **Docker:** 24.0+
 - **Docker Compose:** 2.20+
-- **Node.js:** NEM szükséges a gépre (a React frontend a Dockerben épül meg)
-
-> **Megjegyzés:** A React frontend multi-stage Docker build segítségével épül meg (`node:20-alpine` → `nginx:alpine`), így a production telepítéshez nem kell Node.js a host gépre. Fejlesztéshez (fakultatív) Node.js 18+ ajánlott a `npm run dev` futtatásához.
 
 ### Automatikus Modell Ajánlás (RAM alapú, GPU nélkül)
 
@@ -135,9 +132,9 @@ bash install.sh
 
 ```bash
 # Webes felület
-http://localhost
+http://localhost:8080
 
-# Email felület (MailHog)
+# MailHog (email teszt, kimenő levelek megtekintése)
 http://localhost:8025
 
 # Admin belépés
@@ -200,7 +197,7 @@ Jelszó: Abrakadabra (változtasd meg!)
 ## 🏗️ Architektúra
 
 ```
-Böngésző (http://localhost:80)
+Böngésző (http://localhost:8080)
         │
         ▼
 ┌───────────────────┐
