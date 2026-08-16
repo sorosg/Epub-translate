@@ -10,7 +10,7 @@
 2. **Jelezd, ha Act mód kell** – módosítás/futtatás előtt mindig jelezd, hogy a felhasználó kapcsoljon Act módba.
 3. **Ne találj ki adatot** – ne generálj jelszót, API-kulcsot, útvonalat vagy verziószámot; a valós értékeket ellenőrizd a fájlokban.
 4. **Ne törölj ellenőrzés nélkül** – törlés/felülírás előtt jelezd, hogy mi és miért törlődik.
-5. **A kanonikus mappa = WSL build-forrás** – minden kódmódosítást ITT végezz, majd szinkronizáld a Desktop-ra (lásd lent).
+5. **A kanonikus mappa = WSL build-forrás** – minden kódmódosítást ITT végezz, szinkronizáld a Desktop-ra, és a Desktop repóból commit+push (branch `main`, SSH).
 6. **Verzió** – minden módosításkor ellenőrizd a verziókezelési szabályt lent, és írd át az érintett 6 helyen.
 7. **Légy tömör, technikai** – magyarul kommunikálj, ahol lehet, tényekkel és fájlhivatkozásokkal.
 8. **Tesztelés** – a kód módosítása után futtasd a verifikációt (`py_compile`, build, `/health`).
@@ -23,7 +23,7 @@
 |------|-------|
 | Név | EPUB Fordító Rendszer |
 | Cél | EPUB könyvek fordítása angolról magyarra (helyi Ollama DeepSeek + opcionális DeepSeek Pro API) |
-| **Aktuális verzió** | **v2.6.11** |
+| **Aktuális verzió** | **v2.6.121** |
 | Tech stack | Flask (Gunicorn) + React 18 (Vite/TS/Tailwind) + PostgreSQL + Ollama + Redis + Nginx + MailHog |
 
 ---
@@ -65,7 +65,20 @@
   cp -r /home/sorosg/epub-translator/backend/* /mnt/c/Users/soros/Desktop/Epub-translate/src/backend/
   cp -r /home/sorosg/epub-translator/frontend/src/* /mnt/c/Users/soros/Desktop/Epub-translate/src/frontend/src/
   ```
-- Az MD-fájlokat is tükrözd (CHANGELOG, ROADMAP, README, USER_GUIDE, DEV_CONTEXT).
+- Az MD-fájlokat is tükrözd (CHANGELOG, ROADMAP, README, USER_GUIDE, DEV_CONTEXT), plusz `desktop/` és `.github/` is.
+
+### 🔄 PUSH szabály (2026-08-16-tól MINDIG)
+A Desktop másolat a git push-forrás (SSH `git@github.com:sorosg/Epub-translate.git`, branch `main`).
+A WSL → Desktop szinkron után a commit + push a Desktop repóból történik:
+```bash
+T=/mnt/c/Users/soros/Desktop/Epub-translate
+# 1. szinkron (lásd fent), majd:
+git -C "$T" add -A
+git -C "$T" commit -m "vX.Y.Z: rövid leírás"
+git -C "$T" push origin main
+```
+- A `.env` SOSEM kerül commitba (a Desktop .gitignore kizárja; push előtt ellenőrizd: `git -C "$T" ls-files | grep env` üres legyen).
+- A CI (`desktop-build.yml`) a `main` tag/push-ra indul; a Windows/macOS telepítőt tag (`git tag vX.Y.Z && git -C "$T" push origin vX.Y.Z`) triggereli.
 
 ---
 
@@ -131,7 +144,7 @@ docker exec epub-postgres psql -U epub_user -d epub_translator -c "..."
 
 ---
 
-## 🧩 Kódkonvenciók (a jelenlegi v2.5.7 állapothoz)
+## 🧩 Kódkonvenciók (a jelenlegi v2.6.122 állapothoz)
 
 - **Endpointok**: törekedj az egységesítésre `/api/` alá (a `/delete`, `/upload`, `/download` még külön van — ismert téma).
 - **Unicode védelem**: `sanitize_text()` — minden kimenő promptot tisztíts (surrogate-hiba megelőzése).
