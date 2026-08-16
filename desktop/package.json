@@ -19,11 +19,11 @@
     "files": [
       "main.js",
       "backend_entry.py",
-      "../frontend/dist/**/*"
+      "../src/frontend/dist/**/*"
     ],
     "extraResources": [
       {
-        "from": "../backend",
+        "from": "../src/backend",
         "to": "backend",
         "filter": ["**/*", "!venv/**", "!__pycache__/**", "!*.pyc"]
       }

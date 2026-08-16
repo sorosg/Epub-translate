@@ -26,3 +26,10 @@ A macOs .dmg-hez Apple fejlesztői fiók + notarization ajánlott (különben
 - ⬜ Hátralévő: PyInstaller + electron-builder éles futtatás/tesztelés,
      AI-motor irányelvek UI-ba (GPU-kapcsoló + VRAM-modell + figyelmeztetés),
      macOS notarization.
+
+
+## 📤 Push (a Desktop repó a git-forrás)
+A Desktop másolat a push-forrás (SSH remote, `main` branch). Folyamat:
+1. WSL → Desktop szinkron (a közös kód + desktop/ + .github/).
+2. `git -C <Desktop> add -A && git -C <Desktop> commit -m "..." && git -C <Desktop> push origin main`
+3. A CI-t (desktop-build.yml) egy `v*` tag push indítja el (Windows/macOS telepítő).

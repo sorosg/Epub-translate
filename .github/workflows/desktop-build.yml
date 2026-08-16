@@ -24,7 +24,7 @@ jobs:
 
       # Frontend build (a React SPA -> frontend/dist)
       - name: Build frontend
-        working-directory: frontend
+        working-directory: src/frontend
         run: |
           npm ci
           npm run build
@@ -33,11 +33,11 @@ jobs:
       # A desktop buildhez a szerver-függőségek nélküli requirements-desktop.txt-t
       # használjuk (nincs psycopg2/gunicorn/redis -> kisebb, stabilabb bináris).
       - name: Install backend deps (desktop)
-        working-directory: backend
+        working-directory: src/backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-desktop.txt pyinstaller
-          pyinstaller --onefile --name backend --add-data "requirements-desktop.txt:." ../desktop/backend_entry.py 2>/dev/null || pyinstaller --onefile --name backend ../desktop/backend_entry.py
+          pyinstaller --onefile --name backend ../../desktop/backend_entry.py
 
       # Electron telepítő
       - name: Build Electron installer

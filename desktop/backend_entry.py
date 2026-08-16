@@ -8,7 +8,13 @@ import os, sys, threading, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(ROOT, 'backend'))
+# A backend/ vagy src/backend/ mappát is felismerjük:
+# - WSL build-forrásban: backend/
+# - GitHub repóban: src/backend/
+_BACKEND = os.path.join(ROOT, 'backend')
+if not os.path.isdir(_BACKEND):
+    _BACKEND = os.path.join(ROOT, 'src', 'backend')
+sys.path.insert(0, _BACKEND)
 
 # Desktop környezet kikényszerítése (SQLite adatok + automatikus helyi user)
 os.environ['DESKTOP_MODE'] = '1'
@@ -16,7 +22,10 @@ os.environ.setdefault('DATA_DIR', os.path.join(os.path.expanduser('~'), '.epub-t
 
 from app import app, db, init_db  # noqa: E402
 
-FRONTEND_DIST = os.path.join(ROOT, 'frontend', 'dist')
+_FD = os.path.join(ROOT, 'frontend', 'dist')
+if not os.path.isdir(_FD):
+    _FD = os.path.join(ROOT, 'src', 'frontend', 'dist')
+FRONTEND_DIST = _FD
 
 # --- 2) SPA statikus kiszolgálás (csak ha létezik a buildelt dist) ---
 if os.path.isdir(FRONTEND_DIST):
