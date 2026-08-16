@@ -53,3 +53,5 @@ fine_tuning/
 optimization_profiles/
 backups/
 updates.log
+# Desktop PyInstaller build-melléktermékek
+desktop/pybuild/

@@ -23,7 +23,7 @@
     ],
     "extraResources": [
       {
-        "from": "../src/backend",
+        "from": "./pybackend",
         "to": "backend",
         "filter": ["**/*", "!venv/**", "!__pycache__/**", "!*.pyc"]
       }
