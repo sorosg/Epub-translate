@@ -43,7 +43,7 @@ class Config:
     # (nincs login UI). Docker/Postgres szerver módban alapból False.
     DESKTOP_MODE = os.environ.get('DESKTOP_MODE', 'n').lower() in ('true', '1', 'i')
 
-    VERSION = os.environ.get('VERSION', '2.6.12')
+    VERSION = os.environ.get('VERSION', '3.0.0')
     CODENAME = os.environ.get('CODENAME', 'Smart Optimizer')
     RELEASE_DATE = os.environ.get('RELEASE_DATE', '2026-08-12')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this')

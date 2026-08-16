@@ -1,6 +1,6 @@
 # 📚 EPUB Fordító Rendszer – Felhasználói Kézikönyv
 
-**Verzió:** 2.6.11 – "Smart Optimizer"
+**Verzió:** 3.0.0 – "Smart Optimizer"
 **Utolsó frissítés:** 2026-08-15
 
 ---
@@ -500,4 +500,4 @@ docker compose logs -f --tail=100
 
 ---
 
-**Készítette:** EPUB Fordító Rendszer v2.6.11 – "Smart Optimizer"
+**Készítette:** EPUB Fordító Rendszer v3.0.0 – "Smart Optimizer"

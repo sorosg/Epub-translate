@@ -46,7 +46,7 @@ nem gond: az Electron és a sidecar ugyanazon a gépen fut.
 - PyInstaller + electron-builder telepítő build (CI-ben/natív gépen).
 - A helyi modell VRAM-alapú szűrése a SettingsPage modellek listájában.
 
-## 2026-08-16 — v2.6.12 fejezet-duplikáció javítás
+## 2026-08-16 — v3.0.0 fejezet-duplikáció javítás
 
 ### Tünet (a felhasználó mintája)
 A Relentless fordításban ugyanaz a bekezdés (Dauntless konferenciaterem /

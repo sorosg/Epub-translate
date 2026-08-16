@@ -1,7 +1,7 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 2.5.7 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-15 (v2.5.7)  
+**Verzió:** 3.0.0 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-16 (v3.0.0)  
 
 ### 🎯 Verziószámozási séma (1.0.0-tól)
 - **PATCH** (1.0.x): hibajavítások

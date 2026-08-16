@@ -1,5 +1,15 @@
 # 📋 EPUB Fordító – Fejlesztési Napló (Changelog)
 
+## v3.0.0 – 2026-08-16 (aktuális)
+
+### 🖥️ Desktop kiadás (Windows/macOS) – MAJOR
+- Önálló asztali alkalmazás (Electron + PyInstaller + SQLite), egyfelhasználós,
+  Docker és helyi AI nélkül; DeepSeek Pro a fő motor, a helyi GPU opcionális.
+- Platformfüggetlen backend (DATA_DIR, SQLite fallback, DESKTOP_MODE),
+  GPU-detektálás, desktop scaffold + CI (desktop-build.yml).
+- A v2.6.x fordítási minőségi javításai is ebbe a MAJOR-ba foglalva.
+
+---
 ## v2.6.12 – 2026-08-16 (aktuális)
 
 ### 🐛 Kritikus: fejezet-duplikáció javítva
@@ -450,4 +460,4 @@
 
 ---
 
-*Utolsó frissítés: 2026-08-16 · v2.6.12*
+*Utolsó frissítés: 2026-08-16 · v3.0.0*

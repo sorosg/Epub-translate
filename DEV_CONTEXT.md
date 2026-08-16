@@ -23,7 +23,7 @@
 |------|-------|
 | Név | EPUB Fordító Rendszer |
 | Cél | EPUB könyvek fordítása angolról magyarra (helyi Ollama DeepSeek + opcionális DeepSeek Pro API) |
-| **Aktuális verzió** | **v2.6.121** |
+| **Aktuális verzió** | **v3.0.0** |
 | Tech stack | Flask (Gunicorn) + React 18 (Vite/TS/Tailwind) + PostgreSQL + Ollama + Redis + Nginx + MailHog |
 
 ---
@@ -89,6 +89,12 @@ git -C "$T" push origin main
 - **MINOR** (x.Y.z): új funkció
 - **MAJOR** (X.y.z): nagy áttörés (a felhasználó dönt)
 
+### 🏷️ TAG és verziószabály (2026-08-16-tól MINDIG)
+- A tag-et és a push-t az AI kezeli (a Desktop repóból: `git tag vX.Y.Z && git push origin vX.Y.Z`).
+- **Verzióbump CSAK kódmódosításnál**; a dokumentum-frissítés önmagában NEM növel verziót.
+- A tag push (v*) elindítja a CI-t (Windows .exe + macOS .dmg buildet).
+- Aktuális verzió: **v3.0.0**.
+
 ### Hol kell frissíteni a verziót (mind a 6 helyen!)
 1. `backend/config.py` → `VERSION = os.environ.get('VERSION', 'x.y.z')`
 2. `.env` → `VERSION=x.y.z`
@@ -144,7 +150,7 @@ docker exec epub-postgres psql -U epub_user -d epub_translator -c "..."
 
 ---
 
-## 🧩 Kódkonvenciók (a jelenlegi v2.6.122 állapothoz)
+## 🧩 Kódkonvenciók (a jelenlegi v3.0.02 állapothoz)
 
 - **Endpointok**: törekedj az egységesítésre `/api/` alá (a `/delete`, `/upload`, `/download` még külön van — ismert téma).
 - **Unicode védelem**: `sanitize_text()` — minden kimenő promptot tisztíts (surrogate-hiba megelőzése).
