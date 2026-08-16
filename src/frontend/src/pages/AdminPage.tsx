@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Shield, Users, FileText, Activity, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Shield, Users, FileText, Activity, Plus, Pencil, Trash2, Library } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
 import { useUiStore } from '../stores/uiStore';
 
@@ -26,14 +26,25 @@ interface UserForm {
   is_admin: boolean;
 }
 
+interface PendingItem {
+  id: number;
+  original_filename: string;
+  quality_score: number | null;
+  model_used: string;
+  owner: string;
+  created_at: string | null;
+}
+
 const emptyForm: UserForm = { email: '', password: '', first_name: '', last_name: '', tokens: 5, is_admin: false };
 
 export function AdminPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
-  const [tab, setTab] = useState<'users' | 'logs' | 'system'>('users');
+  const [tab, setTab] = useState<'users' | 'logs' | 'system' | 'library'>('users');
+  const [logType, setLogType] = useState<'app' | 'translation'>('translation');
   const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<UserForm>(emptyForm);
 
   const { data: users, isLoading: usersLoading } = useQuery<AdminUser[]>({
@@ -46,12 +57,13 @@ export function AdminPage() {
   });
 
   const { data: logs, isLoading: logsLoading } = useQuery<string>({
-    queryKey: ['admin-logs'],
+    queryKey: ['admin-logs', logType],
     queryFn: async () => {
-      const d = await apiGet<{ log_content: string }>('/api/admin/logs?type=app&lines=100');
+      const d = await apiGet<{ log_content: string }>(`/api/admin/logs?type=${logType}&lines=100`);
       return d.log_content;
     },
     enabled: tab === 'logs',
+    refetchInterval: 5000, // élő frissítés a fordítási log követéséhez
   });
 
   const { data: sysinfo } = useQuery<{
@@ -64,15 +76,27 @@ export function AdminPage() {
     enabled: tab === 'system',
   });
 
+  const { data: pending, isLoading: pendingLoading } = useQuery<PendingItem[]>({
+    queryKey: ['admin-pending'],
+    queryFn: async () => {
+      const d = await apiGet<{ pending: PendingItem[] }>('/api/admin/pending-library');
+      return d.pending;
+    },
+    enabled: tab === 'library',
+    refetchInterval: 5000,
+  });
+
   const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ['admin-users'] });
 
   const openCreate = () => {
     setEditing(null);
+    setShowForm(true);
     setForm(emptyForm);
   };
 
   const openEdit = (u: AdminUser) => {
     setEditing(u);
+    setShowForm(true);
     setForm({
       email: u.email,
       password: '',
@@ -93,6 +117,7 @@ export function AdminPage() {
         addToast('success', 'Felhasználó létrehozva');
       }
       setEditing(null);
+      setShowForm(false);
       setForm(emptyForm);
       void invalidateUsers();
     } catch (e) {
@@ -111,8 +136,29 @@ export function AdminPage() {
     }
   };
 
+  const handleApprove = async (id: number) => {
+    try {
+      await apiPost(`/api/admin/library/approve/${id}`);
+      addToast('success', 'Könyv jóváhagyva, a könyvtárba került');
+      void queryClient.invalidateQueries({ queryKey: ['admin-pending'] });
+    } catch (e) {
+      addToast('error', (e as Error).message || t('common.errorOccurred'));
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      await apiPost(`/api/admin/library/reject/${id}`);
+      addToast('success', 'Fordítás elutasítva (letölthető marad)');
+      void queryClient.invalidateQueries({ queryKey: ['admin-pending'] });
+    } catch (e) {
+      addToast('error', (e as Error).message || t('common.errorOccurred'));
+    }
+  };
+
   const tabs = [
     { key: 'users' as const, label: 'Felhasználók', icon: Users },
+    { key: 'library' as const, label: 'Könyvtár jóváhagyás', icon: Library },
     { key: 'logs' as const, label: 'Logok', icon: FileText },
     { key: 'system' as const, label: 'Rendszer', icon: Activity },
   ];
@@ -138,7 +184,7 @@ export function AdminPage() {
             <Plus className="w-4 h-4" /> Új felhasználó
           </button>
 
-          {editing !== null || (form.email !== '' && form.password !== '' && editing === null) ? (
+          {showForm ? (
             <div className="card p-4 space-y-3">
               <h2 className="font-semibold text-text-primary">
                 {editing ? 'Felhasználó szerkesztése' : 'Új felhasználó'}
@@ -164,7 +210,7 @@ export function AdminPage() {
                 <button onClick={() => void handleSave()} className="btn-primary">
                   Mentés
                 </button>
-                <button onClick={() => { setEditing(null); setForm(emptyForm); }} className="btn-outline">
+                <button onClick={() => { setEditing(null); setShowForm(false); setForm(emptyForm); }} className="btn-outline">
                   Mégse
                 </button>
               </div>
@@ -218,13 +264,58 @@ export function AdminPage() {
       )}
 
       {tab === 'logs' && (
-        <div className="card card-body">
-          {logsLoading ? (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLogType('translation')}
+              className={`btn ${logType === 'translation' ? 'btn-primary' : 'btn-outline'}`}
+            >
+              Fordítási log
+            </button>
+            <button
+              onClick={() => setLogType('app')}
+              className={`btn ${logType === 'app' ? 'btn-primary' : 'btn-outline'}`}
+            >
+              Alkalmazás log
+            </button>
+          </div>
+          <div className="card card-body">
+            {logsLoading ? (
+              <div className="skeleton h-40" />
+            ) : (
+              <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap max-h-[400px] overflow-y-auto">
+                {logs || '(Nincs log tartalom)'}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'library' && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-text-primary">Jóváhagyásra váró fordítások</h2>
+          {pendingLoading ? (
             <div className="skeleton h-40" />
+          ) : !pending || pending.length === 0 ? (
+            <p className="text-text-secondary text-sm">Nincs jóváhagyásra váró fordítás.</p>
           ) : (
-            <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap max-h-[400px] overflow-y-auto">
-              {logs || '(Nincs log tartalom)'}
-            </pre>
+            <div className="space-y-3">
+              {pending.map((p) => (
+                <div key={p.id} className="card p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-text-primary truncate">{p.original_filename}</div>
+                    <div className="text-xs text-text-secondary">
+                      {p.owner} · {p.model_used} · ⭐ {p.quality_score ?? '–'}/100
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <a href={`/download/${p.id}`} className="btn-ghost min-w-[40px] min-h-[40px] p-2" title="Letöltés">⬇️</a>
+                    <button onClick={() => void handleApprove(p.id)} className="btn-primary min-h-[40px]">Jóváhagyás</button>
+                    <button onClick={() => void handleReject(p.id)} className="btn-outline min-h-[40px] text-accent-red">Elutasítás</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

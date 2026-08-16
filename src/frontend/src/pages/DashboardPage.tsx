@@ -30,7 +30,10 @@ export function DashboardPage() {
   const handleDelete = async (id: number) => {
     if (!window.confirm('Biztosan törlöd ezt a fordítást?')) return;
     try {
-      await fetch(`/delete/${id}`, { method: 'POST', credentials: 'same-origin' });
+      const resp = await fetch(`/delete/${id}`, { method: 'POST', credentials: 'same-origin' });
+      if (!resp.ok && !resp.redirected) {
+        throw new Error('Törlés sikertelen');
+      }
       addToast('success', 'Fordítás törölve');
       // Cache érvénytelenítése, hogy frissüljön a lista
       await queryClient.invalidateQueries({ queryKey: ['translations'] });
@@ -81,6 +84,7 @@ export function DashboardPage() {
                   key={tr.id}
                   translation={tr}
                   onDelete={handleDelete}
+                  onStopped={handleUploaded}
                 />
               ))}
             </div>

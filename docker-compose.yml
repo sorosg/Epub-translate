@@ -1,0 +1,136 @@
+services:
+  nginx:
+    # A React frontend multi-stage build-je (node:20-alpine -> nginx:alpine).
+    # A build a Dockerben történik, így a hostra NEM kell Node.js.
+    build: ./frontend
+    container_name: epub-nginx
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./logs/nginx:/var/log/nginx
+      # SSL tanúsítványok (Let's Encrypt)
+      - ./nginx/ssl:/etc/letsencrypt:ro
+      - ./nginx/www:/var/www/certbot
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - translator-network
+    restart: unless-stopped
+  backend:
+    build: ./backend
+    container_name: epub-backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - epub_uploads:/app/uploads
+      - epub_output:/app/output
+      - ./logs/backend:/app/logs
+      - ./book_database:/app/book_database
+      - ./translation_memory:/app/translation_memory
+      - ./glossaries:/app/glossaries
+      - ./community_library:/app/community_library
+      - ./achievements:/app/achievements
+      - ./fine_tuning:/app/fine_tuning
+      - ./optimization_profiles:/app/optimization_profiles
+    environment:
+      - DATABASE_URL=postgresql://epub_user:epub_password@postgres:5432/epub_translator
+      - OLLAMA_HOST=http://ollama:11434
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - SELECTED_MODEL=${SELECTED_MODEL}
+      - MAX_WORKERS=${MAX_WORKERS}
+      - VERSION=${VERSION}
+      - ENABLE_AUTO_OPTIMIZE=${ENABLE_AUTO_OPTIMIZE}
+      - ENABLE_RESOURCE_MONITOR=${ENABLE_RESOURCE_MONITOR}
+      - ENABLE_SMART_SWITCH=${ENABLE_SMART_SWITCH}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - translator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    command: gunicorn -w 1 -b 0.0.0.0:5000 app:app --timeout 7200
+  postgres:
+    image: postgres:15-alpine
+    container_name: epub-postgres
+    environment:
+      - POSTGRES_DB=epub_translator
+      - POSTGRES_USER=epub_user
+      - POSTGRES_PASSWORD=epub_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - translator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epub_user -d epub_translator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  ollama:
+    build: ./ollama
+    container_name: epub-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=2
+    # A GPU-passthrough a docker-compose.gpu.yml override fájlban van (NEM itt),
+    # hogy GPU hiányában a rendszer tisztán CPU-val fusson. A GPU-s override-ot
+    # az install.sh alkalmazza, ha nvidia-smi érzékeli a GPU-t.
+    networks:
+      - translator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    command: serve
+  redis:
+    image: redis:alpine
+    container_name: epub-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory ${OPTIMAL_REDIS} --maxmemory-policy allkeys-lru
+    networks:
+      - translator-network
+    restart: unless-stopped
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: epub-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - translator-network
+    restart: unless-stopped
+    # MailHog email tesztelő SMTP szerver – minden kimenő emailt elfog
+    # Webes felület: http://localhost:8025
+    # SMTP: localhost:1025 (nem igényel hitelesítést)
+networks:
+  translator-network:
+    driver: bridge
+volumes:
+  postgres_data:
+  ollama_data:
+  redis_data:
+  epub_uploads:
+  epub_output:

@@ -20,6 +20,7 @@ class User(UserMixin, db.Model):
     preferred_model_source = db.Column(db.String(20), default='local')  # 'local' vagy 'remote'
     preferred_model = db.Column(db.String(100), default='')  # preferált modell név (pl. deepseek-chat)
     dark_mode = db.Column(db.Boolean, default=True)
+    formality = db.Column(db.String(10), default='informal')  # 'informal' = tegezés, 'formal' = magázás
     points = db.Column(db.Integer, default=0)
     level = db.Column(db.Integer, default=1)
     address = db.Column(db.String(255))
@@ -52,6 +53,18 @@ class Translation(db.Model):
     # A felhasználó által kért leállítás jelzése – a fordítási ciklus ezt
     # ellenőrzi minden iterációnál, és ha True, a lehető leggyorsabban leáll.
     stop_requested = db.Column(db.Boolean, default=False)
+    # Token-fogyasztás és költség napló (a tényleges használat méréséhez)
+    input_tokens_used = db.Column(db.Integer, default=0)   # a fordításra beküldött tokenek
+    output_tokens_used = db.Column(db.Integer, default=0)  # a modell által generált tokenek
+    cost_usd = db.Column(db.Float, default=0.0)            # becsült költség USD-ben
+    # Checkpoint/folytatás (v2.3.0+): a feldolgozott fejezetek HTML tartalma +
+    # az eredeti szövegek, hogy a rendszer-újraindítás után ne vesszen el a részeredmény.
+    checkpoint_data = db.Column(db.Text)                     # JSON: {chapter_index, items_html, original_texts}
+    last_checkpoint_at = db.Column(db.DateTime)              # utolsó checkpoint időbélyeg
+    # Könyvtár jóváhagyási állapot (v2.6.0+): a lefordított könyv admin
+    # jóváhagyás után kerül a közös könyvtárba. Értékek:
+    # 'none' (alap), 'pending' (várakozó), 'approved' (könyvtárban), 'rejected'.
+    library_status = db.Column(db.String(20), default='none')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ---- 1. GLOSSZÁRIUM (automatikus terminológia építés) ----

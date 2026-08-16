@@ -24,7 +24,7 @@ app.config['SWAGGER'] = {
         'endpoint': 'apispec',
         'route': '/api/apispec.json',
     }],
-    'swagger_ui': True,
+    'swagger_ui': True, 
     'specs_route': '/api/docs/'
 }
 swagger = Swagger(app, template={
@@ -45,16 +45,18 @@ swagger = Swagger(app, template={
         {'name': 'System', 'description': 'Rendszer monitorozás és frissítés'}
     ]
 })
-app.config['UPLOAD_FOLDER'] = '/app/uploads/books'
-app.config['REFERENCE_FOLDER'] = '/app/uploads/reference'
-app.config['OUTPUT_FOLDER'] = '/app/output'
-app.config['LIBRARY_FOLDER'] = '/app/uploads/library'
+# A mappák a Config-ból jönnek (platformfüggetlen): Dockerben /app alatt,
+# natív (desktop) környezetben ~/.epub-translator alatt.
+app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
+app.config['REFERENCE_FOLDER'] = Config.REFERENCE_FOLDER
+app.config['OUTPUT_FOLDER'] = Config.OUTPUT_FOLDER
+app.config['LIBRARY_FOLDER'] = Config.LIBRARY_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 db.init_app(app)
 
 # --- LOGOLÁS BEÁLLÍTÁSA ---
 import sys
-LOG_DIR = '/app/logs'
+LOG_DIR = Config.LOG_DIR
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Közös formatter
@@ -87,6 +89,27 @@ sh_trans = logging.StreamHandler(sys.stdout)
 sh_trans.setLevel(logging.DEBUG)
 sh_trans.setFormatter(log_formatter)
 translation_logger.addHandler(sh_trans)
+translation_logger.propagate = False  # a fordítási log NE menjen duplán az app.log-ba
+
+def _trans_log(msg, level='INFO'):
+    """Megbízható fordítási naplózás: KÖZVETLENÜL a translation.log fájlba és a
+    stdout-ra ír, flush-sel. A logging modul handlerjei gunicorn worker +
+    háttérszál környezetben nem mindig írnak ki időben, ezért a fordítási szál
+    ezt a direkt írást használja (a fájl írhatósága ellenőrizve, a fordítás
+    fut, de a logger néma maradt).
+    """
+    ts = datetime.utcnow().isoformat()
+    ln = f"{ts} [{level.upper()}] {msg}"
+    try:
+        with open(os.path.join(LOG_DIR, 'translation.log'), 'a', encoding='utf-8') as _f:
+            _f.write(ln + "\n")
+    except Exception:
+        pass
+    try:
+        print(ln, flush=True)
+    except Exception:
+        pass
+
 
 # Flask built-in logger
 app.logger.handlers.clear()
@@ -112,6 +135,35 @@ os.makedirs(app.config['LIBRARY_FOLDER'], exist_ok=True)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Desktop (egyfelhasználós) mód: automatikus bejelentkezés.
+# Ha az Electron sidecar DESKTOP_MODE=1 flag-gel indítja a backendet, nincs
+# login oldal; minden kérés előtt gondoskodunk arról, hogy a helyi felhasználó
+# be legyen jelentkezve. (Docker/Postgres szerver módban a Config.DESKTOP_MODE
+# False, így ez a hook no-op.)
+@app.before_request
+def _desktop_auto_login():
+    if not Config.DESKTOP_MODE:
+        return None
+    if current_user.is_authenticated:
+        return None
+    user = User.query.filter_by(email='desktop@local').first()
+    if not user:
+        user = User(
+            username='desktop',
+            email='desktop@local',
+            password_hash='!',  # nem használt (nincs login)
+            first_name='Helyi',
+            last_name='Felhasználó',
+            is_admin=True,
+            tokens=999999,
+            preferred_model_source='remote',
+        )
+        db.session.add(user)
+        db.session.commit()
+    login_user(user)
+    return None
+
 limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["5000 per day", "2000 per hour"])
 
 # A React SPA-hitelesítéshez: amikor egy /api/ végpont login_required miatt
@@ -144,7 +196,13 @@ def load_user(user_id):
 
 @app.route('/health')
 def health():
-    return jsonify({'status':'healthy','version':app.config['VERSION'],'model':app.config['DEFAULT_MODEL']})
+    return jsonify({
+        'status':'healthy',
+        'version':app.config['VERSION'],
+        'model':app.config['DEFAULT_MODEL'],
+        'desktop_mode': Config.DESKTOP_MODE,
+        'gpu_available': Config.gpu_available(),
+    })
 
 @app.route('/')
 def index():
@@ -368,10 +426,14 @@ def translation_status(translation_id):
         'output_filename': t.output_filename,
         'model_used': t.model_used,
         'quality_score': t.quality_score,
-        'created_at': t.created_at.isoformat() if t.created_at else None,
+        'created_at': to_budapest(t.created_at) if t.created_at else None,
         # Becsült idő mezők
         'elapsed_seconds': elapsed_seconds,
-        'estimated_seconds': estimated_seconds
+        'estimated_seconds': estimated_seconds,
+        # Token/költség napló
+        'input_tokens_used': t.input_tokens_used,
+        'output_tokens_used': t.output_tokens_used,
+        'cost_usd': t.cost_usd
     })
 
 @app.route('/api/model/status')
@@ -407,7 +469,10 @@ def api_translations():
         'total_words': t.total_words,
         'model_used': t.model_used,
         'quality_score': t.quality_score,
-        'created_at': t.created_at.isoformat() if t.created_at else None,
+        'created_at': to_budapest(t.created_at) if t.created_at else None,
+        'input_tokens_used': t.input_tokens_used,
+        'output_tokens_used': t.output_tokens_used,
+        'cost_usd': t.cost_usd,
     } for t in translations]})
 
 @app.route('/api/translations/events')
@@ -424,19 +489,19 @@ def translation_events():
             events.append({
                 'id': t.id, 'type': 'success', 
                 'message': f'✅ {t.original_filename} – Fordítás kész! (minőség: {t.quality_score}/100)',
-                'time': t.created_at.isoformat() if t.created_at else ''
+                'time': to_budapest(t.created_at) if t.created_at else ''
             })
         elif t.status == 'processing':
             events.append({
                 'id': t.id, 'type': 'info',
                 'message': f'⏳ {t.original_filename} – Fordítás folyamatban ({t.progress}%)...',
-                'time': t.created_at.isoformat() if t.created_at else ''
+                'time': to_budapest(t.created_at) if t.created_at else ''
             })
         elif t.status == 'failed':
             events.append({
                 'id': t.id, 'type': 'error',
                 'message': f'❌ {t.original_filename} – Fordítás sikertelen',
-                'time': t.created_at.isoformat() if t.created_at else ''
+                'time': to_budapest(t.created_at) if t.created_at else ''
             })
     return jsonify({'events': events})
 
@@ -559,6 +624,38 @@ def review_save(translation_id):
 def library():
     return render_template('library.html')
 
+def openlibrary_enrich(title, author):
+    """OpenLibrary keresés cím+szerző alapján; visszaadja a pótolható mezőket
+    (title, author, genre). Hálózati hiba/hiány esetén üres dict-et ad."""
+    import requests as _req
+    from urllib.parse import quote as _quote
+    q = ' '.join(x for x in [title, author] if x).strip()
+    if not q:
+        return {}
+    try:
+        resp = _req.get(
+            f'https://openlibrary.org/search.json?q={_quote(q)}&limit=3',
+            timeout=8
+        )
+        if resp.status_code != 200:
+            return {}
+        docs = resp.json().get('docs', [])
+        if not docs:
+            return {}
+        d = docs[0]
+        result = {}
+        if d.get('title'):
+            result['title'] = str(d['title'])[:500]
+        if d.get('author_name'):
+            result['author'] = ', '.join([str(a) for a in d['author_name']])[:255]
+        subjects = d.get('subject', [])
+        if subjects:
+            result['genre'] = ', '.join([str(g) for g in subjects[:3]])[:300]
+        return result
+    except Exception:
+        return {}
+
+
 @app.route('/api/library/upload', methods=['POST'])
 @login_required
 def library_upload():
@@ -570,7 +667,22 @@ def library_upload():
     
     title = request.form.get('title','') or file.filename.rsplit('.',1)[0]
     author = request.form.get('author','')
-    
+    genre = request.form.get('genre','')
+    series = request.form.get('series','')
+
+    # Hiányzó metaadatok automatikus pótlása OpenLibrary-ből (cím/szerző/műfaj)
+    if (not genre or not author) and title:
+        try:
+            enriched = openlibrary_enrich(title, author)
+            if not author and enriched.get('author'):
+                author = enriched['author']
+            if not title and enriched.get('title'):
+                title = enriched['title']
+            if not genre and enriched.get('genre'):
+                genre = enriched['genre']
+        except Exception:
+            pass
+
     # Deduplikáció ellenőrzés: cím + szerző alapján
     if title and author:
         existing = Book.query.filter(
@@ -593,7 +705,7 @@ def library_upload():
         user_id=current_user.id, filename=file.filename, file_path=filepath,
         title=title, author=author,
         language=request.form.get('language','en'),
-        genre=request.form.get('genre',''), series=request.form.get('series',''),
+        genre=genre, series=series,
         series_number=int(request.form.get('series_number',0)) if request.form.get('series_number','').isdigit() else None
     )
     db.session.add(book); db.session.commit()
@@ -617,7 +729,7 @@ def library_list():
         'is_selected': prefs[b.id].is_selected if b.id in prefs else False,
         'is_owner': b.user_id == current_user.id,
         'uploader_name': b.uploader.username if b.uploader else 'Ismeretlen',
-        'uploaded_at':b.uploaded_at.isoformat() if b.uploaded_at else '',
+        'uploaded_at':to_budapest(b.uploaded_at) if b.uploaded_at else '',
         'filename':b.filename
     } for b in books]})
 
@@ -768,6 +880,24 @@ def library_extract_metadata():
                 calibre_titles = book.get_metadata('OPF', 'calibre:title_sort')
                 if calibre_titles:
                     title = calibre_titles[0][0] if isinstance(calibre_titles[0], tuple) else str(calibre_titles[0])
+
+            # Sorozat kinyerése a címből/fájlnévből, ha a Calibre mező üres.
+            # Gyakori minták: "The Lost Fleet: Relentless", "Title 03",
+            # "Title #3", "Title - Book 3", "Title (Book 3)".
+            if not series and title:
+                import re as _re
+                m = _re.match(r'^(.*?)[:\-–—]\s*(.*)$', title.strip())
+                if m:
+                    series = m.group(1).strip()
+                    rest = m.group(2).strip()
+                    # Ha a kettőspont utáni rész csak egy sorszám mintázat, akkor
+                    # a "title" valójában sorozat + rész. Különben csak sorozatnevet
+                    # jelölünk, sorszám nélkül.
+                # Sorszám mintázatok a cím végén: " Title 3", " Title #3", "Book 3"
+                num_m = _re.search(r'\s+(?:book\s+)?#?(\d+)\s*$', title.strip(), _re.IGNORECASE)
+                if num_m and not series:
+                    series = title.strip()[:num_m.start()].strip()
+                    series_number = int(num_m.group(1))
             
             app_logger.info(f"EPUB metaadat kinyerve: '{title}' by '{author}' (lang: {language}, genre: {genre}, series: {series}#{series_number})")
             
@@ -971,6 +1101,146 @@ def library_recommend():
         'count': len(recommendations)
     })
 
+@app.route('/api/library/enrich-missing', methods=['POST'])
+@login_required
+@admin_required
+def library_enrich_missing():
+    """Hiányos metaadatú könyvek (szerző/műfaj/cím) automatikus pótlása OpenLibrary-ből."""
+    import time as _time
+    books = Book.query.all()
+    updated = 0
+    for b in books:
+        if not b.title:
+            continue
+        if b.author and b.genre:
+            continue
+        try:
+            enriched = openlibrary_enrich(b.title, b.author)
+            changed = False
+            if not b.author and enriched.get('author'):
+                b.author = enriched['author']
+                changed = True
+            if not b.title and enriched.get('title'):
+                b.title = enriched['title']
+                changed = True
+            if not b.genre and enriched.get('genre'):
+                b.genre = enriched['genre']
+                changed = True
+            if changed:
+                updated += 1
+            _time.sleep(0.2)  # OpenLibrary rate-limit védelem
+        except Exception:
+            pass
+    db.session.commit()
+    return jsonify({'success': True, 'updated': updated})
+
+
+@app.route('/api/admin/pending-library', methods=['GET'])
+@login_required
+@admin_required
+def admin_pending_library():
+    """A könyvtárba jóváhagyásra váró (pending) lefordított könyvek listája."""
+    pending = Translation.query.filter_by(library_status='pending')\
+        .order_by(Translation.created_at.desc()).all()
+    return jsonify({'pending': [{
+        'id': t.id,
+        'original_filename': t.original_filename,
+        'output_filename': t.output_filename,
+        'quality_score': t.quality_score,
+        'model_used': t.model_used,
+        'owner': t.user.email if t.user else '',
+        'created_at': to_budapest(t.created_at) if t.created_at else None,
+    } for t in pending]})
+
+@app.route('/api/admin/library/approve/<int:translation_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_library_approve(translation_id):
+    """Várakozó fordítás jóváhagyása → a lefordított EPUB a közös könyvtárba kerül."""
+    t = Translation.query.get_or_404(translation_id)
+    if t.library_status != 'pending':
+        return jsonify({'error': 'Ez a fordítás nincs jóváhagyásra váró állapotban'}), 400
+
+    output_path = os.path.join(app.config['OUTPUT_FOLDER'], t.output_filename) if t.output_filename else None
+    if not output_path or not os.path.exists(output_path):
+        return jsonify({'error': 'A lefordított fájl nem található'}), 404
+
+    # Az eredeti EPUB-ból próbáljuk meg cím/szerző meghatározását, OpenLibrary fallback-kel
+    from ebooklib import epub as epub_lib
+    from bs4 import BeautifulSoup
+    title = t.original_filename.rsplit('.', 1)[0]
+    author = ''
+    genre = ''
+    try:
+        ob = epub_lib.read_epub(output_path)
+        ttl = ob.get_metadata('DC', 'title')
+        cr = ob.get_metadata('DC', 'creator')
+        if ttl:
+            title = ttl[0][0] if isinstance(ttl[0], tuple) else str(ttl[0])
+        if cr:
+            author = cr[0][0] if isinstance(cr[0], tuple) else str(cr[0])
+        subj = ob.get_metadata('DC', 'subject')
+        if subj:
+            genre = ', '.join([str((s[0] if isinstance(s, tuple) else s)).strip() for s in subj[:3]])
+    except Exception:
+        pass
+
+    # OpenLibrary pótlás a hiányzó mezőkre
+    if (not author or not genre) and title:
+        try:
+            enriched = openlibrary_enrich(title, author)
+            if not author and enriched.get('author'):
+                author = enriched['author']
+            if not genre and enriched.get('genre'):
+                genre = enriched['genre']
+        except Exception:
+            pass
+
+    # Dedup ellenőrzés
+    existing = Book.query.filter(
+        db.func.lower(Book.title) == title.lower().strip(),
+        db.func.lower(Book.author) == author.lower().strip()
+    ).first() if author else None
+    if existing:
+        t.library_status = 'approved'  # már van ilyen, a fordítás „jóváhagyva" de nem duplikálunk
+        db.session.commit()
+        return jsonify({'success': True, 'duplicate': True, 'book_id': existing.id,
+                        'message': 'Már létezik ilyen könyv a könyvtárban, a fordítás jóváhagyva'})
+
+    # A lefordított EPUB másolása a könyvtár mappába
+    lib_name = f"lib_{uuid.uuid4().hex}_{t.output_filename}"
+    lib_path = os.path.join(app.config['LIBRARY_FOLDER'], lib_name)
+    shutil.copy2(output_path, lib_path)
+
+    book = Book(
+        user_id=t.user_id,   # a fordító felhasználó a tulajdonos
+        filename=t.original_filename,
+        file_path=lib_path,
+        title=title,
+        author=author,
+        language='hu',
+        genre=genre,
+        series='',
+        series_number=None,
+    )
+    db.session.add(book)
+    t.library_status = 'approved'
+    db.session.commit()
+    app_logger.info(f"Fordítás #{translation_id} jóváhagyva és a könyvtárba került (book #{book.id})")
+    return jsonify({'success': True, 'book_id': book.id, 'message': 'Könyv a könyvtárba került'})
+
+@app.route('/api/admin/library/reject/<int:translation_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_library_reject(translation_id):
+    """Várakozó fordítás elutasítása (nem kerül a könyvtárba, letölthető marad)."""
+    t = Translation.query.get_or_404(translation_id)
+    if t.library_status != 'pending':
+        return jsonify({'error': 'Ez a fordítás nincs jóváhagyásra váró állapotban'}), 400
+    t.library_status = 'rejected'
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Fordítás elutasítva (letölthető marad)'})
+
 @app.route('/api/library/fetch-metadata', methods=['POST'])
 @login_required
 def library_fetch_metadata():
@@ -1103,9 +1373,14 @@ def user_settings():
     """Felhasználói beállítások mentése (API kulcs, preferált modell, téma)"""
     data = request.get_json() or {}
     
-    # DeepSeek API kulcs mentése
+    # DeepSeek API kulcs mentése.
+    # FONTOS: a beállítások oldal a kulcsot MASZKOLVA (*** + utolsó 4 karakter)
+    # küldheti vissza; ezt NEM szabad elmenteni, mert felülírná a valódi kulcsot
+    # (ez okozta, hogy a fordítás angolul maradt – érvénytelen kulccsal hívtunk).
     if 'deepseek_api_key' in data:
-        current_user.deepseek_api_key = data['deepseek_api_key'].strip()
+        new_key = (data['deepseek_api_key'] or '').strip()
+        if new_key and not new_key.startswith('***'):
+            current_user.deepseek_api_key = new_key
     
     # Preferált modell forrás (local/remote)
     if 'preferred_model_source' in data:
@@ -1119,6 +1394,10 @@ def user_settings():
     if 'dark_mode' in data:
         current_user.dark_mode = bool(data['dark_mode'])
     
+    # Tegezés/magázás preferencia (v2.5.0+)
+    if 'formality' in data:
+        current_user.formality = data['formality'] if data['formality'] in ('informal', 'formal') else 'informal'
+    
     db.session.commit()
     
     return jsonify({
@@ -1126,7 +1405,8 @@ def user_settings():
         'deepseek_api_key': ('***' + current_user.deepseek_api_key[-4:]) if current_user.deepseek_api_key else '',
         'preferred_model_source': current_user.preferred_model_source,
         'preferred_model': current_user.preferred_model,
-        'dark_mode': current_user.dark_mode
+        'dark_mode': current_user.dark_mode,
+        'formality': current_user.formality
     })
 
 @app.route('/api/models/list')
@@ -1157,6 +1437,103 @@ def api_models_list():
         'remote_available': remote_available,
         'current_model': app.config['DEFAULT_MODEL'],
         'error': error
+    })
+
+@app.route('/api/estimate', methods=['POST'])
+@login_required
+def api_estimate():
+    """Előzetes fordítási becslés a feltöltött EPUB alapján.
+    A választott modell alapján visszaadja a szószámot, a becsült token-
+    mennyiséget, a becsült időt (helyi modellnél) és a becsült költséget
+    (DeepSeek Pro-nál, USD-ben).
+
+    ---
+    tags:
+      - Translation
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: A feltöltendő EPUB fájl
+      - name: model_source
+        in: formData
+        type: string
+        required: true
+        enum: [local, remote]
+        description: Modell forrás (helyi Ollama vagy DeepSeek Pro)
+      - name: selected_model
+        in: formData
+        type: string
+        required: false
+        description: A kiválasztott modell azonosítója
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'Nincs fájl'}), 400
+    file = request.files['file']
+    model_source = request.form.get('model_source', 'local')
+    selected_model = request.form.get('selected_model', '').strip()
+
+    # 1. EPUB szöveg kinyerése és szószám számítás
+    total_words = 0
+    try:
+        import tempfile
+        from ebooklib import epub as epub_lib
+        from bs4 import BeautifulSoup
+        import re as _re
+
+        with tempfile.NamedTemporaryFile(suffix='.epub', delete=False) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+        try:
+            book = epub_lib.read_epub(tmp_path)
+            items = list(book.get_items_of_type(9))
+            for it in items:
+                try:
+                    text = BeautifulSoup(it.get_body_content(), 'html.parser').get_text()
+                    total_words += len(text.split())
+                except Exception:
+                    pass
+        finally:
+            os.unlink(tmp_path)
+    except Exception as e:
+        app_logger.warning(f"Becslési hiba (EPUB olvasás): {e}")
+        return jsonify({'error': f'Nem sikerült beolvasni az EPUB-ot: {str(e)[:100]}'}), 400
+
+    # 2. Token becslés (angol szövegre ~1.3 token/szó, magyarra ~1.5)
+    #    A fordítás két menetes: input ≈ forrás tokenek, output ≈ cél tokenek.
+    input_tokens = int(total_words * 1.3)
+    output_tokens = int(total_words * 1.5)
+
+    # 3. Idő becslés (szavak/perc átlagos sebességgel)
+    #    Helyi Ollama: ~300 szó/perc, DeepSeek: ~900 szó/perc (becslés).
+    words_per_minute = 900 if model_source == 'remote' else 300
+    estimated_minutes = total_words / max(words_per_minute, 1)
+
+    # 4. Költség becslés (csak DeepSeek Pro-nál)
+    cost_usd = 0.0
+    currency = 'USD'
+    if model_source == 'remote':
+        pricing = {}
+        for m in Config.REMOTE_MODELS:
+            if m.get('id') == selected_model:
+                pricing = m
+                break
+        in_price = pricing.get('input_price_per_mtok', 0.27)
+        out_price = pricing.get('output_price_per_mtok', 1.10)
+        cost_usd = (input_tokens / 1_000_000) * in_price + (output_tokens / 1_000_000) * out_price
+
+    return jsonify({
+        'total_words': total_words,
+        'input_tokens': input_tokens,
+        'output_tokens': output_tokens,
+        'estimated_minutes': round(estimated_minutes, 1),
+        'cost': round(cost_usd, 4),
+        'currency': currency,
+        'model_source': model_source,
+        'selected_model': selected_model,
     })
 
 @app.route('/admin/users')
@@ -1398,7 +1775,7 @@ def api_reader_bookmark(book_id):
                 'bookmark': {
                     'chapter_index': bm.chapter_index,
                     'scroll_position': bm.scroll_position,
-                    'updated_at': bm.updated_at.isoformat() if bm.updated_at else None
+                    'updated_at': to_budapest(bm.updated_at) if bm.updated_at else None
                 }
             })
         return jsonify({'bookmark': None})
@@ -1474,7 +1851,7 @@ def api_notifications():
             'type':t.status,
             'icon':status_icon,
             'message':f'{status_icon} {t.original_filename} – {"Fordítás kész!" if t.status=="completed" else "Folyamatban..." if t.status=="processing" else "Várakozik..." if t.status=="pending" else "Hiba történt"}',
-            'time':t.created_at.isoformat() if t.created_at else '',
+            'time':to_budapest(t.created_at) if t.created_at else '',
             'progress':t.progress,
             'quality_score':t.quality_score
         })
@@ -1521,7 +1898,7 @@ def api_system_containers():
 @login_required
 @admin_required
 def system_monitor():
-    return jsonify({'cpu':{'percent':psutil.cpu_percent(),'cores':psutil.cpu_count()},'memory':{'total_gb':round(psutil.virtual_memory().total/(1024**3),2),'used_gb':round(psutil.virtual_memory().used/(1024**3),2),'percent':psutil.virtual_memory().percent},'disk':{'total_gb':round(psutil.disk_usage('/').total/(1024**3),2),'free_gb':round(psutil.disk_usage('/').free/(1024**3),2),'percent':psutil.disk_usage('/').percent},'uptime':datetime.utcnow().isoformat()})
+    return jsonify({'cpu':{'percent':psutil.cpu_percent(),'cores':psutil.cpu_count()},'memory':{'total_gb':round(psutil.virtual_memory().total/(1024**3),2),'used_gb':round(psutil.virtual_memory().used/(1024**3),2),'percent':psutil.virtual_memory().percent},'disk':{'total_gb':round(psutil.disk_usage('/').total/(1024**3),2),'free_gb':round(psutil.disk_usage('/').free/(1024**3),2),'percent':psutil.disk_usage('/').percent},'uptime':to_budapest(datetime.utcnow())})
 
 # ---- ADMIN LOGOK ----
 @app.route('/admin/logs')
@@ -1627,6 +2004,7 @@ def api_get_user_settings():
         'preferred_model_source': current_user.preferred_model_source or 'local',
         'preferred_model': current_user.preferred_model or '',
         'dark_mode': current_user.dark_mode,
+        'formality': current_user.formality or 'informal',
     })
 
 @app.route('/api/library/<int:book_id>/toc')
@@ -1702,7 +2080,7 @@ def api_history():
         'book_author': e.book.author if e.book else '',
         'chapter_index': e.chapter_index,
         'scroll_position': e.scroll_position,
-        'last_read_at': e.last_read_at.isoformat() if e.last_read_at else None,
+        'last_read_at': to_budapest(e.last_read_at) if e.last_read_at else None,
     } for e in entries]})
 
 @app.route('/api/history', methods=['POST'])
@@ -1767,7 +2145,7 @@ def api_admin_users():
         'last_name': u.last_name or '',
         'tokens': u.tokens,
         'is_admin': u.is_admin,
-        'created_at': u.created_at.isoformat() if u.created_at else None,
+        'created_at': to_budapest(u.created_at) if u.created_at else None,
     } for u in users]})
 
 
@@ -1901,6 +2279,35 @@ def api_translation_stop(translation_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Leállítási kérés rögzítve'})
 
+@app.route('/api/translations/<int:translation_id>/resume', methods=['POST'])
+@login_required
+def api_translation_resume(translation_id):
+    """Megszakadt (paused) fordítás folytatása a checkpoint alapján."""
+    t = Translation.query.get_or_404(translation_id)
+    if t.user_id != current_user.id:
+        return jsonify({'error': 'Nincs jogosultságod'}), 403
+    if t.status != 'paused':
+        return jsonify({'error': 'Csak megszakadt (paused) fordítás folytatható'}), 400
+
+    # A checkpoint-ból ellenőrizzük a forrásfájlt
+    src = None
+    if t.checkpoint_data:
+        try:
+            cp = json.loads(t.checkpoint_data)
+            src = cp.get('source_filepath')
+        except Exception:
+            src = None
+    if not src or not os.path.exists(src):
+        return jsonify({'error': 'A forrásfájl már nem elérhető, a folytatás nem lehetséges'}), 400
+
+    t.stop_requested = False
+    t.status = 'pending'
+    db.session.commit()
+    thread = threading.Thread(target=translate_epub, args=(app, t.id, src, None, (t.first_pass_model or 'local')))
+    thread.daemon = True
+    thread.start()
+    return jsonify({'success': True, 'message': 'Fordítás folytatása elindítva'})
+
 @app.route('/api/admin/logs')
 @login_required
 @admin_required
@@ -1931,21 +2338,112 @@ def api_admin_logs():
     ]
     return jsonify({'log_content': log_content, 'log_type': log_type, 'available_logs': available_logs})
 
+def to_budapest(dt):
+    """Naiv UTC datetime objektumot budapesti idővé konvertál és ISO stringet ad vissza.
+    A zoneinfo (DST-helyes) ha elérhető, különben fix UTC+2 (nyári) fallback."""
+    if dt is None:
+        return None
+    import datetime as _dt
+    try:
+        from zoneinfo import ZoneInfo
+        btz = ZoneInfo('Europe/Budapest')
+    except Exception:
+        btz = _dt.timezone(_dt.timedelta(hours=2))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(btz).isoformat()
+
+def sanitize_text(s):
+    """Eltávolítja a magányos Unicode surrogate-öket (félbevágott karaktereket),
+    amelyek érvénytelen JSON-t eredményeznének az API szerver felé."""
+    if not isinstance(s, str):
+        return s
+    try:
+        s.encode('utf-8')
+        return s
+    except UnicodeEncodeError:
+        return s.encode('utf-8', 'replace').decode('utf-8')
+
+def protect_entities(text, entities):
+    """Ismert entitások (tulajdonnevek, terminusok) védelme placeholder-ekkel,
+    hogy a modell ne tudja őket félrefordítani / inkonzisztensen kezelni.
+
+    Visszaadja a védett szöveget és a visszaállító map-et (placeholder -> entity)."""
+    if not text or not entities:
+        return text, {}
+    import re
+    # Egyedi, hosszabbak először (a részleges egyezések elkerülésére)
+    unique = sorted({e.strip() for e in entities if e and e.strip()}, key=len, reverse=True)
+    restore = {}
+    protected = text
+    idx = 0
+    for ent in unique:
+        if len(ent) < 2:
+            continue
+        ph = f"__ENT{idx}__"
+        replaced = re.subn(re.escape(ent), ph, protected, flags=re.IGNORECASE)
+        if replaced[1] > 0:
+            protected = replaced[0]
+            restore[ph] = ent
+            idx += 1
+    return protected, restore
+
+def restore_entities(text, restore_map):
+    """A placeholder-ek visszaállítása az eredeti entitás-szövegre."""
+    if not text or not restore_map:
+        return text
+    for ph, ent in restore_map.items():
+        text = text.replace(ph, ent)
+    return text
+
+# Átmeneti hibakódok, amiknél érdemes újrapróbálkozni exponenciális háttal.
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+def request_with_retry(method, url, retries=3, **kwargs):
+    """HTTP kérés újrapróbálkozással, exponenciális (1s, 2s, 4s) várakozással.
+
+    - 429/5xx és kapcsolódási hibák esetén újrapróbálkozik;
+    - 400-as (például a korábbi érvénytelen JSON / surrogate hiba) esetén NEM
+      próbálkozik újra, mert az értelmetlen, hanem visszaadja a választ.
+    """
+    import time
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            resp = requests.request(method, url, **kwargs)
+            if resp.status_code in RETRYABLE_STATUS and attempt < retries - 1:
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                continue
+            return resp
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            last_exc = e
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+    if last_exc is not None:
+        raise last_exc
+    # Elméletileg ide nem jutunk, de biztonság kedvéért egy üres választ adunk.
+    return requests.Response()
+
 def translate_epub(app_ref, translation_id, filepath, context_files=None, model_source='local'):
     with app_ref.app_context():
         t = Translation.query.get(translation_id)
         if not t:
-            translation_logger.error(f"Translation #{translation_id} nem található az adatbázisban")
+            _trans_log(f"Translation #{translation_id} nem található az adatbázisban")
             return
         user = User.query.get(t.user_id) if t.user_id else None
         user_info = f"{user.email} (ID:{user.id})" if user else "ismeretlen"
-        translation_logger.info(f"=== Fordítás indítása === Fordítás ID:{translation_id}, Fájl: {t.original_filename}, Felhasználó: {user_info}, Modell: {app_ref.config['DEFAULT_MODEL']}")
+        _trans_log(f"=== Fordítás indítása === Fordítás ID:{translation_id}, Fájl: {t.original_filename}, Felhasználó: {user_info}, Modell: {app_ref.config['DEFAULT_MODEL']}")
+        try:
+            fh_trans.flush()
+        except Exception:
+            pass
         try:
             # === RÉSZLETES PROGRESSZ INICIALIZÁLÁSA (5. fejlesztés) ===
             t.status = 'processing'; t.progress = 5
             t.current_stage = 'first_pass'  # első menet: AI fordítás
             db.session.commit()
-            translation_logger.info(f"[ID:{translation_id}] 📖 EPUB olvasása: {t.original_filename}")
+            _trans_log(f"[ID:{translation_id}] 📖 EPUB olvasása: {t.original_filename}")
             from ebooklib import epub as epub_lib
             from bs4 import BeautifulSoup, NavigableString, Tag
             import hashlib, re
@@ -1954,15 +2452,15 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             ollama_host = app_ref.config['OLLAMA_HOST']
             deepseek_api_key = user.deepseek_api_key if user else ''
             use_deepseek = (model_source == 'remote' and deepseek_api_key)
-            translation_logger.info(f"[ID:{translation_id}] 🔧 Modell forrás: {'DeepSeek Pro' if use_deepseek else 'Helyi Ollama'}, modell: {model}")
+            _trans_log(f"[ID:{translation_id}] 🔧 Modell forrás: {'DeepSeek Pro' if use_deepseek else 'Helyi Ollama'}, modell: {model}")
             
             if use_deepseek:
                 # A felhasználó által kiválasztott remote modell használata
                 # (lehet deepseek-chat vagy deepseek-reasoner)
                 model = t.model_used if t.model_used in ('deepseek-chat', 'deepseek-reasoner') else 'deepseek-chat'
-                translation_logger.info(f"[ID:{translation_id}] 🌐 DeepSeek Pro API: {model}")
+                _trans_log(f"[ID:{translation_id}] 🌐 DeepSeek Pro API: {model}")
             else:
-                translation_logger.info(f"[ID:{translation_id}] 🖥️ Helyi Ollama modell: {model}")
+                _trans_log(f"[ID:{translation_id}] 🖥️ Helyi Ollama modell: {model}")
             items = list(book.get_items_of_type(9))  # ITEM_DOCUMENT
             total = len(items)
             t.total_chapters = total  # összes fejezet/dokumentum
@@ -1978,7 +2476,7 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
                     original_texts.append(orig_soup.get_text()[:2000].strip())
                 except:
                     original_texts.append("")
-            translation_logger.debug(f"[ID:{translation_id}] Eredeti szövegek elmentve a második menethez ({total} dokumentum)")
+            _trans_log(f"[ID:{translation_id}] Eredeti szövegek elmentve a második menethez ({total} dokumentum)")
             # Becsült szószám számítás (az első 5 dokumentum alapján extrapolálunk)
             total_words_est = 0
             for it in items[:min(5, total)]:
@@ -1989,7 +2487,64 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             if total > 0:
                 t.total_words = int(total_words_est * (total / min(5, total)))
             db.session.commit()
-            translation_logger.info(f"[ID:{translation_id}] 📊 {total} szöveges elem, ~{t.total_words} szó, fordítás kezdése a(z) {model} modellel")
+            _trans_log(f"[ID:{translation_id}] 📊 {total} szöveges elem, ~{t.total_words} szó, fordítás kezdése a(z) {model} modellel")
+
+            # === CHECKPOINT VISSZAÁLLÍTÁS (v2.3.0+) ===
+            # Ha van mentett állapot (pl. konténer-újraindítás után folytatjuk),
+            # a már lefordított fejezetek tartalmát visszatöltjük.
+            resume_from = 0
+            if t.checkpoint_data:
+                try:
+                    import base64
+                    cp = json.loads(t.checkpoint_data)
+                    contents = cp.get('contents') or []
+                    saved_texts = cp.get('original_texts') or []
+                    if saved_texts and len(saved_texts) == len(original_texts):
+                        original_texts = saved_texts
+                    for i, b64 in enumerate(contents):
+                        if i < total and b64:
+                            try:
+                                items[i].set_content(base64.b64decode(b64))
+                            except Exception:
+                                pass
+                    resume_from = int(cp.get('chapter_index', 0)) + 1
+                    _trans_log(f"[ID:{translation_id}] 🔁 Checkpoint visszaállítva: {resume_from}/{total} fejezettől folytatás")
+                except Exception as cp_err:
+                    _trans_log(f"[ID:{translation_id}] Checkpoint visszaállítása sikertelen: {cp_err}")
+
+            # Checkpoint mentő helper: minden fejezet után elmenti a kész tartalmat.
+            def save_checkpoint(last_idx):
+                try:
+                    import base64
+                    contents = []
+                    for i in range(last_idx + 1):
+                        try:
+                            contents.append(base64.b64encode(items[i].get_content()).decode('ascii'))
+                        except Exception:
+                            contents.append(None)
+                    cp = json.dumps({
+                        'chapter_index': last_idx,
+                        'contents': contents,
+                        'original_texts': original_texts,
+                        'source_filepath': filepath,
+                    })
+                    t.checkpoint_data = cp
+                    t.last_checkpoint_at = datetime.utcnow()
+                except Exception as cp_err:
+                    _trans_log(f"[ID:{translation_id}] Checkpoint mentése sikertelen: {cp_err}")
+
+            def stop_requested_fresh():
+                """A stop_requested flag friss olvasása az adatbázisból, mert a
+                /stop kérés egy másik munkamenetben commitolja azt."""
+                try:
+                    v = db.session.execute(
+                        db.text("SELECT stop_requested FROM translations WHERE id = :id"),
+                        {'id': translation_id}
+                    ).scalar()
+                    return bool(v)
+                except Exception:
+                    return False
+
             app_logger.info(f"🚀 Fordítás indult: #{translation_id} '{t.original_filename}' ({model}, {t.total_words} szó)")
             translated_count = 0; failed_items = 0; total_nodes_translated = 0
             
@@ -1998,14 +2553,16 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
             
             # === GLOSSZÁRIUM BETÖLTÉSE (1. fejlesztés) ===
             glossary_terms = {}
+            glossary_source_terms = []
             try:
                 entries = GlossaryEntry.query.filter_by(user_id=t.user_id).order_by(GlossaryEntry.source_count.desc()).limit(100).all()
                 for entry in entries:
                     glossary_terms[entry.source_term.lower()] = entry.target_term
+                    glossary_source_terms.append(entry.source_term)
                 if glossary_terms:
-                    translation_logger.debug(f"[ID:{translation_id}] Glosszárium betöltve: {len(glossary_terms)} bejegyzés")
+                    _trans_log(f"[ID:{translation_id}] Glosszárium betöltve: {len(glossary_terms)} bejegyzés")
             except Exception as ge:
-                translation_logger.debug(f"[ID:{translation_id}] Glosszárium nem elérhető: {ge}")
+                _trans_log(f"[ID:{translation_id}] Glosszárium nem elérhető: {ge}")
             
             # === FORDÍTÁSI MEMÓRIA ELŐKÉSZÍTÉSE (4. fejlesztés) ===
             # A TM-et menet közben használjuk – a search_translation_memory segédfüggvénnyel
@@ -2023,6 +2580,58 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
                 except:
                     pass
                 return None
+
+            def fuzzy_search_tm(source_text, user_id, threshold=0.8, max_candidates=200):
+                """Hasonlóságalapú fordítási memória keresés difflib-bal.
+
+                Előszűrés: csak a felhasználó bejegyzései, hosszarány-szűrés
+                (0.6–1.6×) és last_used szerinti rendezés + limit, hogy nagy TM
+                esetén se lassuljon le a keresés.
+                """
+                try:
+                    import difflib
+                    src = source_text.strip()
+                    slen = len(src)
+                    if slen < 10:
+                        return None
+                    candidates = (TranslationMemory.query
+                                  .filter_by(user_id=user_id)
+                                  .order_by(TranslationMemory.last_used.desc())
+                                  .limit(max_candidates)
+                                  .all())
+                    best = None
+                    best_ratio = threshold
+                    for tm in candidates:
+                        text = (tm.source_text or '').strip()
+                        if not text:
+                            continue
+                        tlen = len(text)
+                        # Hosszarány-szűrés a felesleges összehasonlítások elkerülésére
+                        if slen > 0 and (tlen / slen > 1.6 or tlen / slen < 0.6):
+                            continue
+                        ratio = difflib.SequenceMatcher(None, src, text).ratio()
+                        if ratio >= best_ratio:
+                            best = tm
+                            best_ratio = ratio
+                    if best:
+                        best.usage_count += 1
+                        best.last_used = datetime.utcnow()
+                        db.session.commit()
+                        return best.translated_text
+                except:
+                    pass
+                return None
+
+            # Token-fogyasztás és költség napló gyűjtése
+            tokens_in_total = 0
+            tokens_out_total = 0
+            cost_total = 0.0
+            # DeepSeek árazás (USD / 1M token) a későbbi költségszámításhoz
+            ds_pricing = {}
+            for m in Config.REMOTE_MODELS:
+                if m.get('id') == model:
+                    ds_pricing = m
+                    break
             
             # === HUNSPELL INICIALIZÁLÁS (3. fejlesztés) ===
             # CLI eszközként használjuk (subprocess), mivel a hunspell Python binding
@@ -2034,13 +2643,14 @@ def translate_epub(app_ref, translation_id, filepath, context_files=None, model_
                                 capture_output=True, text=True, timeout=5)
                 hunspell_available = result.returncode == 0
                 if hunspell_available:
-                    translation_logger.debug(f"[ID:{translation_id}] Hunspell CLI magyar helyesírás-ellenőrző elérhető")
+                    _trans_log(f"[ID:{translation_id}] Hunspell CLI magyar helyesírás-ellenőrző elérhető")
             except Exception as he:
-                translation_logger.debug(f"[ID:{translation_id}] Hunspell nem elérhető: {he}")
+                _trans_log(f"[ID:{translation_id}] Hunspell nem elérhető: {he}")
             
             # === FEJLETT PROMPT KONTEXTUS ELŐKÉSZÍTÉSE ===
             style_instruction = ""
             terminology_list = ""
+            terminology_entities = set()
             
             # 1. Stílus-instrukció gyűjtése referencia (minta) könyvekből
             try:
@@ -2066,27 +2676,26 @@ Minták a kívánt stílushoz:
 {combined_sample}
 ---
 """
-                        translation_logger.debug(f"[ID:{translation_id}] Stílusinstrukció betöltve ({len(style_samples)} referencia könyvből)")
+                        _trans_log(f"[ID:{translation_id}] Stílusinstrukció betöltve ({len(style_samples)} referencia könyvből)")
             except Exception as style_err:
-                translation_logger.debug(f"[ID:{translation_id}] Stílusinstrukció nem elérhető: {style_err}")
+                _trans_log(f"[ID:{translation_id}] Stílusinstrukció nem elérhető: {style_err}")
             
             # 2. Terminológia gyűjtése könyvtári könyvekből (a felhasználó által kiválasztottak)
             try:
-                # A felhasználó által kiválasztott könyvek az UserBookPreference-ből
-                selected_prefs = UserBookPreference.query.filter_by(user_id=t.user_id, is_selected=True).all()
-                selected_book_ids = [p.book_id for p in selected_prefs]
-                if selected_book_ids:
-                    library_books = Book.query.filter(Book.id.in_(selected_book_ids)).all()
+                # A fordítási űrlapról érkező kiválasztott könyvek (context_files) az elsődleges forrás.
+                # Ha nincs kijelölés, a felhasználó saját 3 legutóbb feltöltött könyve a fallback.
+                all_book_paths = []
+                if context_files:
+                    all_book_paths.extend(context_files)
                 else:
-                    library_books = Book.query.order_by(Book.uploaded_at.desc()).limit(3).all()
-                if library_books:
-                    # Kontextus fájlok is lehetnek
-                    all_book_paths = []
-                    if context_files:
-                        all_book_paths.extend(context_files)
-                    all_book_paths.extend([lb.file_path for lb in library_books if lb.file_path])
-                    all_book_paths = all_book_paths[:5]  # max 5 könyv
-                    
+                    fallback_books = Book.query.filter_by(user_id=t.user_id).order_by(Book.uploaded_at.desc()).limit(3).all()
+                    fallback_paths = [b.file_path for b in fallback_books if b.file_path]
+                    if fallback_paths:
+                        _trans_log(f"[ID:{translation_id}] Nincs kijelölt kontextus-könyv, fallback: a felhasználó 3 legutóbbi könyve")
+                    all_book_paths.extend(fallback_paths)
+                all_book_paths = all_book_paths[:5]  # max 5 könyv
+
+                if all_book_paths:
                     # Kulcsszavak kigyűjtése: tulajdonnevek, speciális kifejezések
                     import re
                     terms = set()
@@ -2111,24 +2720,54 @@ Minták a kívánt stílushoz:
                             pass
                     
                     if terms:
+                        terminology_entities = terms
                         term_list = sorted(list(terms))[:30]
                         terminology_list = f"""Fontos terminológia és tulajdonnevek (ezeket NE fordítsd le, hagyd eredeti formában):
 {', '.join(term_list)}
 
 """
-                        translation_logger.debug(f"[ID:{translation_id}] Terminológia betöltve: {len(term_list)} kifejezés")
+                        _trans_log(f"[ID:{translation_id}] Terminológia betöltve: {len(term_list)} kifejezés")
             except Exception as term_err:
-                translation_logger.debug(f"[ID:{translation_id}] Terminológia gyűjtés nem sikerült: {term_err}")
-            
+                _trans_log(f"[ID:{translation_id}] Terminológia gyűjtés nem sikerült: {term_err}")
+
+            # === NER ENTITÁS-VÉDELEM (v2.4.0+) – KI VAN KAPCSOLVA (v2.5.6) ===
+            # A regex-alapú „tulajdonnév" gyűjtés minden nagybetűvel kezdődő
+            # KÖZNEVET is névnek nézett (Could, Another), és a modell ezeket
+            # angolul hagyta. A glosszárium-védelem (megerősített terminusok)
+            # TÖRETLENÜL megmarad; a nyers regex-védelem törölve.
+            protected_entities = []
+
+            # === TELEZÉS/MAGÁZÁS + REGISZTER UTASÍTÁS (v2.5.0+) ===
+            formality = (user.formality if user and getattr(user, 'formality', None) else 'informal')
+            if formality == 'formal':
+                formality_hint = "Formasági utasítás: magázó stílusban fordíts (Ön, önt formák).\n"
+            else:
+                formality_hint = "Formasági utasítás: tegeződő stílusban fordíts.\n"
+
             for idx, item in enumerate(items):
+                # A korábbi checkpoint-nál már kész fejezeteket átugorjuk
+                if resume_from > 0 and idx < resume_from:
+                    continue
                 # Leállítási kérés ellenőrzése (a felhasználó a /stop végponttal kéri)
-                if t.stop_requested:
-                    translation_logger.info(f"[ID:{translation_id}] ⏹️ Leállítási kérés észlelve, fordítás megszakítva (elem {idx+1}/{total})")
-                    t.status = 'stopped'
-                    t.current_stage = 'stopped'
+                if stop_requested_fresh():
+                    _trans_log(f"[ID:{translation_id}] ⏹️ Leállítási kérés észlelve, fordítás megszakítva (elem {idx+1}/{total})")
+                    save_checkpoint(idx - 1) if idx > 0 else None
+                    t.status = 'paused'
+                    t.current_stage = 'paused'
                     db.session.commit()
                     return
                 try:
+                    # Fejezet kezdete – azonnali visszajelzés (fejezetszám + log),
+                    # hogy ne tűnjön a fordítás „beragadtnak" egy hosszú fejezet közben.
+                    if idx >= resume_from:
+                        t.current_chapter = idx + 1
+                        t.nodes_translated = total_nodes_translated
+                        db.session.commit()
+                        _trans_log(f"[ID:{translation_id}] 📖 Fejezet {idx+1}/{total} feldolgozása…")
+                        try:
+                            fh_trans.flush()
+                        except Exception:
+                            pass
                     soup = BeautifulSoup(item.get_body_content(), 'html.parser')
                     
                     # 1. szakasz: Gyűjtsük ki az összes lefordítandó NavigableString-et
@@ -2145,42 +2784,20 @@ Minták a kívánt stílushoz:
                             text_nodes.append((node, stripped))
                     
                     if not text_nodes:
-                        translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}: nincs lefordítandó szöveg, kihagyva")
+                        _trans_log(f"[ID:{translation_id}] Elem {idx+1}/{total}: nincs lefordítandó szöveg, kihagyva")
                         continue
                     
-                    translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}: {len(text_nodes)} text node, fordítás batch-ben...")
+                    _trans_log(f"[ID:{translation_id}] Elem {idx+1}/{total}: {len(text_nodes)} text node, fordítás batch-ben...")
                     
                     # 2. szakasz: Batch fordítás placeholder-alapú biztonságos cserével
                     source_texts = [tn[1] for tn in text_nodes]
                     combined_source = NODE_SEP.join(source_texts)
                     
-                    # 3. Szélesebb sliding window kontextus (8. fejlesztés):
-                    #    Előző fejezet első bekezdése (max 800 karakter) +
-                    #    következő fejezet első bekezdése (max 500 karakter, előretekintő)
-                    #    Ez segít a narratív folytonosság fenntartásában és jobb kontextust ad a modellnek.
+                    # v2.6.12: a szomszédos fejezet kontextus KI VAN KAPCSOLVA.
+                    # A korábbi sliding-window (előző 800 + következő 500 karakter)
+                    # a node-onkénti promptBA tette a szomszédos fejezetet, amit a modell
+                    # lefordítva visszamondott -> duplikáció és rossz helyen lévő részek.
                     surrounding_context = ""
-                    # Előző fejezet kontextusa
-                    if idx > 0:
-                        try:
-                            prev_item = items[idx-1]
-                            prev_soup = BeautifulSoup(prev_item.get_body_content(), 'html.parser')
-                            prev_text = prev_soup.get_text()[:800].strip()
-                            if prev_text:
-                                surrounding_context = f"Előző fejezet/bekezdés kontextusa: {prev_text}\n---\n"
-                        except Exception:
-                            pass
-                    # Következő fejezet kontextusa (előretekintő) – a prompt elejére kerül,
-                    # hogy a modell lássa, merre halad a történet
-                    if idx < total - 1:
-                        try:
-                            next_item = items[idx+1]
-                            next_soup = BeautifulSoup(next_item.get_body_content(), 'html.parser')
-                            next_text = next_soup.get_text()[:500].strip()
-                            if next_text:
-                                lookahead_context = f"Következő fejezet/bekezdés kontextusa (előretekintő): {next_text}\n---\n"
-                                surrounding_context = lookahead_context + surrounding_context
-                        except Exception:
-                            pass
                     
                     # === NODE-ONKÉNTI FORDÍTÁS (megbízhatóbb, mint a batch) ===
                     # Batch fordítás helyett minden text node-ot egyesével fordítunk,
@@ -2203,10 +2820,20 @@ Magyar: Átsétált a kerten, gyönyörködve a gyönyörű virágokban, amelyek
                     placeholders = []
                     
                     for node_idx, (node, original) in enumerate(text_nodes):
+                        # Leállítás friss ellenőrzése node-szinten is
+                        if stop_requested_fresh():
+                            _trans_log(f"[ID:{translation_id}] ⏹️ Leállítás node-szinten észlelve (elem {idx+1}/{total}, node {node_idx+1})")
+                            save_checkpoint(idx - 1) if idx > 0 else None
+                            t.status = 'paused'
+                            t.current_stage = 'paused'
+                            db.session.commit()
+                            return
                         if len(original) < 5:
                             continue  # túl rövid szöveg, nem érdemes fordítani
                         
-                        # Fordítási memória keresés: ha már lefordítottuk ezt a szöveget
+                        # Fordítási memória keresés: PONTOS egyezés (SHA256).
+                        # A fuzzy matching KI van kapcsolva, mert a rövid, hasonló
+                        # párbeszédeknél téves találatokat adott (Relentless eset).
                         cached = search_tm(original, t.user_id)
                         if cached:
                             ph = f"__CACHED_{hashlib.md5(f'{idx}_{node_idx}_{uuid.uuid4().hex[:6]}'.encode()).hexdigest()[:12]}__"
@@ -2214,7 +2841,7 @@ Magyar: Átsétált a kerten, gyönyörködve a gyönyörű virágokban, amelyek
                             placeholders.append((ph, cached, True))
                             nodes_translated_here += 1
                             total_nodes_translated += 1
-                            translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}/{total}, node {node_idx+1}/{len(text_nodes)}: TM cache találat")
+                            _trans_log(f"[ID:{translation_id}] Elem {idx+1}/{total}, node {node_idx+1}/{len(text_nodes)}: TM cache találat (exact)")
                             continue
                         
                         # Ollama API hívás egyetlen text node fordítására
@@ -2226,10 +2853,18 @@ Magyar: Átsétált a kerten, gyönyörködve a gyönyörű virágokban, amelyek
                             if relevant:
                                 glossary_hint = f"Glosszárium (használd ezeket a fordításokat): {', '.join(relevant[:5])}\n"
                         
-                        single_prompt = f"""{few_shot}{glossary_hint}{style_instruction}{terminology_list}{surrounding_context}Fordítsd le a következő angol szöveget magyarra.
+                        # (NER entitás-védelem kikapcsolva – nincs placeholder-csere)
+
+                        # Regiszter-besorolás: párbeszéd vs. narráció
+                        register_hint = ""
+                        if re.search(r'["“”\u201c\u201d]', original):
+                            register_hint = "Ez párbeszéd. Közvetlen, élő magyar beszélt nyelvet használj.\n"
+
+                        single_prompt = f"""{few_shot}{glossary_hint}{style_instruction}{formality_hint}{register_hint}Fordítsd le a következő angol szöveget magyarra.
 Csak a fordítást add vissza, semmi mást!
 
 {original[:800]}"""
+                        single_prompt = sanitize_text(single_prompt)
                         
                         try:
                             if use_deepseek:
@@ -2245,19 +2880,23 @@ Csak a fordítást add vissza, semmi mást!
                                     deepseek_payload['temperature'] = 0.2
                                 # deepseek-reasoner nem támogatja a temperature paramétert
                                 
-                                resp = requests.post("https://api.deepseek.com/v1/chat/completions", json=deepseek_payload,
+                                resp = request_with_retry("POST", "https://api.deepseek.com/v1/chat/completions", json=deepseek_payload,
                                     headers={
                                         'Authorization': f'Bearer {deepseek_api_key}',
                                         'Content-Type': 'application/json'
                                     }, timeout=None)
                                 if resp.status_code == 200:
-                                    translated = resp.json()['choices'][0]['message']['content'].strip()
+                                    data = resp.json()
+                                    translated = data['choices'][0]['message']['content'].strip()
+                                    usage = data.get('usage') or {}
+                                    tokens_in_total += usage.get('prompt_tokens', 0)
+                                    tokens_out_total += usage.get('completion_tokens', 0)
                                 else:
-                                    translation_logger.warning(f"[ID:{translation_id}] DeepSeek API hiba (HTTP {resp.status_code}): {resp.text[:200]}")
+                                    _trans_log(f"[ID:{translation_id}] DeepSeek API hiba (HTTP {resp.status_code}): {resp.text[:200]}")
                                     translated = ''
                             else:
                                 # Helyi Ollama API hívás
-                                resp = requests.post(f"{ollama_host}/api/generate", json={
+                                resp = request_with_retry("POST", f"{ollama_host}/api/generate", json={
                                     'model': model,
                                     'prompt': single_prompt,
                                     'stream': False,
@@ -2269,9 +2908,12 @@ Csak a fordítást add vissza, semmi mást!
                                     }
                                 }, timeout=None)
                                 if resp.status_code == 200:
-                                    translated = resp.json().get('response', '').strip()
+                                    data = resp.json()
+                                    translated = data.get('response', '').strip()
+                                    tokens_in_total += data.get('prompt_eval_count', 0)
+                                    tokens_out_total += data.get('eval_count', 0)
                                 else:
-                                    translation_logger.warning(f"[ID:{translation_id}] Ollama hiba (HTTP {resp.status_code}) node {node_idx+1}-nél")
+                                    _trans_log(f"[ID:{translation_id}] Ollama hiba (HTTP {resp.status_code}) node {node_idx+1}-nél")
                                     translated = ''
                             
                             if translated and translated != original:
@@ -2293,7 +2935,7 @@ Csak a fordítást add vissza, semmi mást!
                                 except:
                                     pass
                         except Exception as node_err:
-                            translation_logger.warning(f"[ID:{translation_id}] Node fordítási hiba: {node_err}")
+                            _trans_log(f"[ID:{translation_id}] Node fordítási hiba: {node_err}")
                     
                     # Cseréljük a placeholder-eket a fordított szövegre
                     html_str = str(soup)
@@ -2306,9 +2948,9 @@ Csak a fordítást add vissza, semmi mást!
                     # Részletes előrehaladás logolás minden 10. elemnél vagy az első 3-nál
                     if idx < 3 or (idx + 1) % 10 == 0:
                         pct = t.progress
-                        translation_logger.info(f"[ID:{translation_id}] ⏳ Előrehaladás: {idx+1}/{total} elem ({pct}%), {total_nodes_translated} node lefordítva, {failed_items} hiba")
+                        _trans_log(f"[ID:{translation_id}] ⏳ Előrehaladás: {idx+1}/{total} elem ({pct}%), {total_nodes_translated} node lefordítva, {failed_items} hiba")
                     
-                    translation_logger.debug(f"[ID:{translation_id}] Elem {idx+1}: {nodes_translated_here}/{len(text_nodes)} node lefordítva (node-onkénti mód)")
+                    _trans_log(f"[ID:{translation_id}] Elem {idx+1}: {nodes_translated_here}/{len(text_nodes)} node lefordítva (node-onkénti mód)")
                     
                     # === GLOSSZÁRIUM ÉPÍTÉS (1. fejlesztés) ===
                     try:
@@ -2333,22 +2975,37 @@ Csak a fordítást add vissza, semmi mást!
                                 else:
                                     existing.source_count += 1
                         db.session.commit()
-                    except Exception: pass
+                    except Exception:
+                        db.session.rollback()
                     
+                    # === FORDÍTÁSI MEMÓRIA MENTÉS (4. fejlesztés) ===
                     # === FORDÍTÁSI MEMÓRIA MENTÉS (4. fejlesztés) ===
                     try:
                         for node, original in text_nodes:
-                            cached = search_tm(original, t.user_id)
-                            if not cached:
-                                translated = None
-                                for ph, txt, _ in placeholders:
-                                    if node.strip()[:20] in original[:20]: translated = txt; break
-                                if translated and translated != original:
-                                    import hashlib
-                                    tm_hash = hashlib.sha256(original.strip().encode()).hexdigest()
-                                    db.session.add(TranslationMemory(user_id=t.user_id, source_text=original[:1000], translated_text=translated[:1000], source_hash=tm_hash))
+                            translated = None
+                            for ph, txt, _ in placeholders:
+                                if node.strip()[:20] in original[:20]:
+                                    translated = txt
+                                    break
+                            if not translated or translated == original:
+                                continue
+                            import hashlib
+                            tm_hash = hashlib.sha256(original.strip().encode()).hexdigest()
+                            # A source_hash GLOBÁLISAN unique; ha már bármely
+                            # felhasználó lefordította ezt a szöveget, ne szúrjuk
+                            # be újra (korábban UniqueViolation miatt szállt el a szál).
+                            exists = TranslationMemory.query.filter_by(source_hash=tm_hash).first()
+                            if exists:
+                                continue
+                            db.session.add(TranslationMemory(
+                                user_id=t.user_id,
+                                source_text=original[:1000],
+                                translated_text=translated[:1000],
+                                source_hash=tm_hash,
+                            ))
                         db.session.commit()
-                    except Exception: pass
+                    except Exception:
+                        db.session.rollback()
                     
                     # === HUNSPELL HELYESÍRÁS ELLENŐRZÉS (3. fejlesztés) ===
                     if hunspell_available:
@@ -2371,40 +3028,53 @@ Csak a fordítást add vissza, semmi mást!
                     item.set_content(html_str.encode('utf-8'))
                     
                 except requests.exceptions.ConnectionError as ce:
-                    translation_logger.error(f"[ID:{translation_id}] Kapcsolódási hiba: {ce}")
+                    _trans_log(f"[ID:{translation_id}] Kapcsolódási hiba: {ce}")
                     raise
                 except Exception as item_err:
-                    translation_logger.warning(f"[ID:{translation_id}] Elem feldolgozási hiba: {item_err}")
+                    _trans_log(f"[ID:{translation_id}] Elem feldolgozási hiba: {item_err}")
                     failed_items += 1
                 
                 t.progress = 5 + int(90 * (idx + 1) / total)
                 db.session.commit()
+                # Checkpoint mentés az aktuális fejezet után
+                if idx >= resume_from:
+                    save_checkpoint(idx)
+                # A fordítási log fájl azonnali frissítése (fejezetszám láthatósága)
+                try:
+                    fh_trans.flush()
+                except Exception:
+                    pass
             
-            translation_logger.info(f"[ID:{translation_id}] Első menet kész: {translated_count}/{total} dokumentum, {total_nodes_translated} szöveges csomópont lefordítva, {failed_items} hiba")
+            _trans_log(f"[ID:{translation_id}] Első menet kész: {translated_count}/{total} dokumentum, {total_nodes_translated} szöveges csomópont lefordítva, {failed_items} hiba")
             
             # ═══════════════════════════════════════════════════════════════
+            t.first_pass_model = model  # elmentjük, melyik modell futott az első menetben
             # === KÉTMENETES FORDÍTÁS – MÁSODIK MENET: MINŐSÉGELLENŐRZÉS ===
             # ═══════════════════════════════════════════════════════════════
-            # A második menet végigmegy az első menetben lefordított szövegen,
-            # és egy (opcionálisan másik) modellel ellenőrzi, javítja a fordítást.
-            # Ez jelentősen javítja a nyelvtani pontosságot és stílust.
-            # A második menet modellje alapértelmezetten ugyanaz, mint az elsőé,
-            # de a first_pass_model mezőbe mentjük az első menet modelljét,
-            # így később más modell is beállítható a második menethez.
-            t.current_stage = 'second_pass'
-            t.progress = 91  # 90% volt az első menet, most jön a második
-            t.first_pass_model = model  # elmentjük, melyik modell futott az első menetben
-            t.second_pass_model = model  # alapértelmezetten ugyanaz
-            db.session.commit()
-            
-            translation_logger.info(f"[ID:{translation_id}] 🔍 Második menet indítása – minőségellenőrzés (modell: {model})...")
+            # v2.5.2-től ALAPBÓL KIKAPCSOLVA (ENABLE_SECOND_PASS='n'), mert a
+            # csonkolt bemenetből (eredeti[:800] + fordítás[:1500]) a modell nem
+            # tudta a teljes fejezetet reprodukálni, és duplikálta/többszörözte a
+            # szöveget (pl. "TartalomjegyzékTartalomjegyzék", "A Berkley ..." 32x).
+            # Visszaépítéshez: Config.ENABLE_SECOND_PASS = True (+ .env ENABLE_SECOND_PASS=i).
             review_count = 0; review_improvements = 0
+            second_pass_enabled = bool(getattr(app_ref.config, 'ENABLE_SECOND_PASS', False))
+            if second_pass_enabled:
+                t.current_stage = 'second_pass'
+                t.progress = 91  # 90% volt az első menet, most jön a második
+                t.second_pass_model = model  # alapértelmezetten ugyanaz
+                db.session.commit()
+                _trans_log(f"[ID:{translation_id}] 🔍 Második menet indítása – minőségellenőrzés (modell: {model})...")
+            else:
+                _trans_log(f"[ID:{translation_id}] ⏭️ Második menet KIHAGYVA (ENABLE_SECOND_PASS=n)")
             for idx, item in enumerate(items):
+                if not second_pass_enabled:
+                    break
                 # Leállítási kérés ellenőrzése a második menetben is
-                if t.stop_requested:
-                    translation_logger.info(f"[ID:{translation_id}] ⏹️ Leállítási kérés észlelve a második menetben (elem {idx+1}/{total})")
-                    t.status = 'stopped'
-                    t.current_stage = 'stopped'
+                if stop_requested_fresh():
+                    _trans_log(f"[ID:{translation_id}] ⏹️ Leállítási kérés észlelve a második menetben (elem {idx+1}/{total})")
+                    save_checkpoint(idx - 1) if idx > 0 else None
+                    t.status = 'paused'
+                    t.current_stage = 'paused'
                     db.session.commit()
                     return
                 try:
@@ -2415,7 +3085,7 @@ Csak a fordítást add vissza, semmi mást!
                         # Túl rövid, nincs értelme ellenőrizni
                         continue
                     
-                    translation_logger.debug(f"[ID:{translation_id}] Második menet: elem {idx+1}/{total}, szöveghossz: {len(review_text)} karakter")
+                    _trans_log(f"[ID:{translation_id}] Második menet: elem {idx+1}/{total}, szöveghossz: {len(review_text)} karakter")
                     review_count += 1
                     
                     # Második menet prompt: az eredeti szöveget és a fordítást is beküldjük
@@ -2439,9 +3109,10 @@ Jelenlegi magyar fordítás:
 
 Kérlek, add vissza a JAVÍTOTT magyar fordítást. Csak a javított szöveget add vissza, semmi mást! 
 Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
+                    review_prompt = sanitize_text(review_prompt)
                     
                     try:
-                        review_resp = requests.post(f"{ollama_host}/api/generate", json={
+                        review_resp = request_with_retry("POST", f"{ollama_host}/api/generate", json={
                             'model': model,
                             'prompt': review_prompt,
                             'stream': False,
@@ -2454,7 +3125,10 @@ Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
                         }, timeout=None)
                         
                         if review_resp.status_code == 200:
-                            improved_text = review_resp.json().get('response', '').strip()
+                            review_data = review_resp.json()
+                            improved_text = review_data.get('response', '').strip()
+                            tokens_in_total += review_data.get('prompt_eval_count', 0)
+                            tokens_out_total += review_data.get('eval_count', 0)
                             if improved_text and improved_text != review_text:
                                 # A javított szöveg visszaírása az item-be
                                 # A HTML struktúra megtartása érdekében a soup-ot használjuk
@@ -2473,15 +3147,15 @@ Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
                                     
                                     item.set_content(str(review_soup).encode('utf-8'))
                                     review_improvements += 1
-                                    translation_logger.debug(f"[ID:{translation_id}] Második menet: elem {idx+1} javítva ({len(improved_text)} karakter)")
+                                    _trans_log(f"[ID:{translation_id}] Második menet: elem {idx+1} javítva ({len(improved_text)} karakter)")
                                 else:
-                                    translation_logger.debug(f"[ID:{translation_id}] Második menet: elem {idx+1} nem tartalmazott text node-okat")
+                                    _trans_log(f"[ID:{translation_id}] Második menet: elem {idx+1} nem tartalmazott text node-okat")
                             else:
-                                translation_logger.debug(f"[ID:{translation_id}] Második menet: elem {idx+1} nem változott (a fordítás megfelelő)")
+                                _trans_log(f"[ID:{translation_id}] Második menet: elem {idx+1} nem változott (a fordítás megfelelő)")
                         else:
-                            translation_logger.warning(f"[ID:{translation_id}] Második menet: Ollama hiba (HTTP {review_resp.status_code}) a(z) {idx+1}. elemnél")
+                            _trans_log(f"[ID:{translation_id}] Második menet: Ollama hiba (HTTP {review_resp.status_code}) a(z) {idx+1}. elemnél")
                     except Exception as review_err:
-                        translation_logger.warning(f"[ID:{translation_id}] Második menet: hiba a(z) {idx+1}. elemnél: {review_err}")
+                        _trans_log(f"[ID:{translation_id}] Második menet: hiba a(z) {idx+1}. elemnél: {review_err}")
                     
                     # Progressz frissítés (91% → 99%)
                     t.progress = 91 + int(8 * (idx + 1) / total)
@@ -2489,9 +3163,10 @@ Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
                     db.session.commit()
                     
                 except Exception as item_review_err:
-                    translation_logger.warning(f"[ID:{translation_id}] Második menet: elem feldolgozási hiba: {item_review_err}")
+                    _trans_log(f"[ID:{translation_id}] Második menet: elem feldolgozási hiba: {item_review_err}")
             
-            translation_logger.info(f"[ID:{translation_id}] Második menet kész: {review_count} dokumentum ellenőrizve, {review_improvements} javítva")
+            if second_pass_enabled:
+                _trans_log(f"[ID:{translation_id}] Második menet kész: {review_count} dokumentum ellenőrizve, {review_improvements} javítva")
             
             # === VÉGSŐ MENTÉS ===
             t.current_stage = 'post_processing'
@@ -2503,10 +3178,30 @@ Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
             epub_lib.write_epub(output_path, book)
             t.output_filename = output_filename; t.status = 'completed'; t.progress = 100
             t.current_stage = 'completed'
-            # Minőségi pontszám: a javítások aránya alapján
-            t.quality_score = min(99, 75 + int((review_improvements / max(review_count, 1)) * 20))
+            if second_pass_enabled:
+                # Minőségi pontszám: a review javítások aránya alapján
+                t.quality_score = min(99, 75 + int((review_improvements / max(review_count, 1)) * 20))
+            else:
+                # Review nélkül: a hibás node-ok arányából becsülünk
+                if total_nodes_translated > 0:
+                    fail_ratio = failed_items / max(total_nodes_translated, 1)
+                    t.quality_score = min(99, 95 - int(fail_ratio * 100 * 0.3))
+                else:
+                    t.quality_score = 85
+            # Token/költség napló mentése (tényleges használat)
+            t.input_tokens_used = tokens_in_total
+            t.output_tokens_used = tokens_out_total
+            if use_deepseek and ds_pricing:
+                in_price = ds_pricing.get('input_price_per_mtok', 0.0)
+                out_price = ds_pricing.get('output_price_per_mtok', 0.0)
+                cost_total = (tokens_in_total / 1_000_000) * in_price + (tokens_out_total / 1_000_000) * out_price
+            t.cost_usd = round(cost_total, 6)
+            # A lefordított könyv a közös könyvtárhoz „várakozó" (pending) állapotba kerül,
+            # admin jóváhagyás után lesz elérhető a könyvtárban. A letöltés addig is működik.
+            if t.library_status == 'none':
+                t.library_status = 'pending'
             db.session.commit()
-            translation_logger.info(f"[ID:{translation_id}] ✅ Fordítás sikeresen befejezve (kétmenetes): {output_filename} | Minőség: {t.quality_score}/100 | Javítások: {review_improvements}/{review_count}")
+            _trans_log(f"[ID:{translation_id}] ✅ Fordítás sikeresen befejezve: {output_filename} | Minőség: {t.quality_score}/100 | Lefordított node-ok: {total_nodes_translated}, hibás: {failed_items}")
             app_logger.info(f"Fordítás kész: {t.original_filename} -> {output_filename} (user: {user_info}, {total_nodes_translated} node)")
             
             # === ÉRTESÍTÉS A FORDÍTÁS BEFEJEZÉSEKOR (7. fejlesztés) ===
@@ -2514,12 +3209,27 @@ Ha a fordítás megfelelő, akkor változtatás nélkül add vissza."""
             try:
                 from flask_mail import Mail, Message
                 mail = Mail(app_ref)
-                # Email küldése (a MailHog localhost:1025 SMTP szervert használja)
                 msg = Message(
                     f"✅ Fordítás kész: {t.original_filename}",
                     sender=app_ref.config.get('MAIL_DEFAULT_SENDER', 'epub-translator@localhost'),
                     recipients=[user.email]
                 )
+
+                # Csatolmány hozzáadása, ha a fájl a beállított limit alatt van
+                attach_note = ""
+                try:
+                    file_size = os.path.getsize(output_path)
+                    max_bytes = app_ref.config.get('EMAIL_ATTACHMENT_MAX_BYTES', 24 * 1024 * 1024)
+                    if file_size <= max_bytes:
+                        with open(output_path, 'rb') as fp:
+                            msg.attach(f"forditott_{t.original_filename}", 'application/epub+zip', fp.read())
+                        attach_note = f"\n📎 A lefordított EPUB ({file_size / 1024 / 1024:.1f} MB) csatolva.\n"
+                    else:
+                        attach_note = (f"\n📎 A lefordított EPUB túl nagy a csatoláshoz "
+                                       f"({file_size / 1024 / 1024:.1f} MB). A fiókodban letöltheted.\n")
+                except Exception as attach_err:
+                    _trans_log(f"[ID:{translation_id}] Csatolmány hozzáadása nem sikerült: {attach_err}")
+
                 msg.body = f"""Kedves {user.first_name}!
 
 A(z) "{t.original_filename}" fordítása sikeresen befejeződött.
@@ -2531,7 +3241,7 @@ A(z) "{t.original_filename}" fordítása sikeresen befejeződött.
   Lefordított node-ok: {total_nodes_translated}
   Ellenőrzött elemek: {review_count}
   Javítások: {review_improvements}
-
+{attach_note}
 📥 Letöltés: http://localhost/download/{t.id}
 📝 Átnézés és javítás: http://localhost/review/{t.id}
 
@@ -2540,19 +3250,42 @@ Köszönjük, hogy az EPUB Fordítót használod!
 Üdv,
 EPUB Fordító"""
                 mail.send(msg)
-                translation_logger.info(f"[ID:{translation_id}] 📧 Értesítő email elküldve: {user.email}")
+                _trans_log(f"[ID:{translation_id}] 📧 Értesítő email elküldve: {user.email}")
             except Exception as mail_err:
-                translation_logger.warning(f"[ID:{translation_id}] Email értesítés nem sikerült: {mail_err}")
+                _trans_log(f"[ID:{translation_id}] Email értesítés nem sikerült: {mail_err}")
         except Exception as e:
             error_detail = _traceback.format_exc()
             t.status = 'failed'; t.progress = 0; t.output_filename = f"HIBA: {str(e)[:500]}"
             db.session.commit()
-            translation_logger.error(f"[ID:{translation_id}] ❌ Fordítási hiba:\n{error_detail}")
+            _trans_log(f"[ID:{translation_id}] ❌ Fordítási hiba:\n{error_detail}")
+            try:
+                fh_trans.flush()
+            except Exception:
+                pass
             app_logger.error(f"Fordítás hiba: {t.original_filename} (user: {user_info}) - {str(e)[:200]}")
         finally:
-            if os.path.exists(filepath):
+            # Ha van checkpoint (megszakadt/folytatható), a forrásfájlt megtartjuk a
+            # későbbi folytatáshoz; csak teljes kész/hiba esetén takarítunk.
+            if os.path.exists(filepath) and not t.checkpoint_data:
                 os.remove(filepath)
-                translation_logger.debug(f"[ID:{translation_id}] Ideiglenes fájl törölve: {filepath}")
+                _trans_log(f"[ID:{translation_id}] Ideiglenes fájl törölve: {filepath}")
+
+def _is_sqlite():
+    """True, ha az aktuális DB SQLite (önálló/desktop mód), egyébként False (Postgres)."""
+    uri = Config.SQLALCHEMY_DATABASE_URI or ''
+    return uri.startswith('sqlite')
+
+def _ensure_column(table, col, col_type):
+    """Oszlop létrehozása, ha még nem létezik – SQLite-on PRAGMA-val ellenőriz,
+    Postgres-en az ADD COLUMN IF NOT EXISTS szintaxissal."""
+    if _is_sqlite():
+        # SQLite: nincs IF NOT EXISTS az ALTER TABLE-nél, PRAGMA table_info-val nézünk.
+        cols = db.session.execute(db.text(f"PRAGMA table_info({table})")).fetchall()
+        existing = {row[1] for row in cols}
+        if col not in existing:
+            db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+    else:
+        db.session.execute(db.text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}"))
 
 def init_db():
     """Adatbázis inicializálás – Alembic migrációval (verziókövetett séma).
@@ -2591,8 +3324,10 @@ def init_db():
                 ('preferred_model', "VARCHAR(100) DEFAULT ''"),
                 # Sötét/világos téma preferencia (v11.0.69+, #10 fejlesztés)
                 ('dark_mode', "BOOLEAN DEFAULT TRUE"),
+                # Tegezés/magázás preferencia (v2.5.0+)
+                ('formality', "VARCHAR(10) DEFAULT 'informal'"),
             ]:
-                db.session.execute(db.text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+                _ensure_column('users', col, col_type)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -2609,9 +3344,20 @@ def init_db():
                 ('nodes_translated', 'INTEGER DEFAULT 0'),
                 ('nodes_failed', 'INTEGER DEFAULT 0'),
                 ('first_pass_model', 'VARCHAR(100)'),
-                ('second_pass_model', 'VARCHAR(100)')
+                ('second_pass_model', 'VARCHAR(100)'),
+                # Fordítás leállítási kérés (v2.1.0+)
+                ('stop_requested', 'BOOLEAN DEFAULT FALSE'),
+                # Token/költség napló (v2.2.0+)
+                ('input_tokens_used', 'INTEGER DEFAULT 0'),
+                ('output_tokens_used', 'INTEGER DEFAULT 0'),
+                ('cost_usd', 'DOUBLE PRECISION DEFAULT 0.0'),
+                # Checkpoint/folytatás (v2.3.0+)
+                ('checkpoint_data', 'TEXT'),
+                ('last_checkpoint_at', 'TIMESTAMP'),
+                # Könyvtár jóváhagyási állapot (v2.6.0+)
+                ('library_status', "VARCHAR(20) DEFAULT 'none'")
             ]:
-                db.session.execute(db.text(f"ALTER TABLE translations ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+                _ensure_column('translations', col, col_type)
             db.session.commit()
         except Exception as e: db.session.rollback()
         # Új táblák létrehozása (pl. reading_history) – a db.create_all() csak
@@ -2625,6 +3371,23 @@ def init_db():
             admin = User(username='admin', email=Config.ADMIN_EMAIL, password_hash=generate_password_hash(Config.ADMIN_PASSWORD),
                         first_name='Admin', last_name='User', is_admin=True, tokens=999999, internal_email='admin@epub.local')
             db.session.add(admin); db.session.commit()
+
+        # Indítási önjavítás: egy friss worker indulásakor nincs élő fordítás-szál,
+        # ezért a korábban megszakadt (pl. konténer újraindítás közben) és
+        # "processing" státuszban ragadt sorokat visszaállítjuk "failed" állapotba,
+        # hogy a felhasználó törölhesse vagy újraindíthassa őket.
+        try:
+            stuck = Translation.query.filter_by(status='processing').all()
+            for st in stuck:
+                # Ha van checkpoint, 'paused' (folytatható), különben 'failed'
+                st.status = 'paused' if st.checkpoint_data else 'failed'
+                st.current_stage = st.status
+            if stuck:
+                db.session.commit()
+                app_logger.info(f"Önjavítás: {len(stuck)} beragadt 'processing' fordítás visszaállítva (paused/failed)")
+        except Exception as stuck_err:
+            db.session.rollback()
+            app_logger.warning(f"Feldolgozás alatt álló fordítások visszaállítása nem sikerült: {stuck_err}")
 
 with app.app_context():
     try: init_db()

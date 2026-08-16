@@ -26,7 +26,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # Verzió
-VERSION="2.0.2"
+VERSION="2.6.9"
 CODENAME="Smart Optimizer"
 RELEASE_DATE="2026-08-11"
 MIN_VERSION_FOR_UPDATE="1.0.0"
@@ -44,12 +44,34 @@ TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
 CPU_CORES=$(nproc)
 FREE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
 
-# Automatikus modell ajánlás (hardver alapján)
+# NVIDIA GPU érzékelés: ha az nvidia-smi parancs fut, van GPU, és az Ollama
+# a docker-compose-ban beállított GPU-passthrough révén automatikusan CUDA-ra
+# teszi a modellt (a docker-compose.yml ollama szolgáltatásában van a deploy.devices blokk).
+GPU_DETECTED=0
+GPU_VRAM_MB=0
+if command -v nvidia-smi >/dev/null 2>&1; then
+    GPU_VRAM_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+    if [ -n "$GPU_VRAM_MB" ] && [ "$GPU_VRAM_MB" -gt 0 ]; then
+        GPU_DETECTED=1
+    fi
+fi
+
+# Automatikus modell ajánlás (hardver alapján).
+# GPU esetén a modellt a VRAM-hoz igazítjuk (biztos illeszkedés), CPU-nál a RAM-hoz.
 # 40 GB RAM: 32b modell (jobb minőség, de lassú CPU-n)
 # 32 GB RAM: 14b modell (jó minőség, elfogadható sebesség)
 # 16 GB RAM: 8b modell
 # 8 GB RAM: 7b modell
-if [ "$TOTAL_RAM" -ge 64 ]; then
+if [ "$GPU_DETECTED" -eq 1 ]; then
+    # GPU-n: 12 GB VRAM ~ 8b kényelmes, 14b épphogy belefér (szoros).
+    # A „biztos" 8b-t ajánljuk GPU-ra a felhasználói döntés alapján.
+    if [ "$GPU_VRAM_MB" -ge 16000 ]; then
+        RECOMMENDED_MODEL="deepseek-r1:14b"
+    else
+        RECOMMENDED_MODEL="deepseek-r1:8b"
+    fi
+    MAX_WORKERS=1  # GPU-n 1 párhuzamos szál a VRAM miatt
+elif [ "$TOTAL_RAM" -ge 64 ]; then
     RECOMMENDED_MODEL="deepseek-r1:32b"
     MAX_WORKERS=4
 elif [ "$TOTAL_RAM" -ge 40 ]; then

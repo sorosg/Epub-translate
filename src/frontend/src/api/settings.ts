@@ -19,6 +19,7 @@ export async function saveUserSettings(settings: {
   preferred_model_source?: 'local' | 'remote';
   preferred_model?: string;
   deepseek_api_key?: string;
+  formality?: 'informal' | 'formal';
 }): Promise<User> {
   return apiPost<User>('/api/user/settings', settings);
 }
@@ -29,6 +30,7 @@ export async function fetchUserSettings(): Promise<{
   preferred_model: string;
   deepseek_api_key: string;
   dark_mode: boolean;
+  formality: 'informal' | 'formal';
 }> {
   return apiGet('/api/user/settings');
 }

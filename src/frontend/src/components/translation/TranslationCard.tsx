@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import type { Translation } from '../../api/types';
 import { useTranslation } from 'react-i18next';
-import { Download, Trash2, FileText, Square } from 'lucide-react';
-import { stopTranslation } from '../../api/translations';
+import { Download, Trash2, FileText, Square, Play } from 'lucide-react';
+import { stopTranslation, resumeTranslation } from '../../api/translations';
 import { useUiStore } from '../../stores/uiStore';
 
 interface Props {
@@ -31,6 +31,17 @@ export function TranslationCard({ translation: t_data, onDelete, onStopped }: Pr
   const isProcessing = t_data.status === 'processing';
   const isCompleted = t_data.status === 'completed';
   const isStopped = t_data.status === 'stopped';
+  const isPaused = t_data.status === 'paused';
+
+  const handleResume = async () => {
+    try {
+      await resumeTranslation(t_data.id);
+      addToast('success', 'Fordítás folytatása elindítva');
+      onStopped?.();
+    } catch {
+      addToast('error', 'Nem sikerült folytatni');
+    }
+  };
 
   const handleStop = async () => {
     if (!window.confirm('Biztosan leállítod a fordítást?')) return;
@@ -85,9 +96,25 @@ export function TranslationCard({ translation: t_data, onDelete, onStopped }: Pr
             </div>
           )}
 
+          {/* Token / költség napló */}
+          {isCompleted && (t_data.input_tokens_used > 0 || t_data.output_tokens_used > 0) && (
+            <div className="text-xs text-text-secondary">
+              🔤 {t_data.input_tokens_used.toLocaleString('hu-HU')} be ·{' '}
+              {t_data.output_tokens_used.toLocaleString('hu-HU')} ki token
+              {t_data.cost_usd != null && t_data.cost_usd > 0 && (
+                <span className="text-accent-yellow"> · ~${t_data.cost_usd.toFixed(6)}</span>
+              )}
+            </div>
+          )}
+
           {/* Leállított állapot */}
           {isStopped && (
             <div className="text-xs text-accent-yellow">⏹️ Leállítva</div>
+          )}
+
+          {/* Megszakadt (paused) – folytatható */}
+          {isPaused && (
+            <div className="text-xs text-accent-yellow">⏸️ Megszakítva (folytatható)</div>
           )}
         </div>
 
@@ -100,6 +127,17 @@ export function TranslationCard({ translation: t_data, onDelete, onStopped }: Pr
             >
               <Download className="w-4 h-4" />
             </a>
+          )}
+
+          {/* Folytatás gomb megszakadt (paused) fordításnál */}
+          {isPaused && (
+            <button
+              onClick={() => void handleResume()}
+              className="btn-ghost min-w-[40px] min-h-[40px] p-2 text-accent-green hover:bg-accent-green/10"
+              title="Folytatás"
+            >
+              <Play className="w-4 h-4" />
+            </button>
           )}
 
           {/* Leállítás gomb folyamatban lévő (vagy még pending) fordításnál */}

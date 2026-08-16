@@ -1,6 +1,7 @@
 // EPUB Fordító – Könyv kártya (Könyvtár listaelem)
 import type { Book } from '../../api/types';
 import { BookOpen, Pencil, Trash2, Star } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Props {
   book: Book;
@@ -10,6 +11,11 @@ interface Props {
 }
 
 export function BookCard({ book, onEdit, onDelete, onToggle }: Props) {
+  // Szerkesztés/törlés: a tulajdonosnak ÉS az adminnak jár
+  // (a régebbi, más fiókkal feltöltött könyvek is kezelhetők admin által).
+  const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
+  const canManage = book.is_owner || isAdmin;
+
   return (
     <div className="card p-4 h-full flex flex-col">
       {/* Cím + szerző */}
@@ -61,7 +67,7 @@ export function BookCard({ book, onEdit, onDelete, onToggle }: Props) {
         >
           <BookOpen className="w-4 h-4" />
         </a>
-        {book.is_owner && (
+        {canManage && (
           <>
             <button
               onClick={() => onEdit(book)}

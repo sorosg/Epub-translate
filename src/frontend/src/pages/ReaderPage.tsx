@@ -1,6 +1,8 @@
 // EPUB Fordító – Olvasó oldal
 // 3. fázis: EPUB olvasás, TOC panel, könyvjelző, előzmény mentés.
-import { useState, useEffect, useCallback } from 'react';
+// v2.6.3: megbízható JS-alapú, felbontás-függő oldaltördelés
+//         (a CSS-oszlopos trükk nem adott megbízható oldalszámot, ezért elhagyva).
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Bookmark, BookmarkCheck, List, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -30,6 +32,16 @@ export function ReaderPage() {
   const [tocOpen, setTocOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Lapozás: a fejezet tartalmát blokkonként mérjük egy fix magasságú ablakhoz.
+  // A lapozás a belső konténer translateY-jával történik (offsetTop-alapú mérés,
+  // amit a translate NEM befolyásol, így az oldalszám pontos).
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const proseRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const [pageHeight, setPageHeight] = useState(0);
+
   // Betöltés: fejezetek + könyvjelző
   useEffect(() => {
     let cancelled = false;
@@ -40,13 +52,11 @@ export function ReaderPage() {
         setBookInfo({ title: data.title, author: data.author });
         setChapters(data.chapters);
 
-        // Könyvjelző betöltés
         const bm = await fetchBookmark(bookId);
         const startIdx = bm.bookmark?.chapter_index ?? 0;
         if (cancelled) return;
         setCurrentIdx(startIdx);
 
-        // Előzmény mentés (könyv megnyitása)
         await saveHistory(bookId, startIdx, 0);
       } catch {
         addToast('error', t('common.errorOccurred'));
@@ -57,9 +67,9 @@ export function ReaderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
-  // Fejezet betöltése
   const loadChapter = useCallback(async (idx: number) => {
     setLoading(true);
+    setPage(0); // új fejezetnél az első oldalra
     try {
       const data = await fetchChapterContent(bookId, idx);
       setCurrent({
@@ -70,8 +80,6 @@ export function ReaderPage() {
         total: data.total,
       });
       setCurrentIdx(idx);
-
-      // Előzmény mentés
       await saveHistory(bookId, idx, 0);
     } catch {
       addToast('error', t('common.errorOccurred'));
@@ -80,12 +88,62 @@ export function ReaderPage() {
     }
   }, [bookId, addToast, t]);
 
-  // Fejezet automatikus betöltése, ha van fejezet lista
   useEffect(() => {
     if (chapters.length > 0 && !current) {
       void loadChapter(currentIdx);
     }
   }, [chapters, current, currentIdx, loadChapter]);
+
+  // Oldalszám mérése blokkonként, a fix magasságú pager-hez viszonyítva.
+  function measurePages() {
+    const pager = pagerRef.current;
+    const prose = proseRef.current;
+    if (!pager || !prose) return;
+    const h = pager.clientHeight;
+    if (h <= 0) return;
+    setPageHeight(h);
+
+    const blocks = Array.from(prose.children) as HTMLElement[];
+    if (blocks.length === 0) {
+      setPageCount(1);
+      setPage(0);
+      return;
+    }
+
+    // offsetTop: a bloKK offsetParentje az innerRef (position:relative), tehát
+    // az érték az innerRef tetejétől mérve a layout-pozíció — a translateY nem
+    // befolyásolja, így a mérés mindig ugyanaz, akárhányadik oldalon is állunk.
+    let count = 1;
+    for (const b of blocks) {
+      const bottom = b.offsetTop + b.offsetHeight;
+      const needed = Math.ceil(bottom / h);
+      if (needed > count) count = needed;
+    }
+    count = Math.max(1, count);
+    setPageCount(count);
+    setPage((p) => Math.min(p, count - 1));
+  }
+
+  // Mérés a tartalom betöltése után (rövid halasztás a DOM rendereléséhez).
+  useEffect(() => {
+    if (!current) return;
+    const t = setTimeout(() => measurePages(), 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
+
+  // Mérés ablakméret-változásnál (mobil/desktop váltás).
+  useEffect(() => {
+    const pager = pagerRef.current;
+    if (!pager) return;
+    const ro = new ResizeObserver(() => measurePages());
+    ro.observe(pager);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const prevPage = () => setPage((p) => Math.max(0, p - 1));
+  const nextPage = () => setPage((p) => Math.min(pageCount - 1, p + 1));
 
   const toggleBookmark = async () => {
     try {
@@ -130,23 +188,51 @@ export function ReaderPage() {
             <div className="skeleton h-4 w-5/6" />
           </div>
         ) : current ? (
-          <div className="prose prose-invert max-w-none">
-            <h2 className="text-xl font-bold mb-4">{current.title}</h2>
-            <div dangerouslySetInnerHTML={{ __html: current.html }} />
-          </div>
+          <>
+            <h2 className="text-xl font-bold mb-3">{current.title}</h2>
+
+            {/* Lapozó ablak: fix magasság, a belső tartalom translateY-val mozog */}
+            <div ref={pagerRef} className="overflow-hidden" style={{ height: '60vh' }}>
+              <div
+                ref={innerRef}
+                style={{
+                  position: 'relative',
+                  transform: `translateY(-${page * pageHeight}px)`,
+                  transition: 'transform 0.25s ease',
+                }}
+              >
+                <div
+                  ref={proseRef}
+                  className="prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: current.html }}
+                />
+              </div>
+            </div>
+
+            {/* Oldal-navigáció (oldalszinten) */}
+            <div className="flex items-center justify-center gap-3 mt-3">
+              <button onClick={prevPage} disabled={page <= 0} className="btn-outline disabled:opacity-50 px-4">
+                <ChevronLeft className="w-4 h-4" /> Előző oldal
+              </button>
+              <span className="text-sm text-text-secondary">{page + 1} / {pageCount}</span>
+              <button onClick={nextPage} disabled={page >= pageCount - 1} className="btn-outline disabled:opacity-50 px-4">
+                Következő oldal <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </>
         ) : (
           <p className="text-text-secondary text-center py-10">{t('common.notFound')}</p>
         )}
       </div>
 
-      {/* Navigáció */}
+      {/* Navigáció (fejezetszinten) */}
       <div className="flex items-center justify-between mt-4">
         <button onClick={prev} disabled={currentIdx <= 0} className="btn-outline disabled:opacity-50">
-          <ChevronLeft className="w-4 h-4" /> Előző
+          <ChevronLeft className="w-4 h-4" /> Előző fejezet
         </button>
-        <span className="text-sm text-text-secondary">{currentIdx + 1} / {chapters.length}</span>
+        <span className="text-sm text-text-secondary">Fejezet {currentIdx + 1} / {chapters.length}</span>
         <button onClick={next} disabled={currentIdx >= chapters.length - 1} className="btn-outline disabled:opacity-50">
-          Következő <ChevronRight className="w-4 h-4" />
+          Következő fejezet <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 

@@ -54,22 +54,26 @@ export function LibraryPage() {
   };
 
   const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.epub')) {
-      addToast('error', 'Csak EPUB fájl tölthető fel!');
-      return;
-    }
+    const files = Array.from(e.target.files ?? []) as File[];
+    if (files.length === 0) return;
 
     setUploading(true);
     try {
-      // Először metaadat kinyerés a fájl belső adataiból, majd feltöltés
-      const meta = await extractLibraryMetadata(file);
-      await uploadLibraryBook(file, meta.metadata || { title: file.name.replace(/\.epub$/i, '') });
-      addToast('success', `"${file.name}" feltöltve a könyvtárba`);
+      for (const file of files) {
+        if (!file.name.toLowerCase().endsWith('.epub')) {
+          addToast('error', `"${file.name}" nem EPUB, kihagyva`);
+          continue;
+        }
+        try {
+          // Először metaadat kinyerés a fájl belső adataiból, majd feltöltés
+          const meta = await extractLibraryMetadata(file);
+          await uploadLibraryBook(file, meta.metadata || { title: file.name.replace(/\.epub$/i, '') });
+          addToast('success', `"${file.name}" feltöltve a könyvtárba`);
+        } catch (err) {
+          addToast('error', `"${file.name}": ${err instanceof Error ? err.message : t('common.errorOccurred')}`);
+        }
+      }
       await refresh();
-    } catch (err) {
-      addToast('error', err instanceof Error ? err.message : t('common.errorOccurred'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -112,6 +116,7 @@ export function LibraryPage() {
           ref={fileInputRef}
           type="file"
           accept=".epub"
+          multiple
           className="hidden"
           onChange={(e) => void handleUpload(e)}
         />

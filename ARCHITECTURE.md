@@ -1,7 +1,7 @@
 # 🏗️ EPUB Fordító – Architektúra Dokumentáció
 
-**Verzió:** 11.0.67 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-07-20  
+**Verzió:** 2.2.0 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-14  
 
 > Ez a dokumentum a rendszer teljes architektúráját írja le. Célja, hogy a Cline AI asszisztens kontextuskeretből való kiesése esetén is gyorsan áttekinthető legyen a kódbázis szerkezete, a főbb komponensek és azok kapcsolatai.
 

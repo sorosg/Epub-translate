@@ -2,50 +2,6 @@
 
 > A frontend UI-redesign projekt fejlesztése során az összes fontos lépés és döntés dokumentálása.
 
-## 2026-08-16 — Desktop A-fázis: PyInstaller Linux próbalegépítés SIKERES
-
-### Elkészült
-- backend/requirements-desktop.txt: a desktop build szerver-függőségek nélkül
-  (nincs psycopg2/gunicorn/redis -> kisebb, stabilabb PyInstaller bináris).
-- .github/workflows/desktop-build.yml: a PyInstaller lépés ezt használja.
-
-### Próbalegépítés (python:3.10-slim + binutils/gcc/libxml-dev + PyInstaller)
-- A 'desktop/backend_entry.py' -> egyfájlos 'backend' bináris (36 MB) SIKERESEN buildelt.
-- A bináris FUT: GET /health -> HTTP 200, desktop_mode=true, version=2.6.12.
-  => a lxml/ebooklib C-bővítmények megfelelően becsomagolódtak.
-
-### Következtetés / következő
-A desktop bináris csomagolása Linuxon ellenőrizve; a Windows/macOS .exe/.dmg
-build a CI-vel (desktop-build.yml) futtatható tag push után. Nincs több blokkoló
-a WSL-oldalon. A build-melléktermékek (dist/build/spec) kitakarítva.
-
-## 2026-08-16 — desktop E2E teszt SIKERES
-
-### Teszt (throwaway konténer, DESKTOP_MODE=1 + SQLite + buildelt SPA)
-- backend_entry.py futtatása: SQLite-vel inicializálódott, fut 127.0.0.1:5000-en.
-- GET /health -> HTTP 200, benne: desktop_mode=true, gpu_available=false.
-- GET /api/profile (login_required) -> HTTP 200, auto-login 'desktop@local'
-  (is_admin, tokens=999999, preferred=remote).
-=> Az egyfelhasználós desktop mód END-TO-END működik: login nélkül, azonnal használható.
-
-### Megjegyzés
-A tesztkonténerben a Flask 127.0.0.1-re köt, ezért a hostról a port-mapping nem
-érte el (a teszt a konténer belső loopback-jén futott). Natív desktop esetén ez
-nem gond: az Electron és a sidecar ugyanazon a gépen fut.
-
-## 2026-08-16 — desktop end-to-end: frontend build + sidecar flow
-
-### Elkészült / tesztelve
-- A frontend host-oldali build (`npm ci && npm run build`) sikeres: tsc átment,
-  dist/index.html + assets (338 KB JS) legyártva.
-- A desktop architektúra megerősítve: backend_entry.py a Flask sidecar-t
-  DESKTOP_MODE=1-gyel indítja, és a buildelt frontend/dist SPA-t szolgálja ki
-  (relative /api útvonalakkal) egy porton. Nincs szükség file:// base-re.
-
-### Hátralévő (desktop, még nem kezdve)
-- PyInstaller + electron-builder telepítő build (CI-ben/natív gépen).
-- A helyi modell VRAM-alapú szűrése a SettingsPage modellek listájában.
-
 ## 2026-08-16 — v2.6.12 fejezet-duplikáció javítás
 
 ### Tünet (a felhasználó mintája)

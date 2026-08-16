@@ -2,11 +2,11 @@
 // Bővítve: modellválasztás + kontextus-könyv választás a fordítás előtt.
 import { useRef, useState, useEffect, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CloudUpload, Cpu, BookOpen } from 'lucide-react';
-import { uploadForTranslation } from '../../api/translations';
+import { CloudUpload, Cpu, BookOpen, Sparkles } from 'lucide-react';
+import { uploadForTranslation, estimateTranslation } from '../../api/translations';
 import { fetchModels } from '../../api/settings';
-import { fetchLibraryBooks } from '../../api/library';
-import type { ModelInfo, RemoteModel, Book } from '../../api/types';
+import { fetchLibraryBooks, extractLibraryMetadata, fetchRecommendations } from '../../api/library';
+import type { ModelInfo, RemoteModel, Book, EstimateResult, Recommendation } from '../../api/types';
 import { useUiStore } from '../../stores/uiStore';
 
 interface Props {
@@ -27,10 +27,21 @@ export function UploadZone({ onUploaded }: Props) {
   const [selectedBookIds, setSelectedBookIds] = useState<number[]>([]);
   const [showOptions, setShowOptions] = useState(false);
 
+  // Becslés
+  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+  const [estimating, setEstimating] = useState(false);
+
   // Elérhető modellek + könyvtári könyvek
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [remoteModels, setRemoteModels] = useState<RemoteModel[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+
+  const reasonLabels: Record<Recommendation['reason'], string> = {
+    series: 'Sorozat',
+    author: 'Szerző',
+    genre: 'Műfaj',
+  };
 
   useEffect(() => {
     void fetchModels()
@@ -45,7 +56,7 @@ export function UploadZone({ onUploaded }: Props) {
       .catch(() => {});
   }, []);
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const f = files[0];
     if (!f.name.toLowerCase().endsWith('.epub')) {
@@ -53,6 +64,15 @@ export function UploadZone({ onUploaded }: Props) {
       return;
     }
     setFile(f);
+    setShowOptions(true);
+    // Kontextus-könyv ajánlás a feltöltött könyv metaadatai alapján
+    try {
+      const meta = await extractLibraryMetadata(f);
+      const recs = await fetchRecommendations(meta.metadata || {});
+      setRecommendations(recs || []);
+    } catch {
+      setRecommendations([]);
+    }
   };
 
   const handleUpload = async () => {
@@ -86,10 +106,28 @@ export function UploadZone({ onUploaded }: Props) {
     );
   };
 
+  // Becslés lekérése a kiválasztott fájl + modell alapján
+  const runEstimate = async () => {
+    if (!file) return;
+    setEstimating(true);
+    setEstimate(null);
+    try {
+      const result = await estimateTranslation(file, {
+        modelSource: source,
+        selectedModel: source === 'remote' ? selectedModel : undefined,
+      });
+      setEstimate(result);
+    } catch {
+      setEstimate(null);
+    } finally {
+      setEstimating(false);
+    }
+  };
+
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    handleFiles(e.dataTransfer.files);
+    void handleFiles(e.dataTransfer.files);
   };
 
   return (
@@ -120,7 +158,7 @@ export function UploadZone({ onUploaded }: Props) {
           type="file"
           accept=".epub"
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => void handleFiles(e.target.files)}
         />
       </div>
 
@@ -183,27 +221,92 @@ export function UploadZone({ onUploaded }: Props) {
                 )}
               </div>
 
-              {/* Kontextus könyvek */}
+              {/* Ajánlott kontextus könyvek */}
+              {recommendations.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 text-text-primary pt-2">
+                    <Sparkles className="w-4 h-4 text-accent-yellow" />
+                    <span className="font-medium">Ajánlott kontextus könyvek</span>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {recommendations.map((r) => (
+                      <label key={r.id} className="flex items-center gap-2 text-sm text-text-primary py-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedBookIds.includes(r.id)}
+                          onChange={() => toggleBook(r.id)}
+                        />
+                        <span className="truncate">{r.title || `#${r.id}`}</span>
+                        <span className="badge bg-accent-yellow/15 text-accent-yellow text-xs shrink-0">
+                          {reasonLabels[r.reason] || r.reason}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Minden könyv */}
               <div className="flex items-center gap-2 text-text-primary pt-2">
                 <BookOpen className="w-4 h-4" />
-                <span className="font-medium">Kontextus könyvek</span>
+                <span className="font-medium">Minden könyv</span>
               </div>
               <div className="max-h-40 overflow-y-auto space-y-1">
-                {books.map((b) => (
-                  <label key={b.id} className="flex items-center gap-2 text-sm text-text-primary py-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedBookIds.includes(b.id)}
-                      onChange={() => toggleBook(b.id)}
-                    />
-                    <span className="truncate">{b.title || b.filename}</span>
-                  </label>
-                ))}
+                {books
+                  .filter((b) => !recommendations.some((r) => r.id === b.id))
+                  .map((b) => (
+                    <label key={b.id} className="flex items-center gap-2 text-sm text-text-primary py-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedBookIds.includes(b.id)}
+                        onChange={() => toggleBook(b.id)}
+                      />
+                      <span className="truncate">{b.title || b.filename}</span>
+                    </label>
+                  ))}
                 {books.length === 0 && (
                   <p className="text-xs text-text-secondary">Nincs könyv a könyvtárban.</p>
                 )}
               </div>
             </>
+          )}
+
+          {/* Becslés sáv */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void runEstimate()}
+              disabled={estimating}
+              className="btn-outline flex-1"
+            >
+              {estimating ? 'Számolás...' : 'Becslés kérése'}
+            </button>
+            {estimate && (
+              <button
+                onClick={() => setEstimate(null)}
+                className="btn-ghost text-xs"
+              >
+                Elrejtés
+              </button>
+            )}
+          </div>
+
+          {estimate && (
+            <div className="text-sm text-text-primary bg-bg-secondary rounded-lg p-3 space-y-1">
+              <div>~{estimate.total_words.toLocaleString('hu-HU')} szó</div>
+              <div>
+                Becsült idő:{' '}
+                {estimate.estimated_minutes >= 1
+                  ? `${Math.round(estimate.estimated_minutes)} perc`
+                  : '< 1 perc'}
+              </div>
+              {estimate.model_source === 'remote' ? (
+                <div className="font-medium text-accent-yellow">
+                  ~${estimate.cost.toFixed(4)} {estimate.currency} (becsült költség)
+                </div>
+              ) : (
+                <div className="text-text-secondary">Helyi modell – nincs költség</div>
+              )}
+            </div>
           )}
 
           <button

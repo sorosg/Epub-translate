@@ -1,7 +1,7 @@
 # 🗺️ EPUB Fordító – Fejlesztési Útiterv (Roadmap)
 
-**Verzió:** 1.0.0 – "Smart Optimizer"  
-**Utolsó frissítés:** 2026-08-11 (stabil 1.0.0 kiadás, új verziószámozás: MAJOR.MINOR.PATCH)  
+**Verzió:** 2.5.7 – "Smart Optimizer"  
+**Utolsó frissítés:** 2026-08-15 (v2.5.7)  
 
 ### 🎯 Verziószámozási séma (1.0.0-tól)
 - **PATCH** (1.0.x): hibajavítások
@@ -37,6 +37,27 @@
 - 🐛 **Számos hibajavítás** – 500 hiba (users oszlopok), MailHog profiles, Ollama deploy/reservations, port foglaltság (retry + auto 8080), install.sh shebang, heredoc → git clone, SECRET_KEY, cp -a teljes másolás
 
 ---
+
+
+## 🖥️ Asztali alkalmazás (opcionális, koncepcionális)
+
+- **Cél**: „telepít és megy" asztali alkalmazás (Windows/Mac), Docker és helyi
+  AI nélkül, csak távoli DeepSeek Pro + SQLite.
+- **Stack**: Electron (React frontend) + PyInstaller (Flask backend sidecar) +
+  SQLite (egyfelhasználós).
+- **Alapok**: a v2.6.5-ben elkészült a platformfüggetlen DB-réteg (DATABASE_URL
+  flag, SQLite fallback, `_ensure_column()`).
+- **Könyvtár asztali módban**: saját referencia-könyvtár (kontextus + terminológia),
+  a közös/admin-jóváhagyás flow nélkül.
+- **Állapot**: ✅ alapozva (DB-réteg), ⬜ Electron/PyInstaller/telepítő/CI — később.
+
+### 🎯 AI-motor irányelvek (döntés: 2026-08-16)
+- **Alapértelmezett**: DeepSeek Pro (távoli) — „telepít és megy", jó minőség, kb. 100 Ft/könyv.
+- **Helyi (GPU) fordítás**: MEGMARAD, de **opcionális „haladó" kapcsoló** (nem kötelező).
+- **Modellméret a VRAM-hoz igazítva** (nvidia-smi detekció, ahogy az install.sh már teszi):
+  6 GB → 7b/8b, 12 GB → 8b/14b, 16+ GB → 14b/nagyobb.
+- **GPU-figyelmeztetés**: fordítás közben ne használd másra a GPU-t (a VRAM-os modell fut).
+- **CPU-s helyi fordítás KIZÁRVA/ELREJTVE** (hetekig tart → haszontalan).
 
 ## ✅ Már megvalósított fejlesztések (v11.0.34 – 11.0.61)
 
@@ -451,11 +472,13 @@ Az alábbi koncepciók a **használhatóságot** és a **fordítási pontosságo
 **Várható hatás:** ⭐⭐⭐ (új felhasználási mód)
 **Implementációs idő:** 4-6 óra
 
-#### I) DeepSeek Pro API költségbecslés
-**Javaslat:** A dashboardon a felhasználó láthatja, hogy mennyibe fog kerülni a fordítás DeepSeek Pro API-val (token alapú becslés), mielőtt elindítja. API árazás alapján valós idejű kalkuláció.
+#### I) DeepSeek Pro API költségbecslés ✅
+**Státusz:** KÉSZ (v2.1.0 előzetes becslés + v2.2.0 tényleges token/költség napló)
+- A feltöltő zóna a fordítás előtt becslést mutat (szószám, idő; DeepSeek-nél költség).
+- A tényleges tokenfogyasztás és USD költség a Dashboard kártyán jelenik meg.
 
 **Várható hatás:** ⭐⭐⭐ (költségtudatosság)
-**Implementációs idő:** 1-2 óra
+**Implementációs idő:** 1-2 óra (ELKÉSZÜLT)
 
 ---
 
@@ -471,12 +494,12 @@ Az alábbi koncepciók a **használhatóságot** és a **fordítási pontosságo
 | F) Statisztika dashboard | ⭐⭐ | ⭐⭐⭐⭐ | 3-5h | 🟡 |
 | G) WebSocket valós idejű frissítés | ⭐ | ⭐⭐ | 2-3h | 🟢 |
 | H) OCR PDF támogatás | ⭐⭐ | ⭐⭐⭐ | 4-6h | 🟢 |
-| I) API költségbecslés | ⭐ | ⭐⭐⭐ | 1-2h | 🟢 |
+| I) API költségbecslés | ✅ KÉSZ | ✅ KÉSZ | — | ✓ |
 
 ### 🎯 TOP 3 ajánlott következő fejlesztés
 
-1. **C) NER + entitás konzisztencia** – a legnagyobb hatás a fordítási minőségre (⭐⭐⭐⭐⭐), megszünteti a tulajdonnév inkonzisztenciát
-2. **D) Checkpoint/folytatás** – kritikus használhatósági fejlesztés, 3-5 napos fordításoknál létfontosságú
+1. **D) Checkpoint/folytatás** – a ma reggeli „elárvult processing" hiba is ezt indokolja; 3-5 napos fordításoknál létfontosságú
+2. **C) NER + entitás konzisztencia** – a legnagyobb hatás a fordítási minőségre (⭐⭐⭐⭐⭐), megszünteti a tulajdonnév inkonzisztenciát
 3. **B) Regiszter/stílus tudatos fordítás** – a párbeszédek és narráció megkülönböztetése drámaian javítja az olvashatóságot
 
 ---

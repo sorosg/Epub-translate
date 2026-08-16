@@ -2,8 +2,8 @@
 // EPUB Fordító – Fordítás API hívások
 // A dashboardhoz és a fordításkezeléshez szükséges végpontok.
 // ============================================================
-import { apiGet } from './client';
-import type { Translation, StatsSummary, NotificationEvent } from './types';
+import { apiGet, apiPostForm } from './client';
+import type { Translation, StatsSummary, NotificationEvent, EstimateResult } from './types';
 
 /** A felhasználó összes fordításának lekérése (a React Dashboard listához) */
 export async function fetchTranslations(): Promise<Translation[]> {
@@ -30,6 +30,14 @@ export async function fetchStatsSummary(): Promise<StatsSummary> {
 /** Folyamatban lévő fordítás leállítása */
 export async function stopTranslation(id: number): Promise<void> {
   await fetch(`/api/translations/${id}/stop`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  });
+}
+
+/** Megszakadt (paused) fordítás folytatása a checkpoint alapján */
+export async function resumeTranslation(id: number): Promise<void> {
+  await fetch(`/api/translations/${id}/resume`, {
     method: 'POST',
     credentials: 'same-origin',
   });
@@ -63,4 +71,20 @@ export async function uploadForTranslation(
   if (!resp.ok && !resp.redirected) {
     throw new Error('Feltöltési hiba');
   }
+}
+
+/**
+ * Előzetes fordítási becslés a feltöltött EPUB alapján.
+ * Elküldi a fájlt + a kiválasztott modellt, és visszakapja a szószámot,
+ * becsült tokeneket, időt és költséget.
+ */
+export async function estimateTranslation(
+  file: File,
+  options: { modelSource: string; selectedModel?: string },
+): Promise<EstimateResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('model_source', options.modelSource);
+  if (options.selectedModel) formData.append('selected_model', options.selectedModel);
+  return apiPostForm<EstimateResult>('/api/estimate', formData);
 }

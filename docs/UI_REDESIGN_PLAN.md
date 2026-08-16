@@ -2,7 +2,7 @@
 
 > **Státusz:** Jóváhagyva (2026-08-12)
 > **Cél:** A teljes webes felület modernizálása React 18 SPA keretrendszerrel.
-> **Verzió:** v2.0.0 terv
+> **Verzió:** v2.2.0 (megvalósult)
 
 ---
 

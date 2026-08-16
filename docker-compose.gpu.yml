@@ -1,0 +1,16 @@
+# ============================================================
+# EPUB Fordító – GPU override (NVIDIA)
+# Ezt a fájlt az install.sh ALKALMAZZA (compose -f ... -f ...), ha nvidia-smi
+# érzékeli a GPU-t. Önállóan NE futtasd GPU nélkül, mert a driver: nvidia hibát dob.
+# Használat (csak GPU-val rendelkező hoston):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+# ============================================================
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

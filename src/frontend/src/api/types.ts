@@ -5,7 +5,7 @@
 // ============================================================
 
 /** Fordítási státusz enum – megfelel a backend értékeinek */
-export type TranslationStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stopped';
+export type TranslationStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stopped' | 'paused';
 
 /** Fordítási szakasz (stage) – a részletes progresszhez */
 export type TranslationStage =
@@ -52,6 +52,9 @@ export interface Translation {
   created_at: string | null;
   elapsed_seconds: number;
   estimated_seconds: number;
+  input_tokens_used: number;
+  output_tokens_used: number;
+  cost_usd: number;
 }
 
 /** Könyv modell – a `GET /api/library/list` eleme */
@@ -134,6 +137,18 @@ export interface Recommendation {
   series: string;
   series_number: number | null;
   reason: 'series' | 'author' | 'genre';
+}
+
+/** Fordítási becslés – a `POST /api/estimate` válasza */
+export interface EstimateResult {
+  total_words: number;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_minutes: number;
+  cost: number;
+  currency: string;
+  model_source: 'local' | 'remote';
+  selected_model: string;
 }
 
 /** Metaadat kinyerés eredménye – a `POST /api/library/extract-metadata` válasza */
