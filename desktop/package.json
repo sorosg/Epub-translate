@@ -13,21 +13,25 @@
   },
   "devDependencies": {
     "electron": "31.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^25.1.8"
   },
   "build": {
     "appId": "hu.epubtranslator.app",
     "productName": "EPUB Fordító",
     "files": [
       "main.js",
-      "backend_entry.py",
-      "../src/frontend/dist/**/*"
+      "backend_entry.py"
     ],
     "extraResources": [
       {
         "from": "./pybackend",
         "to": "backend",
-        "filter": ["**/*", "!venv/**", "!__pycache__/**", "!*.pyc"]
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../src/frontend/dist",
+        "to": "frontend",
+        "filter": ["**/*"]
       }
     ],
     "win": { "target": "nsis" },
