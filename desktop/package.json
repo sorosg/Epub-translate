@@ -1,6 +1,8 @@
 {
   "name": "epub-translator-desktop",
-  "version": "2.6.8",
+  "version": "3.0.0",
+  "description": "EPUB Fordító Rendszer – önálló asztali alkalmazás (Windows/macOS)",
+  "author": "sorosg",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -10,7 +12,7 @@
     "dist:mac": "electron-builder --mac"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
+    "electron": "31.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
