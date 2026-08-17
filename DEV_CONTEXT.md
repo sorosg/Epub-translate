@@ -23,7 +23,7 @@
 |------|-------|
 | Név | EPUB Fordító Rendszer |
 | Cél | EPUB könyvek fordítása angolról magyarra (helyi Ollama DeepSeek + opcionális DeepSeek Pro API) |
-| **Aktuális verzió** | **v3.0.0** |
+| **Aktuális verzió** | **v3.0.1** |
 | Tech stack | Flask (Gunicorn) + React 18 (Vite/TS/Tailwind) + PostgreSQL + Ollama + Redis + Nginx + MailHog |
 
 ---
@@ -77,6 +77,17 @@ git -C "$T" add -A
 git -C "$T" commit -m "vX.Y.Z: rövid leírás"
 git -C "$T" push origin main
 ```
+
+### 🐛 `spawn /bin/bash ENOENT` hiba (2026-08-17, fontos tanulság)
+Ha az AI `execute_command` hívása hirtelen `spawn /bin/bash ENOENT` hibát kezd adni
+(minden parancs, még az `echo` is), akkor:
+- **nem a projekt, nem a git, nem a Windows-újraindítás a hibás**, hanem a
+  **VSCode Remote-WSL kapcsolat** szakadt meg;
+- **megoldás:** a felhasználó zárja be és nyissa újra a mappát WSL-ben
+  (VSCode: „Remote-WSL: Reopen Folder in WSL", vagy a `code --remote wsl+Ubuntu`),
+  ez visszaállítja a shell-t;
+- közben a fájlműveletek (read_file/write_to_file/replace_in_file) Továbbra is működnek,
+  ezért a kódmódosításokat el lehet végezni, csak a `git` parancsok várnak a shell-re.
 - A `.env` SOSEM kerül commitba (a Desktop .gitignore kizárja; push előtt ellenőrizd: `git -C "$T" ls-files | grep env` üres legyen).
 - A CI (`desktop-build.yml`) a `main` tag/push-ra indul; a Windows/macOS telepítőt tag (`git tag vX.Y.Z && git -C "$T" push origin vX.Y.Z`) triggereli.
 
@@ -93,7 +104,7 @@ git -C "$T" push origin main
 - A tag-et és a push-t az AI kezeli (a Desktop repóból: `git tag vX.Y.Z && git push origin vX.Y.Z`).
 - **Verzióbump CSAK kódmódosításnál**; a dokumentum-frissítés önmagában NEM növel verziót.
 - A tag push (v*) elindítja a CI-t (Windows .exe + macOS .dmg buildet).
-- Aktuális verzió: **v3.0.0**.
+- Aktuális verzió: **v3.0.1**.
 
 ### Hol kell frissíteni a verziót (mind a 6 helyen!)
 1. `backend/config.py` → `VERSION = os.environ.get('VERSION', 'x.y.z')`
@@ -103,7 +114,7 @@ git -C "$T" push origin main
 5. `README.md` → verzió badge + lábléc + Verzió Történet
 6. `install.sh` → `VERSION="x.y.z"` (ha van)
 
-> Jelenlegi: **v2.5.7**
+> Jelenlegi: **v3.0.1**
 
 ---
 
@@ -150,7 +161,7 @@ docker exec epub-postgres psql -U epub_user -d epub_translator -c "..."
 
 ---
 
-## 🧩 Kódkonvenciók (a jelenlegi v3.0.02 állapothoz)
+## 🧩 Kódkonvenciók (a jelenlegi v3.0.1 állapothoz)
 
 - **Endpointok**: törekedj az egységesítésre `/api/` alá (a `/delete`, `/upload`, `/download` még külön van — ismert téma).
 - **Unicode védelem**: `sanitize_text()` — minden kimenő promptot tisztíts (surrogate-hiba megelőzése).
