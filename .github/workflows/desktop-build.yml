@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     strategy:
+      # A Windows build akkor is fusson, ha a macOS (pl. notarization) elhasal.
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
