@@ -1,5 +1,18 @@
 # 📋 EPUB Fordító – Fejlesztési Napló (Changelog)
 
+## v3.0.1 – 2026-08-17 (aktuális)
+
+### 💾 Adatmentés / visszaállítás (export/import)
+- **Backend**: két új végpont – `GET /api/backup/export` (a teljes `DATA_DIR`
+  ZIP-ben, a `logs/` nélkül) és `POST /api/backup/import` (ZIP visszacsomagolás,
+  import előtti automatikus biztonsági mentéssel).
+- **Frontend**: a Beállítások oldal alján „Adatok exportálása" és
+  „Adatok importálása" gombok (kulcs + beállítások + könyvtár + fordítások).
+- Hozzáférés: desktop módban bárki (egyfelhasználós), Docker szerver módban
+  csak admin.
+
+---
+
 ## v3.0.0 – 2026-08-16 (aktuális)
 
 ### 🖥️ Desktop kiadás (Windows/macOS) – MAJOR
@@ -460,4 +473,4 @@
 
 ---
 
-*Utolsó frissítés: 2026-08-16 · v3.0.0*
+*Utolsó frissítés: 2026-08-17 · v3.0.1*

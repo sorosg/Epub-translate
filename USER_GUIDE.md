@@ -1,7 +1,3 @@
-# 📖 EPUB Fordító – Felhasználói kézikönyv (v3.0.0)
-
-> Ez a kézikönyv a **v3.0.0** verzióhoz készült. A program kétféleképp fut:
-> **Asztali alkalmazás** (Windows/macOS, egyfelhasználós) vagy **Docker szerver** (Linux, többfelhasználós).
 > Az alábbi lépések mindkét esetben ugyanúgy működnek, kivéve ahol külön jelöljük.
 
 ---
@@ -75,7 +71,21 @@ A könyvtárban egy könyvre kattintva megnyílik az **olvasó**:
 
 ---
 
-## 7. Admin (csak Docker szerver módban)
+## 7. Adatmentés / visszaállítás (export/import)
+
+A **Beállítások** oldal alján két gomb segíti a biztonsági mentést:
+
+- **⬇️ Adatok exportálása** – a teljes adatot (DeepSeek kulcs, beállítások,
+  könyvtár, fordítások, glosszárium, TM) egyetlen `epub-translator-backup-….zip`
+  fájlba menti le.
+- **⬆️ Adatok importálása** – egy korábban exportált ZIP visszatöltése.
+  Az import előtt a rendszer automatikus biztonsági mentést készít, és az
+  app újraindítása javasolt utána.
+
+> Nagyszerű újratelepítés vagy új gép előtt: exportálj, telepítsd újra az appot,
+> majd importáld vissza – minden megmarad.
+
+## 8. Admin (csak Docker szerver módban)
 
 Az admin fülön (admin joggal):
 
@@ -86,7 +96,7 @@ Az admin fülön (admin joggal):
 
 ---
 
-## 8. Gyakori kérdések (GYIK)
+## 9. Gyakori kérdések (GYIK)
 
 **A fordításom elakadt / nem halad?**
 Nézd a Dashboard progresszét és a fejezetszámot. Ha „Megszakítva (folytatható)", nyomj **Folytatás**-t. Ami feldolgozva lett, nem veszik el (checkpoint).
@@ -102,4 +112,4 @@ Asztali módban nincs bejelentkezés. Docker módban ellenőrizd az emailt/jelsz
 
 ---
 
-*Készült ❤️-vel Magyarországon – v3.0.0*
+*Készült ❤️-vel Magyarországon – v3.0.1*

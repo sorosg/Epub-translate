@@ -106,4 +106,4 @@ bash install.sh
 
 ---
 
-*Készült ❤️-vel Magyarországon – v3.0.0*
+*Készült ❤️-vel Magyarországon – v3.0.1*

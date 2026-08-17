@@ -36,6 +36,57 @@ export function SettingsPage() {
   const [desktopMode, setDesktopMode] = useState(false);
   const [gpuAvailable, setGpuAvailable] = useState(false);
 
+  // Adatmentés / visszaállítás (v3.0.1)
+  const [backupBusy, setBackupBusy] = useState(false);
+
+  const handleExport = async () => {
+    setBackupBusy(true);
+    try {
+      const resp = await fetch('/api/backup/export', { credentials: 'same-origin' });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || `Hiba (${resp.status})`);
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      a.download = `epub-translator-backup-${stamp}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      addToast('success', 'Adatok exportálva.');
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Export hiba');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    setBackupBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const resp = await fetch('/api/backup/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: fd,
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error((data as { error?: string }).error || `Hiba (${resp.status})`);
+      }
+      addToast('success', 'Import kész. Az alkalmazás újraindítása ajánlott.');
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Import hiba');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -264,6 +315,36 @@ export function SettingsPage() {
       <button onClick={handleSave} disabled={saving} className="btn-primary w-full">
         {saving ? t('common.loading') : t('common.save')}
       </button>
+
+      {/* Adatmentés / visszaállítás (v3.0.1) */}
+      <div className="border-t border-border-color pt-4 mt-2 space-y-3">
+        <h3 className="font-semibold text-sm text-text-secondary">
+          Biztonsági mentés / visszaállítás
+        </h3>
+        <p className="text-xs text-text-muted">
+          A kulcs, a beállítások, a könyvtár és a fordítások egyetlen ZIP-ben.
+          Telepítés/új gép előtt érdemes exportálni, majd importálni.
+        </p>
+        <div className="flex gap-2">
+          <button onClick={handleExport} disabled={backupBusy} className="btn-outline flex-1">
+            {'⬇️ '}Adatok exportálása
+          </button>
+          <label className="btn-outline flex-1 text-center cursor-pointer">
+            {'⬆️ '}Adatok importálása
+            <input
+              type="file"
+              accept="application/zip,.zip"
+              className="hidden"
+              disabled={backupBusy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImport(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
+      </div>
     </div>
   );
 }

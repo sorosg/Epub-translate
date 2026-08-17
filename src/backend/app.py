@@ -11,7 +11,7 @@ from models import db, User, Translation, SystemSettings, OptimizationLog, Refer
 from datetime import datetime
 from functools import wraps
 from packaging import version as pkg_version
-import os, json, psutil, requests, threading, uuid, shutil, logging
+import os, json, psutil, requests, threading, uuid, shutil, logging, zipfile, io
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -3392,6 +3392,86 @@ def init_db():
 with app.app_context():
     try: init_db()
     except Exception as e: app.logger.error(f"DB init error: {e}")
+
+# ==== ADATMENTÉS / VISSZAÁLLÍTÁS (v3.0.1) ====
+# A desktop verzió egyfelhasználós, ezért ott bármikor; Docker szerver módban
+# csak admin joggal érhető el (a közös adat védelme miatt).
+def _backup_allowed():
+    if Config.DESKTOP_MODE:
+        return True
+    return bool(current_user.is_authenticated and current_user.is_admin)
+
+
+@app.route('/api/backup/export', methods=['GET'])
+@login_required
+def api_backup_export():
+    """A teljes DATA_DIR letöltése ZIP-ben (a logs/ mappa nélkül)."""
+    if not _backup_allowed():
+        return jsonify({'error': 'Nincs jogosultságod'}), 403
+
+    data_dir = Config.DATA_DIR
+    if not os.path.isdir(data_dir):
+        return jsonify({'error': 'Nincs menthető adat'}), 404
+
+    stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(data_dir):
+            # a logokat nem mentjük
+            dirs[:] = [d for d in dirs if d != 'logs']
+            for f in files:
+                full = os.path.join(root, f)
+                arc = os.path.relpath(full, data_dir)
+                zf.write(full, arc)
+    mem.seek(0)
+    return send_file(
+        mem,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'epub-translator-backup-{stamp}.zip',
+    )
+
+
+@app.route('/api/backup/import', methods=['POST'])
+@login_required
+def api_backup_import():
+    """ZIP visszacsomagolása a DATA_DIR-be, import előtti biztonsági mentéssel."""
+    if not _backup_allowed():
+        return jsonify({'error': 'Nincs jogosultságod'}), 403
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'Nincs fájl'}), 400
+    file = request.files['file']
+    if not file or not (file.filename or '').lower().endswith('.zip'):
+        return jsonify({'error': 'Csak ZIP fájl importálható'}), 400
+
+    data_dir = Config.DATA_DIR
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Biztonsági mentés az import előtt (a logs/ nélkül).
+    pre = data_dir + '.pre-import-' + datetime.now().strftime('%Y%m%d-%H%M%S')
+    try:
+        shutil.copytree(data_dir, pre, ignore=shutil.ignore_patterns('logs'))
+    except Exception as e:
+        app_logger.warning(f'Import előtti biztonsági mentés nem sikerült: {e}')
+
+    try:
+        with zipfile.ZipFile(file.stream) as zf:
+            for member in zf.namelist():
+                clean = os.path.normpath(member)
+                if clean.startswith('..') or os.path.isabs(clean):
+                    return jsonify({'error': 'Érvénytelen ZIP útvonal'}), 400
+            zf.extractall(data_dir)
+        # A DB-kapcsolat újraépítése az új fájlhoz.
+        db.session.remove()
+        try:
+            db.engine.dispose()
+        except Exception:
+            pass
+        return jsonify({'success': True, 'message': 'Import kész. Az alkalmazás újraindítása ajánlott.'})
+    except Exception as e:
+        return jsonify({'error': f'Import hiba: {str(e)[:200]}'}), 400
+
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
