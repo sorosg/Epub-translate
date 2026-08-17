@@ -35,7 +35,7 @@ A Beállításokban választhatsz:
 - **Olvasó** — fejezetszintű, felbontás-függő oldaltördeléssel, mobilbarát.
 - **Email értesítés** — fordítás végén, a kész EPUB csatolásával (24 MB-ig; SMTP konfigurálható).
 
-> A korábbi „kétmenetes fordítás" (AI + külön minőségellenőrző menet) **kikapcsolásra került**, mert a modell duplikálta a szöveget — a jelenlegi mnemets egyetlen, node-onkénti fordítás.
+> A korábbi „kétmenetes fordítás" (AI + külön minőségellenőrző menet) **kikapcsolásra került**, mert a modell duplikálta a szöveget — a jelenlegi mód egyetlen, node-onkénti fordítás.
 
 ## Asztali alkalmazás (Windows / macOS)
 
@@ -71,7 +71,34 @@ bash install.sh
 
 ## Fejlesztés
 
-Egyetlen kódbázis a szerver (Docker) és a desktop verzióhoz.
+**Egyetlen közös kódbázis, két vékony csomagolással.** A Linux/webes (Docker) és a Windows/macOS (desktop) verzió **ugyanazt a backendet és frontendet** használja; csak a futtató réteg különbözik.
+
+```
+              ┌────────────────────────────────────────┐
+              │      KÖZÖS MAG (egyszer fejlesztve)      │
+              │   backend/  (Flask: fordítás, könyvtár,  │
+              │              API, glosszárium, TM, ...)  │
+              │   frontend/ (React SPA)                  │
+              └───────────────┬──────────────────────────┘
+                              │
+          ┌───────────────────┴───────────────────┐
+          │                                       │
+┌─────────▼─────────┐                 ┌───────────▼─────────┐
+│  Docker (Linux)   │                 │  Desktop (Win/Mac)  │
+│  - nginx          │                 │  - Electron         │
+│  - PostgreSQL     │                 │  - PyInstaller      │
+│  - többfelhasználós│                │  - SQLite           │
+│  - közös könyvtár  │                 │  - egyfelhasználós  │
+└───────────────────┘                 └─────────────────────┘
+```
+
+| Réteg | Fájl | Megosztott? |
+|-------|------|-------------|
+| Backend (fordítás, API) | `backend/` | ✅ ugyanaz |
+| Frontend (React SPA) | `frontend/` | ✅ ugyanaz |
+| Docker futtatás | `docker-compose.yml`, `nginx` | — |
+| Desktop futtatás | `desktop/` (Electron + PyInstaller) | — |
+
 - **Backend:** Python / Flask (`backend/` / `src/backend/`)
 - **Frontend:** React 18 + Vite + TypeScript + Tailwind (`frontend/` / `src/frontend/`)
 - **Desktop:** Electron + PyInstaller + SQLite (`desktop/`)
