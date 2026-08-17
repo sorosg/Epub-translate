@@ -11,7 +11,6 @@ permissions:
 jobs:
   build:
     strategy:
-      # A Windows build akkor is fusson, ha a macOS (pl. notarization) elhasal.
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
@@ -28,32 +27,28 @@ jobs:
           python-version: '3.11'
 
       # Frontend build (a React SPA -> src/frontend/dist)
-      # Itt van package-lock.json, ezért az npm ci megbízható.
       - name: Build frontend
         working-directory: src/frontend
         run: |
           npm ci
           npm run build
 
-      # A buildelt SPA-t a desktop mappába másoljuk, mert az electron-builder
-      # csak az app-könyvtáron BELÜLI útvonalat tud csomagolni.
+      # SPA másolása a desktop mappába (electron-builder csak belső utat tud)
       - name: Copy frontend dist into desktop
         shell: bash
         run: |
           mkdir -p desktop/frontend-dist
           cp -r src/frontend/dist/* desktop/frontend-dist/
 
-      # Backend -> PyInstaller futtatható (a desktop/pybackend mappába)
-      - name: Install backend deps (desktop)
+      # Backend -> PyInstaller (a Flask app becsomagolása kulcsfontosságú)
+      - name: Build backend with PyInstaller
         working-directory: src/backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-desktop.txt pyinstaller
-          pyinstaller --onefile --name backend --distpath ../../desktop/pybackend --workpath ../../desktop/pybuild --specpath ../../desktop/pybuild ../../desktop/backend_entry.py
+          pyinstaller --onefile --name backend --paths . --hidden-import app --hidden-import config --hidden-import models --distpath ../../desktop/pybackend --workpath ../../desktop/pybuild --specpath ../../desktop/pybuild ../../desktop/backend_entry.py
 
-      # Electron telepítő.
-      # A desktop/ mappában NINCS package-lock.json (a package.json kézzel jött
-      # létre), ezért itt az npm ci helyett npm install-t használunk.
+      # Electron telepítő (desktop-nak nincs lockfile -> npm install)
       - name: Build Electron installer
         working-directory: desktop
         run: |

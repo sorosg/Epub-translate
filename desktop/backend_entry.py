@@ -1,17 +1,15 @@
 # ============================================================
 # Desktop (Electron) sidecar backend belépő.
 # A közös backend/app.py-t importálja, és desktop módban szolgálja ki mind az
-# API-t, mind a buildelt React SPA-t (frontend), egyetlen porton.
-# NEM nyúl a docker/app.py-hez; a plusz catch-all route csak ITT regisztrálódik.
+# API-t, mind a buildelt React SPA-t (index.html), egyetlen porton.
 # ============================================================
 import os, sys, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+FROZEN = getattr(sys, 'frozen', False)
 
-# Fejlesztői módban (forráskódból) a backend/ vagy src/backend/ mappát tesszük
-# a PATH-ra, hogy az 'import app' működjön. Csomagolt (PyInstaller) módban a
-# PyInstaller maga építi be az app.py-t + függőségeit, ezért nincs mit keresnünk.
-if not getattr(sys, 'frozen', False):
+# --- 1) Flask app modul elérési út (csak fejlesztői módban) ---
+if not FROZEN:
     for cand in [
         os.path.join(os.path.dirname(HERE), 'backend'),
         os.path.join(os.path.dirname(HERE), 'src', 'backend'),
@@ -20,42 +18,59 @@ if not getattr(sys, 'frozen', False):
             sys.path.insert(0, cand)
             break
 
-# Desktop környezet kikényszerítése (SQLite adatok + automatikus helyi user)
+# --- 2) Desktop környezet kikényszerítése ---
 os.environ['DESKTOP_MODE'] = '1'
 os.environ.setdefault('DATA_DIR', os.path.join(os.path.expanduser('~'), '.epub-translator'))
 
 from app import app  # noqa: E402
 
-# Az SPA build elérési útja (sorrendben ellenőrizve):
-# 1. PyInstaller csomagolt mód: a bináris melletti 'frontend' mappa (resources).
-# 2. Fejlesztői: repó 'frontend/dist' vagy 'src/frontend/dist'.
-_FD = None
-for cand in [
-    os.path.join(os.path.dirname(sys.executable), 'frontend'),
-    os.path.join(HERE, 'frontend-dist'),
-    os.path.join(os.path.dirname(HERE), 'src', 'frontend', 'dist'),
-    os.path.join(os.path.dirname(HERE), 'frontend', 'dist'),
-]:
-    if os.path.isdir(cand):
-        _FD = cand
-        break
-FRONTEND_DIST = _FD
 
-# --- SPA statikus kiszolgálás (csak ha létezik a buildelt dist) ---
-if FRONTEND_DIST and os.path.isdir(FRONTEND_DIST):
-    from flask import send_from_directory
+def _find_frontend():
+    """Megkeresi a buildelt React SPA (index.html) könyvtárát."""
+    candidates = []
+    if FROZEN:
+        exe_dir = os.path.dirname(sys.executable)
+        candidates.append(os.path.join(os.path.dirname(exe_dir), 'frontend'))
+        candidates.append(os.path.join(exe_dir, 'frontend'))
+    else:
+        candidates.append(os.path.join(os.path.dirname(HERE), 'src', 'frontend', 'dist'))
+        candidates.append(os.path.join(os.path.dirname(HERE), 'frontend', 'dist'))
+    candidates.append(os.path.join(HERE, 'frontend-dist'))
 
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def _spa(path):
-        full = os.path.join(FRONTEND_DIST, path)
-        if path and os.path.isfile(full):
-            return send_from_directory(FRONTEND_DIST, path)
+    for cand in candidates:
+        if os.path.isfile(os.path.join(cand, 'index.html')):
+            return cand
+    return None
+
+
+FRONTEND_DIST = _find_frontend()
+
+# --- 3) SPA kiszolgálás: a nem-API GET kérések az index.html-t kapják ---
+if FRONTEND_DIST:
+    from flask import request, send_from_directory
+
+    def _is_spa_asset(p):
+        return os.path.isfile(os.path.join(FRONTEND_DIST, p.lstrip('/')))
+
+    @app.before_request
+    def _serve_spa():
+        if request.method != 'GET':
+            return None
+        p = request.path
+        if p == '/health':
+            return None
+        if p.startswith('/api/'):
+            return None
+        if p.startswith('/download/') or p.startswith('/logout'):
+            return None
+        if p.startswith('/upload') or p.startswith('/reference/'):
+            return None
+        if p != '/' and _is_spa_asset(p):
+            return send_from_directory(FRONTEND_DIST, p.lstrip('/'))
         return send_from_directory(FRONTEND_DIST, 'index.html')
 
 PORT = int(os.environ.get('PORT', '8765'))
 
 if __name__ == '__main__':
-    # Az adatbázis inicializálása már az app.py importálásakor megtörténik.
     webbrowser.open(f'http://127.0.0.1:{PORT}')
     app.run(host='127.0.0.1', port=PORT, debug=False, threaded=True)
