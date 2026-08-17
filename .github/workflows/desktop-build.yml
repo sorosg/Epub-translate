@@ -5,6 +5,9 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
@@ -18,22 +21,28 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # Frontend build (a React SPA -> frontend/dist)
+      # Frontend build (a React SPA -> src/frontend/dist)
       - name: Build frontend
         working-directory: src/frontend
         run: |
           npm ci
           npm run build
 
-      # Backend -> PyInstaller futtatható (backend_entry.py)
-      # A desktop buildhez a szerver-függőségek nélküli requirements-desktop.txt-t
-      # használjuk (nincs psycopg2/gunicorn/redis -> kisebb, stabilabb bináris).
+      # A buildelt SPA-t a desktop mappába másoljuk, mert az electron-builder
+      # csak az app-könyvtáron BELÜLI útvonalat tud csomagolni.
+      - name: Copy frontend dist into desktop
+        shell: bash
+        run: |
+          mkdir -p desktop/frontend-dist
+          cp -r src/frontend/dist/* desktop/frontend-dist/
+
+      # Backend -> PyInstaller futtatható (a desktop/pybackend mappába)
       - name: Install backend deps (desktop)
         working-directory: src/backend
         run: |
@@ -51,5 +60,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}
-          path: desktop/dist/*.exe
+          path: desktop/dist/*
           if-no-files-found: ignore
