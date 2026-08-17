@@ -28,6 +28,7 @@ jobs:
           python-version: '3.11'
 
       # Frontend build (a React SPA -> src/frontend/dist)
+      # Itt van package-lock.json, ezért az npm ci megbízható.
       - name: Build frontend
         working-directory: src/frontend
         run: |
@@ -50,11 +51,13 @@ jobs:
           pip install -r requirements-desktop.txt pyinstaller
           pyinstaller --onefile --name backend --distpath ../../desktop/pybackend --workpath ../../desktop/pybuild --specpath ../../desktop/pybuild ../../desktop/backend_entry.py
 
-      # Electron telepítő
+      # Electron telepítő.
+      # A desktop/ mappában NINCS package-lock.json (a package.json kézzel jött
+      # létre), ezért itt az npm ci helyett npm install-t használunk.
       - name: Build Electron installer
         working-directory: desktop
         run: |
-          npm ci
+          npm install
           npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || 'mac' }} --publish never
 
       - uses: actions/upload-artifact@v4
