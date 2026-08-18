@@ -1,140 +1,67 @@
 # 🗂️ EPUB Fordító – Munkakönyvtárak rendje
 
 Ez a dokumentum pontosan leírja, hogy **melyik mappa mire való**, hogy ne keveredjenek
-össze a forráskód, a telepített példány és a GitHub tároló.
+össze a forráskód, a Docker-példány és a GitHub tároló.
 
 ---
 
-## A 3 különálló hely
+## A 3 fontos hely (aktuális, v3.0.1)
 
-| # | Elérési út | Szerep | Mikor használd |
-|---|-----------|--------|----------------|
-| 1 | `/mnt/c/Users/soros/Desktop/Epub-translate` | **FORRÁS-repo** (a GitHub tükre) | Ezt **szerkeszted**, innen commitolsz + pusholsz |
-| 2 | `/home/sorosg/epub-translator` | **TELEPÍTETT példány** (futó rendszer) | Ezt **indítod / nézed / frissíted** – ide ne írj kódot |
-| 3 | `/home/sorosg/epub-translator-src` | **TISZTA KLÓN** (pull + install.sh) | Innen **pullolsz**, itt futtatod az `./install.sh`-t |
-| 4 | `github.com/sorosg/Epub-translate` | **GITHUB** | A `1`-es repo nyilvános mása (a `git push` ide küld) |
+| # | Elérési út | Szerep | Mit csinálsz itt |
+|---|-----------|--------|------------------|
+| 1 | `/home/sorosg/epub-translator` | **KANONIKUS forrás** (WSL) | Itt **szerkeszted** a kódot, itt buildelsz/tesztelsz |
+| 2 | `/mnt/c/Users/soros/Desktop/Epub-translate` | **GIT-push tükör** (Windows) | Ide **szinkronizálsz**, innen commit + tag + push |
+| 3 | `github.com/sorosg/Epub-translate` | **GITHUB** | A `2`-es repo nyilvános mása (`git push` ide küld) |
 
-> ⚠️ **A legfontosabb szabály:** a kódot **csak az `1`-es mappában** szerkeszd.
-> A `2`-es mappa a telepítő által **generált futtató példány** – ha ott javítasz,
-> az a frissítéskor felülíródik és elveszik.
-
----
-
-## 1. Forrás-repo – itt dolgozunk
-
-```
-/mnt/c/Users/soros/Desktop/Epub-translate/
-├── src/                      ← a teljes forráskód
-│   ├── backend/              ← Flask backend (app.py, config.py, models.py, templates/)
-│   ├── frontend/             ← React SPA (src/, Dockerfile, nginx.conf, package.json)
-│   ├── ollama/               ← Ollama konténer (Dockerfile + healthcheck)
-│   └── docker-compose.yml    ← konténer definíciók (nginx/backend/postgres/ollama/...)
-├── install.sh                ← telepítő/frissítő
-├── docs/                     ← dokumentáció
-├── README.md, CHANGELOG.md, VERSION.txt
-└── _archiv/                  ← felesleges, archivált fájlok (nem a git tetején)
-```
-
-### Itt végezd ezeket
-- Kód módosítása (backend + frontend)
-- Dokumentáció frissítése
-- `git add` + `git commit` + `git push origin main`
+> ⚠️ **A legfontosabb szabály:** a kódot **csak a WSL-ben (`/home/sorosg/epub-translator`)**
+> szerkeszd. A Desktop mappa **csak tükör** — oda szinkronizálunk, és onnan pusholunk,
+> de kézzel ne ott javíts kódot.
 
 ---
 
-## 2. Telepített példány – fut, ne szerkeszd
+## 1. WSL – kanonikus forrás (itt dolgozunk)
 
 ```
 /home/sorosg/epub-translator/
-├── docker-compose.yml        ← az install.sh generálja
-├── .env                      ← a telepítő hozza létre
-├── backend/, frontend/       ← az install.sh másolja (futó kódról tükör)
-├── logs/, book_database/, translation_memory/, ...  ← futás közbeni adatok
-└── .install_config           ← a telepítő tárolja itt a verziót
+├── backend/          # Flask (app.py, config.py, models.py, requirements*, templates)
+├── frontend/         # React SPA (src/, package.json, Dockerfile, nginx.conf)
+├── desktop/          # Electron + PyInstaller + SQLite (asztali csomag)
+├── .github/workflows/# CI (ci.yml + desktop-build.yml)
+├── docs/             # dokumentáció (napló, terv, elrendezés)
+├── *.md, install.sh, VERSION.txt, .env
 ```
 
-> A `2`-es mappát az install.sh **`cp -a "$SRC_DIR"/* .`** paranccsal tölti meg.
-> Ha ide is mástol a fejlesztői fájlokat (pl. `docs/`, `reset_admin_password.py`),
-> az fölösleges duplikáció, ami összezavar.
+- **Ez a Docker build-forrás** és a desktop build forrása is.
+- Itt futtatod: `docker compose build` / `up`, `py_compile`, `npm build`.
 
-### Itt végezd ezeket
-- Frissítés: `bash install.sh` (a Desktop repóból futtasd, ne ide másolva)
-- Státusz: `docker compose ps`
-- Web: `http://localhost:8080`
-
----
-
-## 3. GitHub – a push célpontja
+## 2. Windows Desktop – git-push tükör
 
 ```
-git remote -v
-# origin  git@github.com:sorosg/Epub-translate.git
+/mnt/c/Users/soros/Desktop/Epub-translate/
+├── src/backend/      # ← a WSL backend/ szinkronizált mása
+├── src/frontend/     # ← a WSL frontend/ szinkronizált mása
+├── desktop/          # ← a WSL desktop/ szinkronizált mása
+├── .github/          # ← a WSL .github/ szinkronizált mása
+└── *.md, VERSION.txt, install.sh
 ```
 
-A push innen történik: a Desktop repó `main` ága → GitHub `main` ága.
+- A git remote itt **SSH** (`git@github.com:sorosg/Epub-translate.git`, branch `main`).
+- Innen commitolsz + pusholsz, és a `v*` tag push indítja a CI desktop-buildet.
 
----
-
-## 🧪 Hogyan tesztelj telepítést helyesen
-
-### Friss telepítés tesztelése (ajánlott)
-A telepítőt **a Desktop repóból** futtasd, mert ott van a friss forrás:
+## 3. Szinkron irány (mindig WSL → Desktop)
 
 ```bash
-cd /mnt/c/Users/soros/Desktop/Epub-translate
-./install.sh
+S=/home/sorosg/epub-translator
+T=/mnt/c/Users/soros/Desktop/Epub-translate
+rsync -a "$S/backend/" "$T/src/backend/"
+rsync -a "$S/frontend/src/" "$T/src/frontend/src/"
+rsync -a "$S/desktop/" "$T/desktop/"
+rsync -a "$S/.github/" "$T/.github/"
+rsync -a "$S"/*.md "$S/install.sh" "$S/VERSION.txt" "$T/"
 ```
 
-A script a `$HOME/epub-translator`-ba telepít (a `2`-es mappába), és a repo `src/`-jéből másol.
-
-### Frissítés tesztelése
-```bash
-cd /mnt/c/Users/soros/Desktop/Epub-translate
-./install.sh
-# Válaszd: 1) Frissítés
-```
-
-### Gyors fordulat, ha dolgozol
-```bash
-# 1) Szerkesztés a forrás-repóban:
-cd /mnt/c/Users/soros/Desktop/Epub-translate
-git add -A
-git commit -m "leírás"
-git push origin main
-
-# 2) A WSL tiszta klónnal pullolj + indítsd az install.sh-t:
-cd /home/sorosg/epub-translator-src
-git pull origin main
-./install.sh
-```
-
-### Tiszta klón létrehozása (első alkalommal)
-```bash
-cd /home/sorosg
-git clone https://github.com/sorosg/Epub-translate.git epub-translator-src
-cd epub-translator-src
-./install.sh
-```
+> A `.env` **soha** nem kerül a Desktop repóba (a `.gitignore` kizárja).
 
 ---
 
-## 🧹 Amit a mappákból kitakarítottunk
-
-- A `2`-es (`/home/sorosg/epub-translator`) mappából eltávolítottuk a fejlesztői duplikátumokat,
-  mert azok a forrás-repóban (`1`) vannak.
-- A macOS/Windows szinkron-maradványokat (`*:Zone.Identifier`, `*:com.apple.*`) eltávolítottuk.
-- A felesleges egyszeri segédfájlokat a `_archiv/` mappába helyeztük.
-
----
-
-## ❓ Gyakori hibák
-
-| Hiba | Ok | Megoldás |
-|------|----|----------|
-| `Telepített verzió: 1.3.5 = Új verzió: 1.3.5` | A telepített `.install_config` és a script verziója megegyezett (elavult) | Frissítsd az install.sh verziószámát a Desktop repóban, majd futtasd onnan |
-| Blank page a weben | `/api/profile` 302 JSON helyett | Javítva: a backend most JSON 401-et ad (v2.0.2) |
-| A `2`-es mappa kódja eltér a `1`-estől | A `2`-es mappába is szerkesztettél | Csak a `1`-esben dolgozz, majd `./install.sh` frissíti a `2`-est |
-
----
-
-*Utolsó frissítés: 2026-08-13*
+*Utolsó frissítés: 2026-08-17 · v3.0.1*

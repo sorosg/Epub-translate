@@ -1,8 +1,8 @@
 # 🎨 UI Redesign Terv — React 18 SPA
 
-> **Státusz:** Jóváhagyva (2026-08-12)
+> **Státusz:** Megvalósult (a React 18 SPA a v2.0.0-tól él, jelenleg v3.0.1)
 > **Cél:** A teljes webes felület modernizálása React 18 SPA keretrendszerrel.
-> **Verzió:** v2.2.0 (megvalósult)
+> **Verzió:** v3.0.1
 
 ---
 

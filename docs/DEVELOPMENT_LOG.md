@@ -2,6 +2,26 @@
 
 > A frontend UI-redesign projekt fejlesztése során az összes fontos lépés és döntés dokumentálása.
 
+## 2026-08-17 — v3.0.1 export/import + dokumentáció rendbetétel
+
+### Export/import adatmentés
+- Backend: `GET /api/backup/export` + `POST /api/backup/import` (a teljes
+  `DATA_DIR` ZIP-ben, `logs/` nélkül, import előtti biztonsági mentéssel).
+- Frontend: Beállítások oldalon „Adatok exportálása / importálása" gombok.
+
+### Dokumentáció rendbetétel (a felhasználó kérésére)
+- `README.md`, `USER_GUIDE.md`, `CHANGELOG.md` → v3.0.1-re frissítve.
+- `VSCode_DEV_GUIDE.md` → teljesen újraírva (Windows + VSCode + WSL + pluginok + git/SSH).
+- `docs/WORKSPACE_LAYOUT.md` → újraírva a HELYES iránnyal (WSL = forrás, Desktop = git-tükör).
+- `desktop/README.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `docs/UI_REDESIGN_PLAN.md`
+  fejlécei aktualizálva.
+
+### Tanulság rögzítve
+- `spawn /bin/bash ENOENT` → VSCode Remote-WSL kapcsolatszakadás; megoldás:
+  mappa újranyitása WSL-ben. Beírva a `DEV_CONTEXT.md`-be.
+
+---
+
 ## 2026-08-16 — Desktop A-fázis: PyInstaller Linux próbalegépítés SIKERES
 
 ### Elkészült

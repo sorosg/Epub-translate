@@ -1,8 +1,8 @@
-# EPUB Fordító Rendszer v3.0
+# EPUB Fordító Rendszer v3.0.1
 
 EPUB könyvek **angolról magyarra** fordítása, öntanuló módon.
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue)
+![Version](https://img.shields.io/badge/version-3.0.1-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-brightgreen)
 
 ---
@@ -68,6 +68,7 @@ bash install.sh
 - `CHANGELOG.md` — verziótörténet
 - `docs/DEVELOPMENT_LOG.md` — fejlesztői napló
 - `ROADMAP.md` — fejlesztési terv
+- `VSCode_DEV_GUIDE.md` — fejlesztői környezet beállítása (Windows + VSCode + WSL)
 
 ## Fejlesztés
 
@@ -103,6 +104,7 @@ bash install.sh
 - **Frontend:** React 18 + Vite + TypeScript + Tailwind (`frontend/` / `src/frontend/`)
 - **Desktop:** Electron + PyInstaller + SQLite (`desktop/`)
 - Részletek és konvenciók: `DEV_CONTEXT.md`.
+- Fejlesztői környezet (VSCode + WSL + pluginok): `VSCode_DEV_GUIDE.md`.
 
 ---
 
